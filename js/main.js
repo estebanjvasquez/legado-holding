@@ -31,8 +31,10 @@
 const CHAT_WEBHOOK_URL = "https://TU-N8N-WEBHOOK-URL/webhook/chat"; // ← CAMBIAR
 
 /* Stripe configuration */
-const STRIPE_PUBLISHABLE_KEY = "pk_test_51JB2MWIOEbttUcdVHyahKFZ6Np2BSQivPzopyjhftPVyqPt1U0s1JklUIVGZeWiydvCB3DLxC9tcBMCuefM4wAVy00RwEMEs8Z";
-const WIZARD_WEBHOOK_URL = "https://vmi2945958.contaboserver.net/webhook/legado-wizard";
+const STRIPE_PUBLISHABLE_KEY =
+  "pk_test_51JB2MWIOEbttUcdVHyahKFZ6Np2BSQivPzopyjhftPVyqPt1U0s1JklUIVGZeWiydvCB3DLxC9tcBMCuefM4wAVy00RwEMEs8Z";
+const WIZARD_WEBHOOK_URL =
+  "https://vmi2945958.contaboserver.net/webhook/legado-wizard";
 
 /* =============================================================================
    i18n / LANG — Diccionario bilingüe ES / EN
@@ -295,10 +297,18 @@ const LANG = {
     "Select your payment method",
   ],
   wiz_monthly_title: ["Suscripción mensual", "Monthly subscription"],
+  wiz_select_billing: ["Selecciona tu modalidad de pago", "Select your billing mode"],
+  wiz_payment_method: ["Selecciona tu método de pago", "Select your payment method"],
+  wiz_method_card: ["Tarjeta de crédito/débito", "Credit/Debit card"],
+  wiz_method_zelle: ["Zelle", "Zelle"],
+  wiz_method_card_info: ["Serás redirigido a Stripe para completar el pago seguro", "You will be redirected to Stripe to complete secure payment"],
+  wiz_method_bank: ["Transferencia bancaria", "Bank transfer"],
   wiz_monthly_sub: ["Tarjeta de crédito", "Credit card"],
   wiz_annual_title: ["Pago anual", "Annual payment"],
   wiz_annual_sub: ["¡Ahorra 2 meses!", "Save 2 months!"],
   wiz_summary_title: ["Resumen de compra", "Purchase summary"],
+  wiz_sum_billing: ["Modalidad", "Billing mode"],
+  wiz_sum_method: ["Método de pago", "Payment method"],
   wiz_sum_plan: ["Plan", "Plan"],
   wiz_sum_payment: ["Pago", "Payment"],
   wiz_sum_buyer: ["Comprador", "Buyer"],
@@ -513,6 +523,7 @@ let wizardOpen = false;
 let wizardStep = 0;
 let wizardSelectedPlan = null;
 let wizardPaymentType = "monthly";
+let wizardPaymentMethod = "card"; // "card" | "zelle" | "bank"
 let wizardAcceptedTerms = false;
 let wizardBuyer = {
   name: "",
@@ -952,6 +963,7 @@ function openWizard(planId) {
   wizardStep = 0;
   wizardSelectedPlan = planId;
   wizardPaymentType = "monthly";
+  wizardPaymentMethod = "card";
   wizardAcceptedTerms = false;
   wizardBuyer = {
     name: "",
@@ -1140,8 +1152,19 @@ function renderStep2() {
       : "Charge to credit card";
   const annualSub =
     currentLang === "es" ? "¡Oferta de lanzamiento!" : "Launch offer!";
+
+  // Get method display name
+  const getMethodName = (method) => {
+    switch(method) {
+      case "card": return t("wiz_method_card");
+      case "zelle": return t("wiz_method_zelle");
+      case "bank": return t("wiz_method_bank");
+      default: return method;
+    }
+  };
+
   return `
-    <p style="color:var(--muted-foreground);font-size:0.875rem;margin-bottom:1rem">${t("wiz_select_payment")}</p>
+    <p style="color:var(--muted-foreground);font-size:0.875rem;margin-bottom:0.5rem">${t("wiz_select_billing")}</p>
     <button class="payment-option${wizardPaymentType === "monthly" ? " selected" : ""}" data-type="monthly">
       <div>
         <p class="payment-option-title">${t("wiz_monthly_title")}</p>
@@ -1154,8 +1177,24 @@ function renderStep2() {
         <p class="payment-option-title">${t("wiz_annual_title")}</p>
         <p class="payment-option-sub highlight">${annualSub}</p>
       </div>
-      <div class="payment-option-price">${isSelecto ? plan.initial + " + " : ""}${plan.annual}<span>${t("plan_yr")}</span></div>
-    </button>`;
+      <div class="payment-option-price">${isSelecto ? plan.initial + " + " : ""}${plan.annual}<span>${t("wiz_yr")}</span></div>
+    </button>
+    <p style="color:var(--muted-foreground);font-size:0.875rem;margin:1.5rem 0 0.5rem">${t("wiz_payment_method")}</p>
+    <div class="payment-methods">
+      <button class="payment-method${wizardPaymentMethod === "card" ? " selected" : ""}" data-method="card">
+        <span class="method-icon">💳</span>
+        <span class="method-name">${t("wiz_method_card")}</span>
+      </button>
+      <button class="payment-method${wizardPaymentMethod === "zelle" ? " selected" : ""}" data-method="zelle">
+        <span class="method-icon">📱</span>
+        <span class="method-name">${t("wiz_method_zelle")}</span>
+      </button>
+      <button class="payment-method${wizardPaymentMethod === "bank" ? " selected" : ""}" data-method="bank">
+        <span class="method-icon">🏦</span>
+        <span class="method-name">${t("wiz_method_bank")}</span>
+      </button>
+    </div>
+    ${wizardPaymentMethod ? `<p class="method-info">${wizardPaymentMethod === "card" ? t("wiz_method_card_info") : ""}</p>` : ""}`;
 }
 
 function renderStep3() {
@@ -1168,12 +1207,30 @@ function renderStep3() {
       ? prefix + plan.monthly + t("plan_mo")
       : prefix +
         plan.annual +
-        t("plan_yr") +
+        t("wiz_yr") +
         (currentLang === "es" ? " (oferta lanzamiento)" : " (launch offer)");
+
+  // Get billing mode display
+  const billingMode = wizardPaymentType === "monthly"
+    ? t("wiz_monthly_title")
+    : t("wiz_annual_title");
+
+  // Get payment method display
+  const getMethodDisplay = () => {
+    switch(wizardPaymentMethod) {
+      case "card": return t("wiz_method_card");
+      case "zelle": return t("wiz_method_zelle");
+      case "bank": return t("wiz_method_bank");
+      default: return wizardPaymentMethod || "-";
+    }
+  };
+
   return `
     <div class="summary-box">
       <h4>${t("wiz_summary_title")}</h4>
       <div class="summary-row"><span class="label">${t("wiz_sum_plan")}</span><span class="value">${planName}</span></div>
+      <div class="summary-row"><span class="label">${t("wiz_sum_billing")}</span><span class="value">${billingMode}</span></div>
+      <div class="summary-row"><span class="label">${t("wiz_sum_method")}</span><span class="value">${getMethodDisplay()}</span></div>
       <div class="summary-row"><span class="label">${t("wiz_sum_payment")}</span><span class="value highlight">${priceDisplay}</span></div>
       <div class="summary-row"><span class="label">${t("wiz_sum_buyer")}</span><span class="value">${escapeHTML(wizardBuyer.name)} ${escapeHTML(wizardBuyer.lastName)}</span></div>
       <div class="summary-row"><span class="label">${t("wiz_sum_members")}</span><span class="value">${wizardFamily.length}</span></div>
@@ -1191,7 +1248,6 @@ function renderStep3() {
       </label>
     </div>`;
 }
-
 function validateAge(dateStr, maxAge) {
   if (!dateStr) return true;
   const birth = new Date(dateStr);
@@ -1253,11 +1309,22 @@ function bindWizardStepEvents() {
     });
   }
   if (wizardStep === 2) {
+    // Billing mode (monthly/annual) selection
     $$(".payment-option").forEach((btn) => {
       btn.addEventListener("click", () => {
         wizardPaymentType = btn.dataset.type;
         $$(".payment-option").forEach((b) => b.classList.remove("selected"));
         btn.classList.add("selected");
+        updateWizardFooter();
+      });
+    });
+    // Payment method (card/zelle/bank) selection
+    $$(".payment-method").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        wizardPaymentMethod = btn.dataset.method;
+        $$(".payment-method").forEach((b) => b.classList.remove("selected"));
+        btn.classList.add("selected");
+        renderWizardStep(); // Re-render to show info message
         updateWizardFooter();
       });
     });
@@ -1289,7 +1356,7 @@ function canWizardNext() {
     );
   }
   if (wizardStep === 1) return true;
-  if (wizardStep === 2) return !!wizardSelectedPlan && !!wizardPaymentType;
+  if (wizardStep === 2) return !!(wizardSelectedPlan && wizardPaymentType && wizardPaymentMethod);
   if (wizardStep === 3) return wizardAcceptedTerms;
   return true;
 }
@@ -1332,6 +1399,7 @@ INCLUSION DEL WEBHOOK AL FLUJO
    ══════════════════════════════════════════════════════════════════════════ */
 async function submitWizard() {
   const payload = {
+    paymentMethod: wizardPaymentMethod,
     plan: wizardSelectedPlan,
     paymentType: wizardPaymentType,
     buyer: wizardBuyer,
