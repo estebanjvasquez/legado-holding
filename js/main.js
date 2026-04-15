@@ -30,6 +30,10 @@
    ============================================================================= */
 const CHAT_WEBHOOK_URL = "https://TU-N8N-WEBHOOK-URL/webhook/chat"; // ← CAMBIAR
 
+/* Stripe configuration */
+const STRIPE_PUBLISHABLE_KEY = "pk_test_51JB2MWIOEbttUcdVHyahKFZ6Np2BSQivPzopyjhftPVyqPt1U0s1JklUIVGZeWiydvCB3DLxC9tcBMCuefM4wAVy00RwEMEs8Z";
+const WIZARD_WEBHOOK_URL = "https://vmi2945958.contaboserver.net/webhook/legado-wizard";
+
 /* =============================================================================
    i18n / LANG — Diccionario bilingüe ES / EN
    ─────────────────────────────────────────────────────────────────────────────

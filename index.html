@@ -1,95 +1,172 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <!-- ═══ SEO — edita title y description para buscadores ═══ -->
-  <title>LEGADO — Previsión Funeraria para Venezolanos en USA</title>
-  <meta name="description" content="Protege a tu familia en Venezuela desde Estados Unidos. Previsión funeraria 100% digital, sin costos ocultos, en español. Respaldado por Funeraria del Zulia." />
-  <meta name="keywords" content="previsión funeraria Venezuela, seguro funeral Venezuela, venezolanos USA, legado holding, funeraria del Zulia" />
+        <!-- ═══ SEO — edita title y description para buscadores ═══ -->
+        <title>LEGADO — Previsión Funeraria para Venezolanos en USA</title>
+        <meta
+            name="description"
+            content="Protege a tu familia en Venezuela desde Estados Unidos. Previsión funeraria 100% digital, sin costos ocultos, en español. Respaldado por Funeraria del Zulia."
+        />
+        <meta
+            name="keywords"
+            content="previsión funeraria Venezuela, seguro funeral Venezuela, venezolanos USA, legado holding, funeraria del Zulia"
+        />
 
-  <!-- Open Graph (redes sociales) -->
-  <meta property="og:title"       content="LEGADO — Previsión Funeraria para tu Familia en Venezuela" />
-  <meta property="og:description" content="Aunque estés lejos, puedes proteger a quienes más amas. 100% digital, en español." />
-  <meta property="og:type"        content="website" />
-  <meta property="og:image"       content="images/hero-family.jpg" />
+        <!-- Open Graph (redes sociales) -->
+        <meta
+            property="og:title"
+            content="LEGADO — Previsión Funeraria para tu Familia en Venezuela"
+        />
+        <meta
+            property="og:description"
+            content="Aunque estés lejos, puedes proteger a quienes más amas. 100% digital, en español."
+        />
+        <meta property="og:type" content="website" />
+        <meta property="og:image" content="images/hero-family.jpg" />
 
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="images/LogoLegado.png" />
+        <!-- Favicon -->
+        <link rel="icon" type="image/png" href="images/LogoLegado.png" />
 
-  <!-- ═══ CSS (un solo archivo) ═══ -->
-  <link rel="stylesheet" href="css/main.css" />
-</head>
-<body>
-
-
-<!-- ════════════════════════════════════════════════════════════
+        <!-- ═══ CSS (un solo archivo) ═══ -->
+        <link rel="stylesheet" href="css/main.css" />
+    </head>
+    <body>
+        <!-- ════════════════════════════════════════════════════════════
      NAVEGACIÓN FIJA
      ────────────────────────────────────────────────────────────
      • Logo: cambia el texto "LEGADO" por <img> si prefieres
      • Links del menú: edita href y data-i18n abajo
      • Colores: edita css/main.css sección "5. NAVEGACIÓN"
      ════════════════════════════════════════════════════════════ -->
-<nav id="main-nav">
-  <div class="container">
-    <div class="nav-inner">
+        <nav id="main-nav">
+            <div class="container">
+                <div class="nav-inner">
+                    <!-- LOGO: cambia el texto o reemplaza por <img src="images/LogoLegado.png"> -->
+                    <a href="#inicio" class="nav-logo">LEGADO</a>
 
-      <!-- LOGO: cambia el texto o reemplaza por <img src="images/LogoLegado.png"> -->
-      <a href="#inicio" class="nav-logo">LEGADO</a>
+                    <!-- Links desktop -->
+                    <div class="nav-links">
+                        <a href="#inicio" data-i18n="nav_inicio">Inicio</a>
+                        <a href="#planes" data-i18n="nav_planes">Planes</a>
+                        <a href="#como-funciona" data-i18n="nav_como"
+                            >Cómo funciona</a
+                        >
+                        <a href="#contacto" data-i18n="nav_contacto"
+                            >Contacto</a
+                        >
 
-      <!-- Links desktop -->
-      <div class="nav-links">
-        <a href="#inicio"        data-i18n="nav_inicio">Inicio</a>
-        <a href="#planes"        data-i18n="nav_planes">Planes</a>
-        <a href="#como-funciona" data-i18n="nav_como">Cómo funciona</a>
-        <a href="#contacto"      data-i18n="nav_contacto">Contacto</a>
+                        <!-- Botón idioma ES/EN (JS lo gestiona) -->
+                        <button class="nav-lang-btn" data-toggle-lang>
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <circle cx="12" cy="12" r="10" />
+                                <line x1="2" y1="12" x2="22" y2="12" />
+                                <path
+                                    d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"
+                                />
+                            </svg>
+                            <span data-i18n-lang>EN</span>
+                        </button>
 
-        <!-- Botón idioma ES/EN (JS lo gestiona) -->
-        <button class="nav-lang-btn" data-toggle-lang>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
-            <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
-          </svg>
-          <span data-i18n-lang>EN</span>
-        </button>
+                        <!-- CTA del nav (abre el wizard) -->
+                        <button class="btn-nav-cta" data-open-wizard>
+                            <span data-i18n="nav_cta">PROTEGE TU LEGADO</span>
+                        </button>
+                    </div>
 
-        <!-- CTA del nav (abre el wizard) -->
-        <button class="btn-nav-cta" data-open-wizard>
-          <span data-i18n="nav_cta">PROTEGE TU LEGADO</span>
-        </button>
-      </div>
+                    <!-- Hamburguesa móvil -->
+                    <button
+                        id="nav-mobile-toggle"
+                        class="nav-mobile-toggle"
+                        aria-label="Menu"
+                    >
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <path d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
+                </div>
 
-      <!-- Hamburguesa móvil -->
-      <button id="nav-mobile-toggle" class="nav-mobile-toggle" aria-label="Menu">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 6h16M4 12h16M4 18h16"/>
-        </svg>
-      </button>
-    </div>
+                <!-- Menú desplegable móvil -->
+                <div id="nav-mobile-menu" class="nav-mobile-menu">
+                    <a
+                        href="#inicio"
+                        class="mobile-nav-link"
+                        data-i18n="nav_inicio"
+                        >Inicio</a
+                    >
+                    <a
+                        href="#planes"
+                        class="mobile-nav-link"
+                        data-i18n="nav_planes"
+                        >Planes</a
+                    >
+                    <a
+                        href="#como-funciona"
+                        class="mobile-nav-link"
+                        data-i18n="nav_como"
+                        >Cómo funciona</a
+                    >
+                    <a
+                        href="#contacto"
+                        class="mobile-nav-link"
+                        data-i18n="nav_contacto"
+                        >Contacto</a
+                    >
+                    <button
+                        class="nav-lang-btn"
+                        data-toggle-lang
+                        style="margin-bottom: 0.25rem"
+                    >
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            width="15"
+                            height="15"
+                        >
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="2" y1="12" x2="22" y2="12" />
+                            <path
+                                d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"
+                            />
+                        </svg>
+                        <span data-i18n-lang>English</span>
+                    </button>
+                    <button
+                        class="btn-gold btn-nav-cta"
+                        data-open-wizard
+                        style="
+                            text-align: center;
+                            justify-content: center;
+                            padding: 0.75rem 1.25rem;
+                        "
+                    >
+                        <span data-i18n="nav_cta">PROTEGE TU LEGADO</span>
+                    </button>
+                </div>
+            </div>
+        </nav>
 
-    <!-- Menú desplegable móvil -->
-    <div id="nav-mobile-menu" class="nav-mobile-menu">
-      <a href="#inicio"        class="mobile-nav-link" data-i18n="nav_inicio">Inicio</a>
-      <a href="#planes"        class="mobile-nav-link" data-i18n="nav_planes">Planes</a>
-      <a href="#como-funciona" class="mobile-nav-link" data-i18n="nav_como">Cómo funciona</a>
-      <a href="#contacto"      class="mobile-nav-link" data-i18n="nav_contacto">Contacto</a>
-      <button class="nav-lang-btn" data-toggle-lang style="margin-bottom:.25rem">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
-          <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
-          <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
-        </svg>
-        <span data-i18n-lang>English</span>
-      </button>
-      <button class="btn-gold btn-nav-cta" data-open-wizard style="text-align:center;justify-content:center;padding:.75rem 1.25rem">
-        <span data-i18n="nav_cta">PROTEGE TU LEGADO</span>
-      </button>
-    </div>
-  </div>
-</nav>
-
-
-<!-- ════════════════════════════════════════════════════════════
+        <!-- ════════════════════════════════════════════════════════════
      HERO — con foto de los abuelos como fondo
      ────────────────────────────────────────────────────────────
      IMAGEN DE FONDO: images/hero-family.jpg
@@ -107,116 +184,175 @@
 
      Para cambiar textos: js/main.js → sección i18n, claves hero_*
      ════════════════════════════════════════════════════════════ -->
-<section id="inicio">
+        <section id="inicio">
+            <!-- Foto de los abuelos (semitransparente sobre el fondo navy) -->
+            <img
+                class="hero-photo"
+                src="images/hero-family.jpg"
+                alt="Abuelos venezolanos en un jardín al atardecer, protegidos por LEGADO"
+                loading="eager"
+                fetchpriority="high"
+                width="1920"
+                height="1080"
+            />
 
-  <!-- Foto de los abuelos (semitransparente sobre el fondo navy) -->
-  <img
-    class="hero-photo"
-    src="images/hero-family.jpg"
-    alt="Abuelos venezolanos en un jardín al atardecer, protegidos por LEGADO"
-    loading="eager"
-    fetchpriority="high"
-    width="1920" height="1080"
-  />
+            <!-- Overlay gradiente navy para contraste del texto -->
+            <div class="hero-overlay" aria-hidden="true"></div>
 
-  <!-- Overlay gradiente navy para contraste del texto -->
-  <div class="hero-overlay" aria-hidden="true"></div>
+            <div class="container">
+                <div class="hero-inner">
+                    <!-- Eyebrow (texto pequeño encima del título) -->
+                    <p class="hero-eyebrow" data-i18n="hero_eyebrow">
+                        Previsión funeraria para venezolanos en USA
+                    </p>
 
-  <div class="container">
-    <div class="hero-inner">
+                    <!-- Título H1 (gradiente dorado en la segunda línea) -->
+                    <h1 class="hero-title">
+                        <span data-i18n="hero_title1"
+                            >Sabemos lo que significa</span
+                        ><br />
+                        <span class="text-gradient-gold" data-i18n="hero_title2"
+                            >no poder estar presente</span
+                        >
+                    </h1>
 
-      <!-- Eyebrow (texto pequeño encima del título) -->
-      <p class="hero-eyebrow" data-i18n="hero_eyebrow">
-        Previsión funeraria para venezolanos en USA
-      </p>
+                    <!-- Subtítulo -->
+                    <p class="hero-subtitle" data-i18n="hero_sub1">
+                        Si eres venezolano y dejaste familia en tu país, este
+                        espacio es para ti. Contrata hoy tu plan de previsión
+                        funeraria directamente, sin intermediarios, sin tasas
+                        confusas.
+                    </p>
 
-      <!-- Título H1 (gradiente dorado en la segunda línea) -->
-      <h1 class="hero-title">
-        <span data-i18n="hero_title1">Sabemos lo que significa</span><br>
-        <span class="text-gradient-gold" data-i18n="hero_title2">no poder estar presente</span>
-      </h1>
+                    <!-- Tagline en cursiva -->
+                    <p class="hero-tagline" data-i18n="hero_tagline">
+                        "Uniendo familias, honrando vidas, preservando memorias"
+                    </p>
 
-      <!-- Subtítulo -->
-      <p class="hero-subtitle" data-i18n="hero_sub1">
-        Si eres venezolano y dejaste familia en tu país, este espacio es para ti. Contrata hoy tu plan de previsión funeraria directamente, sin intermediarios, sin tasas confusas.
-      </p>
+                    <!-- Botón CTA principal -->
+                    <div class="hero-cta-wrap">
+                        <button class="btn-gold hero-cta" data-open-wizard>
+                            <span data-i18n="hero_cta"
+                                >PROTEGE TU LEGADO AQUÍ</span
+                            >
+                            <svg
+                                width="20"
+                                height="20"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2.5"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <line x1="5" y1="12" x2="19" y2="12" />
+                                <polyline points="12 5 19 12 12 19" />
+                            </svg>
+                        </button>
+                    </div>
 
-      <!-- Tagline en cursiva -->
-      <p class="hero-tagline" data-i18n="hero_tagline">
-        "Uniendo familias, honrando vidas, preservando memorias"
-      </p>
+                    <!-- Trust badges -->
+                    <div class="hero-badges">
+                        <span class="hero-badge">
+                            <span class="hero-badge-dot"></span>
+                            <span data-i18n="badge1">Sin intermediarios</span>
+                        </span>
+                        <span class="hero-badge">
+                            <span class="hero-badge-dot"></span>
+                            <span data-i18n="badge2"
+                                >Pago en USA con tarjeta</span
+                            >
+                        </span>
+                        <span class="hero-badge">
+                            <span class="hero-badge-dot"></span>
+                            <span data-i18n="badge3"
+                                >Sin variaciones de precio</span
+                            >
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </section>
 
-      <!-- Botón CTA principal -->
-      <div class="hero-cta-wrap">
-        <button class="btn-gold hero-cta" data-open-wizard>
-          <span data-i18n="hero_cta">PROTEGE TU LEGADO AQUÍ</span>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
-          </svg>
-        </button>
-      </div>
-
-      <!-- Trust badges -->
-      <div class="hero-badges">
-        <span class="hero-badge">
-          <span class="hero-badge-dot"></span>
-          <span data-i18n="badge1">Sin intermediarios</span>
-        </span>
-        <span class="hero-badge">
-          <span class="hero-badge-dot"></span>
-          <span data-i18n="badge2">Pago en USA con tarjeta</span>
-        </span>
-        <span class="hero-badge">
-          <span class="hero-badge-dot"></span>
-          <span data-i18n="badge3">Sin variaciones de precio</span>
-        </span>
-      </div>
-
-    </div>
-  </div>
-</section>
-
-
-<!-- ════════════════════════════════════════════════════════════
+        <!-- ════════════════════════════════════════════════════════════
      TRUST BAR — barra de íconos de credibilidad
      ────────────────────────────────────────────────────────────
      Tomada de la versión raíz. 4 ítems de confianza.
      Para cambiar textos: edita los spans con data-i18n="trust*"
      Para cambiar íconos: reemplaza los SVG inline abajo
      ════════════════════════════════════════════════════════════ -->
-<div class="trust-bar">
-  <div class="container">
-    <div class="trust-bar-inner">
-      <span class="trust-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
-        </svg>
-        <span data-i18n="trust1">Grupo de empresas con 80+ años en Venezuela</span>
-      </span>
-      <span class="trust-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
-        </svg>
-        <span data-i18n="trust2">Contratación directa, sin intermediarios</span>
-      </span>
-      <span class="trust-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
-        </svg>
-        <span data-i18n="trust3">Pago en USA con tarjeta de crédito</span>
-      </span>
-      <span class="trust-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
-        </svg>
-        <span data-i18n="trust4">Precio fijo, sin variaciones</span>
-      </span>
-    </div>
-  </div>
-</div>
+        <div class="trust-bar">
+            <div class="container">
+                <div class="trust-bar-inner">
+                    <span class="trust-item">
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+                            <polyline points="22 4 12 14.01 9 11.01" />
+                        </svg>
+                        <span data-i18n="trust1"
+                            >Grupo de empresas con 80+ años en Venezuela</span
+                        >
+                    </span>
+                    <span class="trust-item">
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+                            <polyline points="22 4 12 14.01 9 11.01" />
+                        </svg>
+                        <span data-i18n="trust2"
+                            >Contratación directa, sin intermediarios</span
+                        >
+                    </span>
+                    <span class="trust-item">
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+                            <polyline points="22 4 12 14.01 9 11.01" />
+                        </svg>
+                        <span data-i18n="trust3"
+                            >Pago en USA con tarjeta de crédito</span
+                        >
+                    </span>
+                    <span class="trust-item">
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+                            <polyline points="22 4 12 14.01 9 11.01" />
+                        </svg>
+                        <span data-i18n="trust4"
+                            >Precio fijo, sin variaciones</span
+                        >
+                    </span>
+                </div>
+            </div>
+        </div>
 
-
-<!-- ════════════════════════════════════════════════════════════
+        <!-- ════════════════════════════════════════════════════════════
      SECCIÓN "PROTEGE A TU FAMILIA EN VENEZUELA"
      ────────────────────────────────────────────────────────────
      TOMADA DE LA VERSIÓN RAÍZ e integrada al diseño V3.
@@ -233,239 +369,346 @@
      Para cambiar textos: js/main.js → sección i18n, claves protege_*
      Para cambiar el fondo: css/main.css → #protege { background: ... }
      ════════════════════════════════════════════════════════════ -->
-<section id="protege">
-  <div class="container">
-    <div class="protege-grid">
+        <section id="protege">
+            <div class="container">
+                <div class="protege-grid">
+                    <!-- Columna izquierda: texto -->
+                    <div class="protege-text reveal">
+                        <h2 data-i18n="protege_h2">
+                            Protege a tu familia en Venezuela aunque estés lejos
+                        </h2>
+                        <p data-i18n="protege_p1">
+                            Sabemos lo que significa no poder estar presente en
+                            los momentos más difíciles para la familia que
+                            dejaste en Venezuela: DUELE DOBLE, porque duele la
+                            pérdida y duele la distancia.
+                        </p>
+                        <p data-i18n="protege_p2">
+                            Legado Holding es un grupo de empresas con
+                            trayectoria comprobada en servicios funerarios en
+                            Venezuela, más de 80 años de experiencia, que nace
+                            para atender a la comunidad venezolana en Estados
+                            Unidos.
+                        </p>
+                        <p data-i18n="protege_p3">
+                            Nos ocupamos de la atención personalizada a
+                            familiares que quedaron en nuestro territorio
+                            nacional. Contrata desde tu teléfono móvil,
+                            directamente, con la tranquilidad que tú necesitas.
+                        </p>
+                        <!-- Enlace "Ver nuestros planes" -->
+                        <a href="#planes" class="protege-link">
+                            <span data-i18n="protege_link"
+                                >Ver nuestros planes</span
+                            >
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <line x1="5" y1="12" x2="19" y2="12" />
+                                <polyline points="12 5 19 12 12 19" />
+                            </svg>
+                        </a>
+                    </div>
 
-      <!-- Columna izquierda: texto -->
-      <div class="protege-text reveal">
-        <h2 data-i18n="protege_h2">
-          Protege a tu familia en Venezuela aunque estés lejos
-        </h2>
-        <p data-i18n="protege_p1">
-          Sabemos lo que significa no poder estar presente en los momentos más difíciles para la familia que dejaste en Venezuela: DUELE DOBLE, porque duele la pérdida y duele la distancia.
-        </p>
-        <p data-i18n="protege_p2">
-          Legado Holding es un grupo de empresas con trayectoria comprobada en servicios funerarios en Venezuela, más de 80 años de experiencia, que nace para atender a la comunidad venezolana en Estados Unidos.
-        </p>
-        <p data-i18n="protege_p3">
-          Nos ocupamos de la atención personalizada a familiares que quedaron en nuestro territorio nacional. Contrata desde tu teléfono móvil, directamente, con la tranquilidad que tú necesitas.
-        </p>
-        <!-- Enlace "Ver nuestros planes" -->
-        <a href="#planes" class="protege-link">
-          <span data-i18n="protege_link">Ver nuestros planes</span>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
-          </svg>
-        </a>
-      </div>
+                    <!-- Columna derecha: imagen + badge dorado -->
+                    <div class="protege-image-col reveal reveal-delay-2">
+                        <!-- IMAGEN DE MANOS — para cambiar: reemplaza images/hands-connection.jpg -->
+                        <img
+                            class="protege-img"
+                            src="images/hands-connection.jpg"
+                            alt="Manos unidas representando la protección familiar entre Venezuela y EE. UU."
+                            loading="lazy"
+                            width="800"
+                            height="544"
+                        />
 
-      <!-- Columna derecha: imagen + badge dorado -->
-      <div class="protege-image-col reveal reveal-delay-2">
+                        <!-- BADGE DORADO superpuesto (versión raíz: -bottom-6 -left-6) -->
+                        <!-- Para cambiar el número o el texto: edita el HTML abajo -->
+                        <div class="protege-badge">
+                            <span class="protege-badge-number">80+</span>
+                            <span class="protege-badge-text"
+                                >años protegiendo familias venezolanas</span
+                            >
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
 
-        <!-- IMAGEN DE MANOS — para cambiar: reemplaza images/hands-connection.jpg -->
-        <img
-          class="protege-img"
-          src="images/hands-connection.jpg"
-          alt="Manos unidas representando la protección familiar entre Venezuela y EE. UU."
-          loading="lazy"
-          width="800" height="544"
-        />
-
-        <!-- BADGE DORADO superpuesto (versión raíz: -bottom-6 -left-6) -->
-        <!-- Para cambiar el número o el texto: edita el HTML abajo -->
-        <div class="protege-badge">
-          <span class="protege-badge-number">80+</span>
-          <span class="protege-badge-text">años protegiendo familias venezolanas</span>
-        </div>
-
-      </div>
-
-    </div>
-  </div>
-</section>
-
-
-<!-- ════════════════════════════════════════════════════════════
+        <!-- ════════════════════════════════════════════════════════════
      PLANES — renderizados dinámicamente por JS
      ────────────────────────────────────────────────────────────
      Para cambiar precios:  js/main.js → objeto PLANS
      Para cambiar features: js/main.js → PLAN_FEATURES
      Para agregar planes:   js/main.js → PLAN_GROUPS + PLANS + LANG
      ════════════════════════════════════════════════════════════ -->
-<section id="planes">
-  <div class="container">
-    <div class="section-header reveal">
-      <h2 class="section-title">
-        <span data-i18n="plans_title1">Con LEGADO, la tranquilidad en los momentos</span>
-        <span class="text-gradient-gold" data-i18n="plans_title2"> más difíciles toma otra dimensión</span>
-      </h2>
-      <p class="section-subtitle" data-i18n="plans_sub">
-        Total, confiable y al alcance de todos. Titular y hasta 6 familiares, edad máxima 65 años.
-      </p>
-    </div>
-    <!-- JS renderiza las tarjetas de planes aquí -->
-    <div id="plans-container"></div>
-  </div>
-</section>
+        <section id="planes">
+            <div class="container">
+                <div class="section-header reveal">
+                    <h2 class="section-title">
+                        <span data-i18n="plans_title1"
+                            >Con LEGADO, la tranquilidad en los momentos</span
+                        >
+                        <span
+                            class="text-gradient-gold"
+                            data-i18n="plans_title2"
+                        >
+                            más difíciles toma otra dimensión</span
+                        >
+                    </h2>
+                    <p class="section-subtitle" data-i18n="plans_sub">
+                        Total, confiable y al alcance de todos. Titular y hasta
+                        6 familiares, edad máxima 65 años.
+                    </p>
+                </div>
+                <!-- JS renderiza las tarjetas de planes aquí -->
+                <div id="plans-container"></div>
+            </div>
+        </section>
 
-
-<!-- ════════════════════════════════════════════════════════════
+        <!-- ════════════════════════════════════════════════════════════
      CÓMO FUNCIONA — pasos renderizados por JS
      ────────────────────────────────────────────────────────────
      Para cambiar textos de los pasos:
      js/main.js → step1_title, step1_desc, step2_title...
      ════════════════════════════════════════════════════════════ -->
-<section id="como-funciona">
-  <div class="container">
-    <div class="section-header reveal">
-      <h2 class="section-title" data-i18n="how_title">Cómo funciona</h2>
-      <p class="section-subtitle" data-i18n="how_sub">Contratación 100% digital en solo 4 pasos</p>
-    </div>
-    <!-- JS renderiza los pasos aquí -->
-    <div id="steps-container" class="steps-grid"></div>
-    <!-- CTA debajo de los pasos -->
-    <div style="text-align:center;margin-top:3.5rem" class="reveal">
-      <button class="btn-gold" data-open-wizard style="padding:1.1rem 2rem;font-size:1.05rem">
-        <span data-i18n="hero_cta">PROTEGE TU LEGADO AQUÍ</span>
-      </button>
-    </div>
-  </div>
-</section>
+        <section id="como-funciona">
+            <div class="container">
+                <div class="section-header reveal">
+                    <h2 class="section-title" data-i18n="how_title">
+                        Cómo funciona
+                    </h2>
+                    <p class="section-subtitle" data-i18n="how_sub">
+                        Contratación 100% digital en solo 4 pasos
+                    </p>
+                </div>
+                <!-- JS renderiza los pasos aquí -->
+                <div id="steps-container" class="steps-grid"></div>
+                <!-- CTA debajo de los pasos -->
+                <div
+                    style="text-align: center; margin-top: 3.5rem"
+                    class="reveal"
+                >
+                    <button
+                        class="btn-gold"
+                        data-open-wizard
+                        style="padding: 1.1rem 2rem; font-size: 1.05rem"
+                    >
+                        <span data-i18n="hero_cta">PROTEGE TU LEGADO AQUÍ</span>
+                    </button>
+                </div>
+            </div>
+        </section>
 
-
-<!-- ════════════════════════════════════════════════════════════
+        <!-- ════════════════════════════════════════════════════════════
      STORYTELLING — Nuestra historia
      ────────────────────────────────────────────────────────────
      IMAGEN: images/family-together.jpg
      Para cambiar imagen: edita el src del <img> abajo
      Para cambiar textos: js/main.js → claves story_*
      ════════════════════════════════════════════════════════════ -->
-<section id="storytelling">
-  <div class="container">
-    <div class="storytelling-grid">
+        <section id="storytelling">
+            <div class="container">
+                <div class="storytelling-grid">
+                    <!-- Imagen izquierda -->
+                    <div class="storytelling-img-wrap reveal">
+                        <img
+                            src="images/family-together.jpg"
+                            alt="Familia venezolana reunida y protegida"
+                            loading="lazy"
+                            width="800"
+                            height="640"
+                        />
+                    </div>
 
-      <!-- Imagen izquierda -->
-      <div class="storytelling-img-wrap reveal">
-        <img
-          src="images/family-together.jpg"
-          alt="Familia venezolana reunida y protegida"
-          loading="lazy"
-          width="800" height="640"
-        />
-      </div>
+                    <!-- Texto derecha -->
+                    <div class="reveal reveal-delay-2">
+                        <p
+                            class="storytelling-eyebrow"
+                            data-i18n="story_eyebrow"
+                        >
+                            Nuestra historia
+                        </p>
+                        <h2 class="storytelling-title" data-i18n="story_title">
+                            La distancia no debería impedir cuidar a quienes más
+                            amas
+                        </h2>
+                        <p class="storytelling-text" data-i18n="story_p1">
+                            En nuestras empresas, nuestra misión es escuchar
+                            cada planteamiento de los clientes. Cada paso que
+                            damos viene de propuestas de familias que hemos
+                            atendido durante casi 85 años y que hoy viven en
+                            USA, al igual que tú.
+                        </p>
+                        <p class="storytelling-text" data-i18n="story_p2">
+                            Es por eso que hemos creado el GRUPO SELECTO: para
+                            dar respuesta a los cambios en la prestación de
+                            servicios funerarios que nuestros clientes han
+                            pedido. Una innovación exclusiva en toda Venezuela,
+                            disponible primero para nuestros clientes en USA.
+                        </p>
+                        <p class="storytelling-quote" data-i18n="story_quote">
+                            "Uniendo familias, honrando vidas, preservando
+                            memorias"
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
 
-      <!-- Texto derecha -->
-      <div class="reveal reveal-delay-2">
-        <p class="storytelling-eyebrow" data-i18n="story_eyebrow">Nuestra historia</p>
-        <h2 class="storytelling-title" data-i18n="story_title">
-          La distancia no debería impedir cuidar a quienes más amas
-        </h2>
-        <p class="storytelling-text" data-i18n="story_p1">
-          En nuestras empresas, nuestra misión es escuchar cada planteamiento de los clientes. Cada paso que damos viene de propuestas de familias que hemos atendido durante casi 85 años y que hoy viven en USA, al igual que tú.
-        </p>
-        <p class="storytelling-text" data-i18n="story_p2">
-          Es por eso que hemos creado el GRUPO SELECTO: para dar respuesta a los cambios en la prestación de servicios funerarios que nuestros clientes han pedido. Una innovación exclusiva en toda Venezuela, disponible primero para nuestros clientes en USA.
-        </p>
-        <p class="storytelling-quote" data-i18n="story_quote">
-          "Uniendo familias, honrando vidas, preservando memorias"
-        </p>
-      </div>
-
-    </div>
-  </div>
-</section>
-
-
-<!-- ════════════════════════════════════════════════════════════
+        <!-- ════════════════════════════════════════════════════════════
      TESTIMONIOS — renderizados por JS
      ────────────────────────────────────────────────────────────
      Para cambiar testimonios:
      js/main.js → LANG.test1_text / test2_text / test3_text
      y el array tests en renderTestimonials()
      ════════════════════════════════════════════════════════════ -->
-<section id="testimonios" style="background:var(--secondary)">
-  <div class="container">
-    <div class="section-header reveal">
-      <h2 class="section-title">
-        <span data-i18n="test_title1">Familias que ya</span>
-        <span class="text-gradient-gold" data-i18n="test_title2"> protegen su legado</span>
-      </h2>
-    </div>
-    <!-- JS renderiza las tarjetas de testimonio aquí -->
-    <div id="testimonials-container" class="testimonials-grid"></div>
-  </div>
-</section>
+        <section id="testimonios" style="background: var(--secondary)">
+            <div class="container">
+                <div class="section-header reveal">
+                    <h2 class="section-title">
+                        <span data-i18n="test_title1">Familias que ya</span>
+                        <span
+                            class="text-gradient-gold"
+                            data-i18n="test_title2"
+                        >
+                            protegen su legado</span
+                        >
+                    </h2>
+                </div>
+                <!-- JS renderiza las tarjetas de testimonio aquí -->
+                <div
+                    id="testimonials-container"
+                    class="testimonials-grid"
+                ></div>
+            </div>
+        </section>
 
-
-<!-- ════════════════════════════════════════════════════════════
+        <!-- ════════════════════════════════════════════════════════════
      CONTACTO
      ────────────────────────────────────────────────────────────
      Para cambiar teléfono: edita el texto "+1 (800) LEGADO" abajo
      Para cambiar email:    edita el texto "info@legado.com" abajo
      Para cambiar cobertura: edita data-i18n="contact_all_vzla" en js/main.js
      ════════════════════════════════════════════════════════════ -->
-<section id="contacto">
-  <div class="container">
-    <div class="contact-inner">
-      <div class="section-header reveal">
-        <h2 class="section-title">
-          <span data-i18n="contact_title1">¿Tienes preguntas?</span>
-          <span class="text-gradient-gold" data-i18n="contact_title2"> Estamos aquí</span>
-        </h2>
-        <p class="section-subtitle" data-i18n="contact_sub">
-          Nuestro equipo te acompaña en cada paso.
-        </p>
-      </div>
+        <section id="contacto">
+            <div class="container">
+                <div class="contact-inner">
+                    <div class="section-header reveal">
+                        <h2 class="section-title">
+                            <span data-i18n="contact_title1"
+                                >¿Tienes preguntas?</span
+                            >
+                            <span
+                                class="text-gradient-gold"
+                                data-i18n="contact_title2"
+                            >
+                                Estamos aquí</span
+                            >
+                        </h2>
+                        <p class="section-subtitle" data-i18n="contact_sub">
+                            Nuestro equipo te acompaña en cada paso.
+                        </p>
+                    </div>
 
-      <div class="contact-grid">
-        <!-- Teléfono — EDITAR: cambia "+1 (800) LEGADO" -->
-        <div class="contact-item reveal reveal-delay-1">
-          <div class="contact-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.97 1.18 2 2 0 013 1h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L7.09 8.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/>
-            </svg>
-          </div>
-          <p class="contact-label" data-i18n="contact_phone">Teléfono</p>
-          <p class="contact-value">+1 (800) LEGADO</p><!-- ← EDITAR -->
-        </div>
+                    <div class="contact-grid">
+                        <!-- Teléfono — EDITAR: cambia "+1 (800) LEGADO" -->
+                        <div class="contact-item reveal reveal-delay-1">
+                            <div class="contact-icon">
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <path
+                                        d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.97 1.18 2 2 0 013 1h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L7.09 8.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"
+                                    />
+                                </svg>
+                            </div>
+                            <p class="contact-label" data-i18n="contact_phone">
+                                Teléfono
+                            </p>
+                            <p class="contact-value">+1 (800) LEGADO</p>
+                            <!-- ← EDITAR -->
+                        </div>
 
-        <!-- Email — EDITAR: cambia "info@legado.com" -->
-        <div class="contact-item reveal reveal-delay-2">
-          <div class="contact-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-              <polyline points="22,6 12,13 2,6"/>
-            </svg>
-          </div>
-          <p class="contact-label">Email</p>
-          <p class="contact-value">info@legadoholding.com</p>
-        </div>
+                        <!-- Email — EDITAR: cambia "info@legado.com" -->
+                        <div class="contact-item reveal reveal-delay-2">
+                            <div class="contact-icon">
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <path
+                                        d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"
+                                    />
+                                    <polyline points="22,6 12,13 2,6" />
+                                </svg>
+                            </div>
+                            <p class="contact-label">Email</p>
+                            <p class="contact-value">info@legadoholding.com</p>
+                        </div>
 
-        <!-- Cobertura -->
-        <div class="contact-item reveal reveal-delay-3">
-          <div class="contact-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/>
-              <circle cx="12" cy="10" r="3"/>
-            </svg>
-          </div>
-          <p class="contact-label" data-i18n="contact_coverage">Cobertura</p>
-          <p class="contact-value" data-i18n="contact_all_vzla">Toda Venezuela</p>
-        </div>
-      </div>
+                        <!-- Cobertura -->
+                        <div class="contact-item reveal reveal-delay-3">
+                            <div class="contact-icon">
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <path
+                                        d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"
+                                    />
+                                    <circle cx="12" cy="10" r="3" />
+                                </svg>
+                            </div>
+                            <p
+                                class="contact-label"
+                                data-i18n="contact_coverage"
+                            >
+                                Cobertura
+                            </p>
+                            <p
+                                class="contact-value"
+                                data-i18n="contact_all_vzla"
+                            >
+                                Toda Venezuela
+                            </p>
+                        </div>
+                    </div>
 
-      <div class="reveal">
-        <button class="btn-gold" data-open-wizard style="padding:1.1rem 2rem;font-size:1rem">
-          <span data-i18n="hero_cta">PROTEGE TU LEGADO AQUÍ</span>
-        </button>
-      </div>
-    </div>
-  </div>
-</section>
+                    <div class="reveal">
+                        <button
+                            class="btn-gold"
+                            data-open-wizard
+                            style="padding: 1.1rem 2rem; font-size: 1rem"
+                        >
+                            <span data-i18n="hero_cta"
+                                >PROTEGE TU LEGADO AQUÍ</span
+                            >
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
 
-
-<!-- ════════════════════════════════════════════════════════════
+        <!-- ════════════════════════════════════════════════════════════
      CTA FINAL — sección oscura de cierre
      ────────────────────────────────────────────────────────────
      IMAGEN DE FONDO: images/family-together.jpg (15% opacidad)
@@ -473,218 +716,409 @@
      Para cambiar textos: js/main.js → claves cta_*
      Para cambiar teléfono del botón: edita el href del <a> abajo
      ════════════════════════════════════════════════════════════ -->
-<section id="cta-final">
-  <!-- Foto de familia como fondo tenue -->
-  <img
-    class="cta-bg"
-    src="images/family-together.jpg"
-    alt=""
-    aria-hidden="true"
-    loading="lazy"
-  />
-  <div class="container">
-    <div class="cta-inner reveal">
-      <!-- Frase solicitada explícitamente en el documento -->
-      <p class="cta-tagline-phrase">"Uniendo familias, honrando vidas, preservando memorias"</p>
-      <h2 data-i18n="cta_title">
-        Esta innovación es simple: tú decides cómo despedirte
-      </h2>
-      <p data-i18n="cta_sub">
-        Sin cambios en tu cuota mensual. Solo haz click en el plan que más te convenga y realiza el pago de la inicial anual. Titular + 6 familiares hasta 65 años.
-      </p>
-      <div class="cta-buttons">
-        <!-- Botón principal -->
-        <button class="btn-gold" data-open-wizard style="padding:1rem 2.25rem;font-size:1.05rem">
-          <span data-i18n="hero_cta">PROTEGE TU LEGADO AQUÍ</span>
-        </button>
-        <!-- Botón llamada — EDITAR: cambia el href con tu número real -->
-        <a href="tel:+18005342361" class="btn-outline-white">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.97 1.18 2 2 0 013 1h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L7.09 8.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/>
-          </svg>
-          <span data-i18n="cta_call">Llámanos</span>
-        </a>
-      </div>
-    </div>
-  </div>
-</section>
+        <section id="cta-final">
+            <!-- Foto de familia como fondo tenue -->
+            <img
+                class="cta-bg"
+                src="images/family-together.jpg"
+                alt=""
+                aria-hidden="true"
+                loading="lazy"
+            />
+            <div class="container">
+                <div class="cta-inner reveal">
+                    <!-- Frase solicitada explícitamente en el documento -->
+                    <p class="cta-tagline-phrase">
+                        "Uniendo familias, honrando vidas, preservando memorias"
+                    </p>
+                    <h2 data-i18n="cta_title">
+                        Esta innovación es simple: tú decides cómo despedirte
+                    </h2>
+                    <p data-i18n="cta_sub">
+                        Sin cambios en tu cuota mensual. Solo haz click en el
+                        plan que más te convenga y realiza el pago de la inicial
+                        anual. Titular + 6 familiares hasta 65 años.
+                    </p>
+                    <div class="cta-buttons">
+                        <!-- Botón principal -->
+                        <button
+                            class="btn-gold"
+                            data-open-wizard
+                            style="padding: 1rem 2.25rem; font-size: 1.05rem"
+                        >
+                            <span data-i18n="hero_cta"
+                                >PROTEGE TU LEGADO AQUÍ</span
+                            >
+                        </button>
+                        <!-- Botón llamada — EDITAR: cambia el href con tu número real -->
+                        <a href="tel:+18005342361" class="btn-outline-white">
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <path
+                                    d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.97 1.18 2 2 0 013 1h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L7.09 8.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"
+                                />
+                            </svg>
+                            <span data-i18n="cta_call">Llámanos</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
 
-
-<!-- ════════════════════════════════════════════════════════════
+        <!-- ════════════════════════════════════════════════════════════
      FOOTER
      ────────────────────────────────────────────────────────────
      Para cambiar redes sociales: edita los <a> en "Síguenos"
      Para cambiar links legales:  edita los <a> en "Legal"
      Para cambiar textos: js/main.js → claves footer_*
      ════════════════════════════════════════════════════════════ -->
-<footer>
-  <div class="container">
-    <div class="footer-grid">
+        <footer>
+            <div class="container">
+                <div class="footer-grid">
+                    <!-- Columna 1: Marca -->
+                    <div>
+                        <div class="footer-brand-name">LEGADO</div>
+                        <p
+                            class="footer-brand-tagline"
+                            data-i18n="footer_tagline"
+                        >
+                            Uniendo familias, honrando vidas, preservando
+                            memorias.
+                        </p>
+                        <p
+                            class="footer-brand-tagline"
+                            style="margin-top: 0.5rem"
+                        >
+                            Legado Holding — Grupo de empresas con 80+ años de
+                            trayectoria en Venezuela.
+                        </p>
+                    </div>
 
-      <!-- Columna 1: Marca -->
-      <div>
-        <div class="footer-brand-name">LEGADO</div>
-        <p class="footer-brand-tagline" data-i18n="footer_tagline">
-          Uniendo familias, honrando vidas, preservando memorias.
-        </p>
-        <p class="footer-brand-tagline" style="margin-top:0.5rem">
-          Legado Holding — Grupo de empresas con 80+ años de trayectoria en Venezuela.
-        </p>
-      </div>
+                    <!-- Columna 2: Redes sociales — especificadas en el documento -->
+                    <div>
+                        <h4
+                            class="footer-section-title"
+                            data-i18n="footer_follow"
+                        >
+                            Síguenos
+                        </h4>
+                        <div class="footer-links">
+                            <a
+                                href="https://instagram.com/funerariazulia"
+                                target="_blank"
+                                rel="noopener"
+                            >
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <rect
+                                        x="2"
+                                        y="2"
+                                        width="20"
+                                        height="20"
+                                        rx="5"
+                                    />
+                                    <path
+                                        d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z"
+                                    />
+                                    <line
+                                        x1="17.5"
+                                        y1="6.5"
+                                        x2="17.51"
+                                        y2="6.5"
+                                    />
+                                </svg>
+                                @funerariazulia
+                            </a>
+                            <a
+                                href="https://instagram.com/crematoriodelzulia"
+                                target="_blank"
+                                rel="noopener"
+                            >
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <rect
+                                        x="2"
+                                        y="2"
+                                        width="20"
+                                        height="20"
+                                        rx="5"
+                                    />
+                                    <path
+                                        d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z"
+                                    />
+                                    <line
+                                        x1="17.5"
+                                        y1="6.5"
+                                        x2="17.51"
+                                        y2="6.5"
+                                    />
+                                </svg>
+                                @crematoriodelzulia
+                            </a>
+                            <a
+                                href="https://funerariadelzulia.com"
+                                target="_blank"
+                                rel="noopener"
+                            >
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="2" y1="12" x2="22" y2="12" />
+                                    <path
+                                        d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"
+                                    />
+                                </svg>
+                                funerariadelzulia.com
+                            </a>
+                            <a href="mailto:info@legadoholding.com">
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <path
+                                        d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"
+                                    />
+                                    <polyline points="22,6 12,13 2,6" />
+                                </svg>
+                                info@legadoholding.com
+                            </a>
+                        </div>
+                    </div>
 
-      <!-- Columna 2: Redes sociales — especificadas en el documento -->
-      <div>
-        <h4 class="footer-section-title" data-i18n="footer_follow">Síguenos</h4>
-        <div class="footer-links">
-          <a href="https://instagram.com/funerariazulia" target="_blank" rel="noopener">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z"/>
-              <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
-            </svg>
-            @funerariazulia
-          </a>
-          <a href="https://instagram.com/crematoriodelzulia" target="_blank" rel="noopener">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z"/>
-              <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
-            </svg>
-            @crematoriodelzulia
-          </a>
-          <a href="https://funerariadelzulia.com" target="_blank" rel="noopener">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
-              <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
-            </svg>
-            funerariadelzulia.com
-          </a>
-          <a href="mailto:info@legadoholding.com">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-              <polyline points="22,6 12,13 2,6"/>
-            </svg>
-            info@legadoholding.com
-          </a>
-        </div>
-      </div>
+                    <!-- Columna 3: Legal -->
+                    <div>
+                        <h4 class="footer-section-title">Legal</h4>
+                        <div class="footer-links">
+                            <a href="#" data-i18n="footer_terms"
+                                >Términos y condiciones</a
+                            >
+                            <a href="#" data-i18n="footer_privacy"
+                                >Política de privacidad</a
+                            >
+                            <a href="#" data-i18n="footer_support">Soporte</a>
+                        </div>
+                    </div>
+                </div>
 
-      <!-- Columna 3: Legal -->
-      <div>
-        <h4 class="footer-section-title">Legal</h4>
-        <div class="footer-links">
-          <a href="#" data-i18n="footer_terms">Términos y condiciones</a>
-          <a href="#" data-i18n="footer_privacy">Política de privacidad</a>
-          <a href="#" data-i18n="footer_support">Soporte</a>
-        </div>
-      </div>
-    </div>
+                <div class="footer-bottom">
+                    © 2026 Legado.
+                    <span data-i18n="footer_rights"
+                        >Todos los derechos reservados.</span
+                    >
+                </div>
+            </div>
+        </footer>
 
-    <div class="footer-bottom">
-      © 2026 Legado. <span data-i18n="footer_rights">Todos los derechos reservados.</span>
-    </div>
-  </div>
-</footer>
-
-
-<!-- ════════════════════════════════════════════════════════════
+        <!-- ════════════════════════════════════════════════════════════
      BOTÓN EMERGENCIA (flotante, abre chat en modo emergencia)
      Para cambiar color/posición: css/main.css → #emergency-btn
      ════════════════════════════════════════════════════════════ -->
-<button id="emergency-btn" title="Ayuda inmediata">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.97 1.18 2 2 0 013 1h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L7.09 8.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/>
-  </svg>
-  <span class="label" data-i18n="emergency">EMERGENCIA</span>
-</button>
+        <button id="emergency-btn" title="Ayuda inmediata">
+            <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
+                <path
+                    d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.97 1.18 2 2 0 013 1h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L7.09 8.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"
+                />
+            </svg>
+            <span class="label" data-i18n="emergency">EMERGENCIA</span>
+        </button>
 
-
-<!-- ════════════════════════════════════════════════════════════
+        <!-- ════════════════════════════════════════════════════════════
      CHATBOT OVERLAY
      Para cambiar URL del webhook: js/main.js → CHAT_WEBHOOK_URL
      Para cambiar textos del chat: js/main.js → claves chat_*
      ════════════════════════════════════════════════════════════ -->
-<div id="chatbot-overlay" class="hidden">
-  <!-- Header del chat -->
-  <div id="chat-header" class="chat-header normal">
-    <div class="chat-header-left">
-      <span id="chat-header-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
-          <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
-        </svg>
-      </span>
-      <span id="chat-title" class="chat-header-title">Asistente LEGADO</span>
-    </div>
-    <button id="chat-close-btn" class="chat-close-btn">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
-        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-      </svg>
-    </button>
-  </div>
-  <!-- Mensajes -->
-  <div id="chat-messages" class="chat-messages"></div>
-  <!-- Input -->
-  <div class="chat-input-area">
-    <input id="chat-input" class="chat-input" type="text" placeholder="Escribe tu pregunta..." />
-    <button id="chat-send-btn" class="chat-send-btn normal" disabled>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
-        <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
-      </svg>
-    </button>
-  </div>
-</div>
+        <div id="chatbot-overlay" class="hidden">
+            <!-- Header del chat -->
+            <div id="chat-header" class="chat-header normal">
+                <div class="chat-header-left">
+                    <span id="chat-header-icon">
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            width="18"
+                            height="18"
+                        >
+                            <path
+                                d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"
+                            />
+                        </svg>
+                    </span>
+                    <span id="chat-title" class="chat-header-title"
+                        >Asistente LEGADO</span
+                    >
+                </div>
+                <button id="chat-close-btn" class="chat-close-btn">
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        width="18"
+                        height="18"
+                    >
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+            <!-- Mensajes -->
+            <div id="chat-messages" class="chat-messages"></div>
+            <!-- Input -->
+            <div class="chat-input-area">
+                <input
+                    id="chat-input"
+                    class="chat-input"
+                    type="text"
+                    placeholder="Escribe tu pregunta..."
+                />
+                <button
+                    id="chat-send-btn"
+                    class="chat-send-btn normal"
+                    disabled
+                >
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        width="16"
+                        height="16"
+                    >
+                        <line x1="22" y1="2" x2="11" y2="13" />
+                        <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                    </svg>
+                </button>
+            </div>
+        </div>
 
-
-<!-- ════════════════════════════════════════════════════════════
+        <!-- ════════════════════════════════════════════════════════════
      WIZARD MODAL (modal de compra en 4 pasos)
      Para cambiar textos: js/main.js → claves wiz_*
      ════════════════════════════════════════════════════════════ -->
-<div id="wizard-overlay" class="hidden">
-  <div class="wizard-modal">
-    <!-- Header -->
-    <div class="wizard-header">
-      <div>
-        <h3 class="wizard-header-title" data-i18n="wiz_title">Compra tu plan</h3>
-        <p id="wizard-plan-name" class="wizard-header-plan" style="display:none"></p>
-      </div>
-      <button id="wizard-close-btn" class="wizard-close-btn">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
-          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
-    </div>
-    <!-- Indicador de pasos (JS lo llena) -->
-    <div id="wizard-steps" class="wizard-steps"></div>
-    <!-- Contenido del paso actual (JS lo renderiza) -->
-    <div id="wizard-body" class="wizard-body"></div>
-    <!-- Navegación atrás / siguiente -->
-    <div class="wizard-footer">
-      <button id="wizard-back-btn" class="btn-back hidden">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
-          <polyline points="15 18 9 12 15 6"/>
-        </svg>
-        <span data-i18n="wiz_back">Atrás</span>
-      </button>
-      <button id="wizard-next-btn" class="btn-next" disabled>
-        <span data-i18n="wiz_next">Siguiente</span>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
-          <polyline points="9 18 15 12 9 6"/>
-        </svg>
-      </button>
-    </div>
-  </div>
-</div>
+        <div id="wizard-overlay" class="hidden">
+            <div class="wizard-modal">
+                <!-- Header -->
+                <div class="wizard-header">
+                    <div>
+                        <h3 class="wizard-header-title" data-i18n="wiz_title">
+                            Compra tu plan
+                        </h3>
+                        <p
+                            id="wizard-plan-name"
+                            class="wizard-header-plan"
+                            style="display: none"
+                        ></p>
+                    </div>
+                    <button id="wizard-close-btn" class="wizard-close-btn">
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            width="20"
+                            height="20"
+                        >
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                    </button>
+                </div>
+                <!-- Indicador de pasos (JS lo llena) -->
+                <div id="wizard-steps" class="wizard-steps"></div>
+                <!-- Contenido del paso actual (JS lo renderiza) -->
+                <div id="wizard-body" class="wizard-body"></div>
+                <!-- Navegación atrás / siguiente -->
+                <div class="wizard-footer">
+                    <button id="wizard-back-btn" class="btn-back hidden">
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2.5"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            width="16"
+                            height="16"
+                        >
+                            <polyline points="15 18 9 12 15 6" />
+                        </svg>
+                        <span data-i18n="wiz_back">Atrás</span>
+                    </button>
+                    <button id="wizard-next-btn" class="btn-next" disabled>
+                        <span data-i18n="wiz_next">Siguiente</span>
+                        <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2.5"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            width="16"
+                            height="16"
+                        >
+                            <polyline points="9 18 15 12 9 6" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
 
-
-<!-- ════════════════════════════════════════════════════════════
+        <!-- ════════════════════════════════════════════════════════════
      TOAST CONTAINER (notificaciones flotantes)
      ════════════════════════════════════════════════════════════ -->
-<div id="toast-container" class="toast-container"></div>
+        <div id="toast-container" class="toast-container"></div>
 
-
-<!-- ════════════════════════════════════════════════════════════
+        <!-- ════════════════════════════════════════════════════════════
      SCRIPT — cargado al final del body
      ════════════════════════════════════════════════════════════ -->
-<script src="js/main.js"></script>
-<script src="js/wizard-generic.js"></script>
-
-</body>
+        <!-- Stripe.js para pagos -->
+        <script src="https://js.stripe.com/v3/"></script>
+        <script src="js/main.js"></script>
+        <script src="js/wizard-generic.js"></script>
+    </body>
 </html>
