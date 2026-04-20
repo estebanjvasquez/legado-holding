@@ -154,6 +154,13 @@ Notas importantes:
 - Si el frontend y el webhook están en dominios distintos, asegúrate que el servidor devuelva
   Access-Control-Allow-Origin: *  (o el dominio del sitio) y permita métodos POST y headers
   Content-Type para que fetch desde el navegador no sea bloqueado por CORS.
+ 
+Nota sobre Stripe: el workflow existente en n8n usa PaymentIntents y devuelve client_secret
+cuando el intent es de tipo 'confirm'. El frontend ahora soporta ambos patrones:
+- PaymentIntent flow: backend devuelve { client_secret: "...", message: "..." } y el
+  frontend monta Stripe Elements, confirma el pago y envía de vuelta intent: 'payment_success'.
+- Checkout Session flow: backend devuelve { checkoutUrl: "https://..." } y el frontend
+  abre la URL en nueva pestaña.
 - Documenta en n8n el flujo de validación de datos (campos obligatorios) y manejo de excepciones.
 
 ---

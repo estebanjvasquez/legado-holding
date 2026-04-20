@@ -535,6 +535,10 @@ let wizardBuyer = {
 };
 let wizardFamily = [];
 let revealObserver = null;
+// Stripe Elements instances (created on demand)
+let __stripe = null;
+let __elements = null;
+let __cardElement = null;
 
 /* =============================================================================
    HELPERS
@@ -1469,6 +1473,14 @@ async function submitWizard() {
       return;
     }
 
+    // If webhook returned a client_secret (PaymentIntent flow), render Stripe Elements to collect card
+    if (data?.client_secret) {
+      // Save last payload (already saved above) and show payment form
+      showPaymentIntentForm(data.client_secret, data.message || null);
+      setWizardProcessing(false);
+      return;
+    }
+
     // If webhook suggests a redirect to checkout (e.g., Stripe Checkout), handle it
     const checkoutUrl = data?.checkoutUrl || data?.redirectUrl || data?.url;
     const success = data?.success === true || data?.ok === true || resp.status === 200;
@@ -1640,6 +1652,77 @@ function showWizardMessageWithChips(message, chips) {
 
   $("#wizard-retry-btn")?.addEventListener("click", () => {
     renderWizardContent();
+  });
+}
+
+/* Render a simple Stripe Elements form inside the wizard when server returns client_secret */
+function showPaymentIntentForm(clientSecret, message) {
+  const body = $("#wizard-body");
+  if (!body) return showToast("Payment init error", "error");
+
+  // Render basic card form
+  body.innerHTML = `
+    <div class="payment-intent-box">
+      ${message ? `<div class="wizard-info-text">${escapeHTML(message)}</div>` : ''}
+      <div id="card-element" style="margin-top:1rem"></div>
+      <div id="card-errors" class="form-error" style="margin-top:0.75rem"></div>
+      <div style="margin-top:1rem"><button id="card-pay-btn" class="btn-gold">${t("wiz_confirm")}</button></div>
+    </div>`;
+
+  // Lazily initialize Stripe elements
+  if (!__stripe) __stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+  if (!__elements) __elements = __stripe.elements();
+  // If card element already exists, destroy and recreate
+  if (__cardElement) {
+    __cardElement.unmount();
+    __cardElement = null;
+  }
+  __cardElement = __elements.create("card", { style: { base: { fontSize: '16px' } } });
+  __cardElement.mount("#card-element");
+
+  const payBtn = $("#card-pay-btn");
+  payBtn?.addEventListener("click", async (e) => {
+    e.preventDefault();
+    payBtn.disabled = true;
+    $("#card-errors").textContent = "";
+    setWizardProcessing(true);
+    try {
+      const res = await __stripe.confirmCardPayment(clientSecret, {
+        payment_method: { card: __cardElement }
+      });
+      if (res.error) {
+        $("#card-errors").textContent = res.error.message || "Payment failed";
+        setWizardProcessing(false);
+        payBtn.disabled = false;
+        return;
+      }
+      if (res.paymentIntent && res.paymentIntent.status === 'succeeded') {
+        // Notify backend (n8n) that payment succeeded so it can continue the flow
+        const notify = {
+          ...window.__lastWizardPayload,
+          intent: 'payment_success',
+          paymentIntentId: res.paymentIntent.id,
+        };
+        try {
+          const r = await fetch(WIZARD_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(notify) });
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          const data = await r.json().catch(() => null);
+          // If backend responds with success or message, show it
+          if (data?.message) showWizardInfo(data.message, null, data.instructions || null);
+          else if (data?.success) { showToast(t('toast_confirm'), 'success'); closeWizard(); }
+          else { showToast(t('toast_confirm'), 'success'); closeWizard(); }
+        } catch (err) {
+          console.error('Notify payment success error:', err);
+          showToast('Pago realizado, pero error al notificar al servidor. Contacta soporte.', 'error');
+        }
+      }
+    } catch (err) {
+      console.error('confirmCardPayment error', err);
+      $("#card-errors").textContent = 'Error procesando pago. Intenta de nuevo.';
+    } finally {
+      setWizardProcessing(false);
+      payBtn.disabled = false;
+    }
   });
 }
 
