@@ -1618,6 +1618,16 @@ footer {
     animation: fadeInUp 0.3s ease;
 }
 
+/* Estado visual cuando el wizard está procesando (petición al webhook) */
+#wizard-overlay.wizard-processing .wizard-modal {
+    opacity: 0.95;
+}
+.wizard-info-title { font-weight:600; margin-bottom:0.5rem }
+.wizard-info-text { color:var(--muted-foreground); white-space:pre-wrap }
+.wizard-info-link a { color:var(--accent); word-break:break-all }
+.wizard-error { color: var(--destructive); font-weight:600 }
+
+
 .wizard-header {
     display: flex;
     align-items: flex-start;

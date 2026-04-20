@@ -886,29 +886,40 @@ async function sendChatMessage() {
   showTypingIndicator();
 
   try {
-    const resp = await fetch(CHAT_WEBHOOK_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message: text,
-        messages: chatMessages,
-        mode: chatMode,
-        sessionId: chatSessionId,
-        lang: currentLang,
-      }),
-    });
-    removeTypingIndicator();
-    if (!resp.ok) throw new Error("HTTP " + resp.status);
-    const data = await resp.json();
-    const reply =
-      data?.response ||
-      data?.message ||
-      data?.content ||
-      data?.text ||
-      (Array.isArray(data) ? data[0]?.response || data[0]?.message : null) ||
-      t(chatMode === "emergency" ? "chat_error_emergency" : "chat_error");
-    chatMessages.push({ role: "assistant", content: reply });
-    appendChatBubble("assistant", reply);
+    // If developer didn't set the webhook URL placeholder, avoid firing a request
+    if (CHAT_WEBHOOK_URL.includes("TU-N8N-WEBHOOK-URL") || CHAT_WEBHOOK_URL.includes("TU-N8N")) {
+      removeTypingIndicator();
+      const err = t(chatMode === "emergency" ? "chat_error_emergency" : "chat_error");
+      const msg = (currentLang === "es")
+        ? "Chat no configurado. Por favor actualiza CHAT_WEBHOOK_URL en js/main.js"
+        : "Chat not configured. Please update CHAT_WEBHOOK_URL in js/main.js";
+      chatMessages.push({ role: "assistant", content: msg + "\n\n" + err });
+      appendChatBubble("assistant", msg + "\n\n" + err);
+    } else {
+      const resp = await fetch(CHAT_WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: text,
+          messages: chatMessages,
+          mode: chatMode,
+          sessionId: chatSessionId,
+          lang: currentLang,
+        }),
+      });
+      removeTypingIndicator();
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      const data = await resp.json();
+      const reply =
+        data?.response ||
+        data?.message ||
+        data?.content ||
+        data?.text ||
+        (Array.isArray(data) ? data[0]?.response || data[0]?.message : null) ||
+        t(chatMode === "emergency" ? "chat_error_emergency" : "chat_error");
+      chatMessages.push({ role: "assistant", content: reply });
+      appendChatBubble("assistant", reply);
+    }
   } catch (e) {
     console.error("Chat error:", e);
     removeTypingIndicator();
@@ -1405,20 +1416,231 @@ async function submitWizard() {
     buyer: wizardBuyer,
     family: wizardFamily,
     timestamp: new Date().toISOString(),
+    source: "wizard",
   };
 
+  // Keep a copy of last payload so we can send follow-up replies for chip-based flows
+  window.__lastWizardPayload = payload;
+
+  // Set UI to processing
+  setWizardProcessing(true);
+
   try {
-    await fetch("https://vmi2945958.contaboserver.net/webhook/legado-wizard", {
+    // If the WIZARD_WEBHOOK_URL is a placeholder, warn and do not send
+    if (WIZARD_WEBHOOK_URL.includes("contaboserver.net") || WIZARD_WEBHOOK_URL.includes("TU-N8N")) {
+      console.warn("WIZARD_WEBHOOK_URL appears to be a placeholder. Update js/main.js to point to your webhook.");
+      showToast(
+        (currentLang === "es")
+          ? "Webhook de compra no configurado. Contacta al administrador."
+          : "Purchase webhook not configured. Contact admin.",
+        "error",
+      );
+      return;
+    }
+
+    const resp = await fetch(WIZARD_WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
+
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => "");
+      console.error("Webhook returned non-OK:", resp.status, text);
+      showWizardError(
+        (currentLang === "es")
+          ? "Ocurrió un error al procesar la solicitud. Intenta de nuevo más tarde."
+          : "An error occurred processing the request. Please try again later.",
+      );
+      setWizardProcessing(false);
+      return;
+    }
+
+    // Try to read JSON response. The webhook may return a checkout URL or success flag,
+    // or a message + chips (interactive flow).
+    let data = null;
+    try { data = await resp.json(); } catch (e) { data = null; }
+
+    // If the webhook returned a conversational message + chips, surface them in the modal
+    if (data?.message || (Array.isArray(data?.chips) && data.chips.length > 0)) {
+      const chips = Array.isArray(data.chips) ? data.chips : [];
+      showWizardMessageWithChips(data.message || (currentLang === "es" ? "Respuesta del servidor" : "Server response"), chips);
+      setWizardProcessing(false);
+      return;
+    }
+
+    // If webhook suggests a redirect to checkout (e.g., Stripe Checkout), handle it
+    const checkoutUrl = data?.checkoutUrl || data?.redirectUrl || data?.url;
+    const success = data?.success === true || data?.ok === true || resp.status === 200;
+
+    if (checkoutUrl) {
+      // Try to open checkout in new tab. Also show fallback link inside modal
+      const opened = window.open(checkoutUrl, "_blank");
+      if (opened) {
+        showToast(
+          (currentLang === "es") ? "Abriendo pasarela de pago..." : "Opening payment gateway...",
+          "info",
+        );
+        setWizardProcessing(false);
+        closeWizard();
+        return;
+      } else {
+        // Popup blocked — show a prominent link and instruction inside the modal
+        showWizardInfo(
+          (currentLang === "es")
+            ? "Se ha generado la pasarela de pago. Haz click en el enlace para continuar." 
+            : "A payment session was created. Click the link to continue.",
+          checkoutUrl,
+        );
+        setWizardProcessing(false);
+        return;
+      }
+    }
+
+    if (success) {
+      showToast(t("toast_confirm"), "success");
+      setWizardProcessing(false);
+      closeWizard();
+      return;
+    }
+
+    // Fallback: show webhook response as info for debugging
+    console.warn("Webhook response:", data);
+    // If the webhook returned instructions, show them in the modal
+    if (data?.instructions) {
+      showWizardInfo(
+        (currentLang === "es") ? "Instrucciones de pago:" : "Payment instructions:",
+        null,
+        data.instructions,
+      );
+      setWizardProcessing(false);
+      return;
+    }
+    showToast(
+      (currentLang === "es")
+        ? "Solicitud enviada. Revisaremos y contactaremos." 
+        : "Request submitted. We'll review and contact you.",
+      "success",
+    );
+    setWizardProcessing(false);
+    closeWizard();
   } catch (e) {
     console.error("Webhook error:", e);
+    showWizardError(
+      (currentLang === "es")
+        ? "Error de conexión. Por favor intenta de nuevo." 
+        : "Connection error. Please try again.",
+    );
+    setWizardProcessing(false);
   }
+}
 
-  showToast(t("toast_confirm"), "success");
-  closeWizard();
+/* Helper para controlar estado de processing dentro del wizard */
+function setWizardProcessing(on) {
+  const overlay = $("#wizard-overlay");
+  const nextBtn = $("#wizard-next-btn");
+  const backBtn = $("#wizard-back-btn");
+  if (nextBtn) nextBtn.disabled = on;
+  if (backBtn) backBtn.disabled = on;
+  // Añadir una clase visual al modal para mostrar spinner si se definió en CSS
+  if (overlay) overlay.classList.toggle("wizard-processing", !!on);
+}
+
+/* Muestra un mensaje informativo dentro del wizard (por ejemplo: checkout link) */
+function showWizardInfo(title, link, text) {
+  const body = $("#wizard-body");
+  if (!body) { showToast(text || title, "info"); return; }
+  const htmlParts = [];
+  if (title) htmlParts.push(`<div class="wizard-info-title">${escapeHTML(title)}</div>`);
+  if (text) htmlParts.push(`<div class="wizard-info-text">${escapeHTML(text)}</div>`);
+  if (link) htmlParts.push(`<div class="wizard-info-link"><a href="${escapeHTML(link)}" target="_blank" rel="noopener">${link}</a></div>`);
+  htmlParts.push('<div style="margin-top:1rem"><button id="wizard-retry-btn" class="btn-outline">Volver a intentar</button></div>');
+  body.innerHTML = htmlParts.join("");
+  $("#wizard-retry-btn")?.addEventListener("click", () => {
+    // Re-render original content and let user re-submit
+    renderWizardContent();
+  });
+}
+
+/* Muestra un error dentro del wizard con botón reintentar */
+function showWizardError(msg) {
+  const body = $("#wizard-body");
+  if (!body) { showToast(msg, "error"); return; }
+  body.innerHTML = `<div class="wizard-error">${escapeHTML(msg)}</div><div style="margin-top:1rem"><button id="wizard-retry-btn" class="btn-outline">Reintentar</button></div>`;
+  $("#wizard-retry-btn")?.addEventListener("click", () => {
+    renderWizardContent();
+  });
+}
+
+/* Muestra un mensaje con "chips" (opciones rápidas) devueltas por el webhook */
+function showWizardMessageWithChips(message, chips) {
+  const body = $("#wizard-body");
+  if (!body) { showToast(message, "info"); return; }
+  const parts = [];
+  parts.push(`<div class="wizard-info-title">${escapeHTML(message)}</div>`);
+  if (chips && chips.length) {
+    parts.push('<div class="wizard-chips" style="margin-top:1rem;display:flex;gap:0.5rem;flex-wrap:wrap">');
+    chips.forEach((c, i) => {
+      parts.push(`<button class="wizard-chip btn-outline" data-chip-idx="${i}">${escapeHTML(c)}</button>`);
+    });
+    parts.push('</div>');
+  }
+  parts.push('<div style="margin-top:1rem"><button id="wizard-retry-btn" class="btn-outline">Cancelar</button></div>');
+  body.innerHTML = parts.join("");
+
+  // Bind chip clicks
+  $$(".wizard-chip").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const idx = parseInt(btn.dataset.chipIdx);
+      const text = chips[idx];
+      // Send follow-up to webhook including last payload and the selected chip
+      try {
+        setWizardProcessing(true);
+        const follow = {
+          ...window.__lastWizardPayload,
+          reply: text,
+        };
+        const resp = await fetch(WIZARD_WEBHOOK_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(follow),
+        });
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        const data = await resp.json().catch(() => null);
+        // If checkoutUrl returned, handle it
+        const checkoutUrl = data?.checkoutUrl || data?.redirectUrl || data?.url;
+        if (checkoutUrl) {
+          window.open(checkoutUrl, "_blank");
+          showToast((currentLang === "es") ? "Abriendo pasarela de pago..." : "Opening payment gateway...", "info");
+          setWizardProcessing(false);
+          closeWizard();
+          return;
+        }
+        if (data?.message || data?.instructions) {
+          showWizardInfo(data.message || (currentLang === "es" ? "Instrucciones:" : "Instructions:"), null, data.instructions || data.message);
+          setWizardProcessing(false);
+          return;
+        }
+        if (data?.success) {
+          showToast(t("toast_confirm"), "success");
+          setWizardProcessing(false);
+          closeWizard();
+          return;
+        }
+        // Fallback: render returned message or re-render wizard
+        if (data?.message) showWizardMessageWithChips(data.message, data.chips || []);
+        else renderWizardContent();
+      } catch (e) {
+        console.error("Follow-up webhook error:", e);
+        showWizardError((currentLang === "es") ? "Error al procesar la opción. Intenta de nuevo." : "Error processing option. Try again.");
+        setWizardProcessing(false);
+      }
+    });
+  });
+
+  $("#wizard-retry-btn")?.addEventListener("click", () => {
+    renderWizardContent();
+  });
 }
 
 function initWizard() {

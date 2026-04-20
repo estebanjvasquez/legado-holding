@@ -89,6 +89,126 @@ El webhook debe devolver JSON con alguno de estos campos:
 
 ---
 
+## Contrato del webhook de compra (WIZARD)
+
+El frontend envía al webhook de compra un POST JSON con el siguiente payload:
+
+Request (POST):
+
+```json
+{
+  "paymentMethod": "card|zelle|bank",
+  "plan": "esencial-zulia|vanguardia-zulia|...",
+  "paymentType": "monthly|annual",
+  "buyer": { "name": "", "lastName": "", "cedula": "", "phone": "", "email": "", "birthDate": "YYYY-MM-DD" },
+  "family": [ { "name":"","lastName":"","cedula":"","phone":"","birthDate":"YYYY-MM-DD","relationship":"" }, ... ],
+  "timestamp": "ISO8601"
+}
+```
+
+Respuestas esperadas del webhook (ejemplos):
+
+- Caso Stripe Checkout (recomendado):
+
+Response 200 JSON:
+
+```json
+{ "success": true, "checkoutUrl": "https://checkout.stripe.com/pay/.." }
+```
+
+El frontend abrirá `checkoutUrl` en una nueva pestaña y cerrará el modal.
+
+- Caso pago offline (Zelle / Transferencia bancaria):
+
+Response 200 JSON:
+
+```json
+{ "success": true, "instructions": "Enviar a nombre X, cuenta Y, referencia Z" }
+```
+
+El frontend mostrará las instrucciones al usuario (en el modal o como toast).
+
+- Caso éxito simple sin pago inmediato:
+
+Response 200 JSON:
+
+```json
+{ "success": true }
+```
+
+El frontend mostrará confirmación y cerrará el modal.
+
+- Caso error:
+
+Response 4xx/5xx (opcional body):
+
+```json
+{ "success": false, "error": "Mensaje legible" }
+```
+
+El frontend mostrará un toast con el error y mantendrá el modal abierto para reintento.
+
+Notas importantes:
+
+- El webhook debe responder con cabecera Content-Type: application/json.
+- Si el frontend y el webhook están en dominios distintos, asegúrate que el servidor devuelva
+  Access-Control-Allow-Origin: *  (o el dominio del sitio) y permita métodos POST y headers
+  Content-Type para que fetch desde el navegador no sea bloqueado por CORS.
+- Documenta en n8n el flujo de validación de datos (campos obligatorios) y manejo de excepciones.
+
+---
+
+## Ejemplo de flujo n8n para crear sesión Stripe Checkout y devolver checkoutUrl
+
+Este es un flujo de referencia que puedes implementar en n8n. El objetivo: recibir el payload
+del frontend, crear una sesión de Stripe Checkout (si paymentMethod === 'card') y devolver
+al frontend el checkoutUrl.
+
+1) Webhook Node (HTTP Request)
+   - Método: POST
+   - Path: /webhook/legado-wizard
+   - Response Mode: "On Received" o "Custom Response" (recomendado: devolver JSON con checkoutUrl)
+
+2) Set / Function Node (validación)
+   - Valida campos obligatorios: buyer.name, buyer.email, plan, paymentMethod
+   - Normaliza montos según plan y paymentType (monthly/annual)
+
+3) If Node (branch by paymentMethod)
+   - Condición: paymentMethod == 'card' → crear session de Stripe
+   - Else: marcar como "manual payment" y enviar instrucciones
+
+4) Stripe Node (Create Checkout Session)
+   - Use your Stripe credentials (secret key) in n8n credentials
+   - Mode: payment
+   - Line items: describe the product/amount (you can store amount in cents)
+   - Success URL: https://your-site.example.com/checkout-success?session_id={CHECKOUT_SESSION_ID}
+   - Cancel URL: https://your-site.example.com/checkout-cancel
+
+5) Respond Node (HTTP Response)
+   - If Stripe created session: return 200 JSON { success:true, checkoutUrl: <session.url> }
+   - If manual payment: return 200 JSON { success:true, instructions: "Enviar a cuenta X" }
+   - On error: return 400/500 with { success:false, error: "mensaje" }
+
+Ejemplo mínimo de función final (pseudo-code) que devuelve JSON:
+
+```json
+{ "success": true, "checkoutUrl": "https://checkout.stripe.com/pay/cs_test_..." }
+```
+
+Notas para Stripe:
+- Asegúrate de calcular el amount correcto (en centavos) y moneda.
+- Si aceptas cuotas iniciales + mensualidad (planes Selecto), decide si cobras la cuota inicial
+  ahora (en la sesión de Checkout) o sólo registras la solicitud y cobras la inicial manualmente.
+
+Notas de seguridad y CORS:
+- n8n debe devolver Access-Control-Allow-Origin con el dominio del sitio (o '*') para evitar
+  que el fetch del navegador sea bloqueado.
+- No expongas claves secretas en el frontend. Solo usa clave secreta en n8n/servidor.
+
+
+
+---
+
 ## Guía de edición por sección
 
 ### HERO — Foto de fondo (abuelos venezolanos)
