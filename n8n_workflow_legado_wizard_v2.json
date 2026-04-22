@@ -1,0 +1,141 @@
+﻿{
+  "name": "LEGADO_Wizard_v2",
+  "nodes": [
+    {
+      "id": "1",
+      "name": "Legado Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [250, 300],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook/legado-wizard"
+      }
+    },
+    {
+      "id": "2",
+      "name": "Generate sessionId",
+      "type": "n8n-nodes-base.function",
+      "position": [450, 300],
+      "parameters": {
+        "functionCode": "// generate session id\nconst sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2,9);\nitems[0].json.sessionId = sessionId;\nreturn items;"
+      }
+    },
+    {
+      "id": "3",
+      "name": "Create PaymentIntent",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [650, 300],
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://api.stripe.com/v1/payment_intents",
+        "options": {
+          "bodyContentType": "form-data"
+        },
+        "bodyParametersUi": {
+          "parameter": [
+            {"name": "amount", "value": "={{$json[\"amount\"]}}"},
+            {"name": "currency", "value": "={{$json[\"currency\"] || 'eur'}}"},
+            {"name": "metadata[sessionId]", "value": "={{$json[\"sessionId\"]}}"},
+            {"name": "metadata[plan]", "value": "={{$json[\"plan\"]}}"},
+            {"name": "metadata[paymentType]", "value": "={{$json[\"paymentType\"] || 'card'}}"},
+            {"name": "receipt_email", "value": "={{$json[\"email\"]}}"}
+          ]
+        },
+        "authentication": "headerAuth",
+        "headerAuth": {
+          "name": "Authorization",
+          "value": "=Bearer {{$credentials.stripe.apiKey}}"
+        }
+      }
+    },
+    {
+      "id": "4",
+      "name": "Respond Show Payment",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [850, 300],
+      "parameters": {
+        "responseMode": "lastNode",
+        "responseData": "={{ {\"client_secret\": $json[\"client_secret\"], \"sessionId\": $json[\"sessionId\"]} }}",
+        "responseCode": 200
+      }
+    },
+    {
+      "id": "5",
+      "name": "Stripe Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [250, 700],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook/stripe-webhook-legado",
+        "responseMode": "lastNode"
+      }
+    },
+    {
+      "id": "6",
+      "name": "Verify Stripe Signature",
+      "type": "n8n-nodes-base.function",
+      "position": [450, 700],
+      "parameters": {
+        "functionCode": "// rawBody must be available as $json['rawBody'] and headers in $json['headers']\nconst stripe = require('stripe')($credentials.stripe.apiKey);\nconst sig = $json['headers'] && ($json['headers']['x-stripe-signature'] || $json['headers']['X-Stripe-Signature']);\ntry {\n  const event = stripe.webhooks.constructEvent($json['rawBody'], sig, $credentials.stripe.webhookSecret);\n  items[0].json.event = event;\n  return items;\n} catch (err) {\n  throw new Error('Stripe webhook verification failed: ' + err.message);\n}"
+      }
+    },
+    {
+      "id": "7",
+      "name": "Route by Stripe Event",
+      "type": "n8n-nodes-base.switch",
+      "position": [650, 700],
+      "parameters": {
+        "rules": [
+          {"value1": "={{$json.event.type}}", "operation": "equals", "value2": "payment_intent.succeeded"},
+          {"value1": "={{$json.event.type}}", "operation": "equals", "value2": "payment_intent.payment_failed"}
+        ]
+      }
+    },
+    {
+      "id": "8",
+      "name": "Create/Find Client (InvoiceNinja)",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [850, 600],
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "={{ 'https://api.invoiceninja.test/clients' }}",
+        "jsonParameters": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "9",
+      "name": "Create Invoice (InvoiceNinja)",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [1050, 600],
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "={{ 'https://api.invoiceninja.test/invoices' }}",
+        "jsonParameters": true
+      }
+    },
+    {
+      "id": "10",
+      "name": "Mark session active",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [1250, 600],
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "={{ 'https://internal-api.legado.test/sessions/activate' }}",
+        "jsonParameters": true,
+        "bodyParametersUi": {"parameter": [{"name": "sessionId","value": "={{$json.event.data.object.metadata.sessionId}}"},{"name":"paymentIntentId","value":"={{$json.event.data.object.id}}"},{"name":"invoiceId","value":"={{$json[\"body\"] && $json[\"body\"].invoice_id || ''}}"}]}
+      }
+    }
+  ],
+  "connections": {
+    "Legado Webhook": {"main": [[{"node":"Generate sessionId","type":"main","index":0}]]},
+    "Generate sessionId": {"main": [[{"node":"Create PaymentIntent","type":"main","index":0}]]},
+    "Create PaymentIntent": {"main": [[{"node":"Respond Show Payment","type":"main","index":0}]]},
+    "Stripe Webhook": {"main": [[{"node":"Verify Stripe Signature","type":"main","index":0}]]},
+    "Verify Stripe Signature": {"main": [[{"node":"Route by Stripe Event","type":"main","index":0}]]},
+    "Route by Stripe Event": {"main": [[{"node":"Create/Find Client (InvoiceNinja)","type":"main","index":0}], [{"node":"Mark session active","type":"main","index":1}]]},
+    "Create/Find Client (InvoiceNinja)": {"main": [[{"node":"Create Invoice (InvoiceNinja)","type":"main","index":0}]]},
+    "Create Invoice (InvoiceNinja)": {"main": [[{"node":"Mark session active","type":"main","index":0}]]}
+  },
+  "active": false
+}

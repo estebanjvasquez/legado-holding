@@ -29,12 +29,25 @@
    ▶ CAMBIA ESTA URL por la de tu webhook de n8n
    ============================================================================= */
 const CHAT_WEBHOOK_URL = "https://TU-N8N-WEBHOOK-URL/webhook/chat"; // ← CAMBIAR
+/* =============================================================================
+   CONFIG
+   ▶ Webhook URLs configurables en tiempo de ejecución
+   ============================================================================= */
+
+const DEFAULT_WIZARD_WEBHOOK = "https://vmi2945958.contaboserver.net/webhook/legado-wizard";
 
 /* Stripe configuration */
 const STRIPE_PUBLISHABLE_KEY =
   "pk_test_51TD0wWIZ8iB3diEjBitOKaGv7OPDilCvCtpOTsA47DiIiVw9lqmZlki1wzDdkOrFRLGiXhdnPULKbuI8ErOmvUQS00ehj9nJZU";
-const WIZARD_WEBHOOK_URL =
-  "https://vmi2945958.contaboserver.net/webhook/legado-chat";
+const DEFAULT_STRIPE_WEBHOOK = "https://vmi2945958.contaboserver.net/webhook/stripe-webhook-legado";
+
+// Runtime config: allows overriding URLs via window.LEGADO_CONFIG before this script loads
+const WIZARD_WEBHOOK_URL = (typeof window !== 'undefined' && window.LEGADO_CONFIG && window.LEGADO_CONFIG.WIZARD_WEBHOOK_URL)
+  ? window.LEGADO_CONFIG.WIZARD_WEBHOOK_URL
+  : DEFAULT_WIZARD_WEBHOOK;
+const STRIPE_WEBHOOK_URL = (typeof window !== 'undefined' && window.LEGADO_CONFIG && window.LEGADO_CONFIG.STRIPE_WEBHOOK_URL)
+  ? window.LEGADO_CONFIG.STRIPE_WEBHOOK_URL
+  : DEFAULT_STRIPE_WEBHOOK;
 
 /* =============================================================================
    i18n / LANG — Diccionario bilingüe ES / EN
