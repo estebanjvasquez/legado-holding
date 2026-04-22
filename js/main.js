@@ -1028,6 +1028,13 @@ function openWizard(planId) {
 
 function closeWizard() {
   wizardOpen = false;
+  // Reset card payment flow state
+  wizardCardConfirmStep = false;
+  __wizardClientSecret = null;
+  if (__cardElement) {
+    __cardElement.unmount();
+    __cardElement = null;
+  }
   $("#wizard-overlay").classList.add("hidden");
 }
 
@@ -1305,6 +1312,117 @@ function renderStep3() {
       </label>
     </div>`;
 }
+
+/* =============================================================================
+   CARD CONFIRM STEP — flujo de confirmación de datos para pago con tarjeta
+   ============================================================================= */
+function renderCardConfirmStep() {
+  const plan = PLANS[wizardSelectedPlan];
+  const planName = t(`plan_${wizardSelectedPlan}_name`);
+  const isSelecto = plan.initial !== undefined;
+  const prefix = isSelecto ? plan.initial + " + " : "";
+  const priceDisplay =
+    wizardPaymentType === "monthly"
+      ? prefix + plan.monthly + t("plan_mo")
+      : prefix + plan.annual + t("wiz_yr");
+
+  const body = $("#wizard-body");
+  if (!body) return;
+
+  // If showing stripe form, render it
+  if (wizardCardConfirmStep === "stripe-form") {
+    body.innerHTML = `
+      <div class="stripe-card-form">
+        <h3 style="text-align:center;margin-bottom:0.5rem">${t("stripe_enter_card")}</h3>
+        <p style="color:var(--muted-foreground);text-align:center;font-size:0.875rem;margin-bottom:1.5rem">
+          ${t("stripe_verify_title")}: ${planName} - ${priceDisplay}
+        </p>
+        <div id="stripe-card-element" style="padding:1rem;border:1.5px solid var(--border);border-radius:var(--radius);background:var(--background);margin-bottom:0.75rem;min-height:44px"></div>
+        <div id="stripe-error-msg" class="form-error" style="display:none;margin-bottom:0.75rem"></div>
+        <div class="wizard-footer-card">
+          <button id="stripe-back-btn" class="btn-outline">${t("stripe_back_btn")}</button>
+          <button id="stripe-pay-btn" class="btn-gold">${t("stripe_pay_btn")}</button>
+        </div>
+      </div>`;
+    bindWizardStepEvents();
+    return;
+  }
+
+  // Default: show data confirmation
+  body.innerHTML = `
+    <div class="card-confirm-box">
+      <h3 style="text-align:center;margin-bottom:0.5rem">${t("stripe_card_title")}</h3>
+      <p style="color:var(--muted-foreground);text-align:center;font-size:0.875rem;margin-bottom:1.5rem">${t("stripe_card_subtitle")}</p>
+
+      <div class="confirm-section">
+        <h4 class="confirm-section-title">${t("stripe_plan_label")}</h4>
+        <div class="confirm-row">
+          <span class="confirm-label">${t("wiz_sum_plan")}</span>
+          <span class="confirm-value">${planName}</span>
+        </div>
+        <div class="confirm-row">
+          <span class="confirm-label">${t("wiz_sum_payment")}</span>
+          <span class="confirm-value highlight">${priceDisplay}</span>
+        </div>
+        <div class="confirm-row">
+          <span class="confirm-label">${t("stripe_method_label")}</span>
+          <span class="confirm-value">💳 ${t("wiz_method_card")}</span>
+        </div>
+      </div>
+
+      <div class="confirm-section">
+        <h4 class="confirm-section-title">${t("wiz_sum_buyer")}</h4>
+        <div class="confirm-row">
+          <span class="confirm-label">${t("wiz_fname")} ${t("wiz_lname")}</span>
+          <span class="confirm-value">${escapeHTML(wizardBuyer.name)} ${escapeHTML(wizardBuyer.lastName)}</span>
+        </div>
+        <div class="confirm-row">
+          <span class="confirm-label">${t("wiz_cedula")}</span>
+          <span class="confirm-value">${escapeHTML(wizardBuyer.cedula)}</span>
+        </div>
+        <div class="confirm-row">
+          <span class="confirm-label">${t("wiz_email")}</span>
+          <span class="confirm-value">${escapeHTML(wizardBuyer.email)}</span>
+        </div>
+        <div class="confirm-row">
+          <span class="confirm-label">${t("wiz_phone")}</span>
+          <span class="confirm-value">${escapeHTML(wizardBuyer.phone)}</span>
+        </div>
+      </div>
+
+      ${
+        wizardFamily.length > 0
+          ? `
+      <div class="confirm-section">
+        <h4 class="confirm-section-title">${t("wiz_sum_members")} (${wizardFamily.length})</h4>
+        ${wizardFamily
+          .map(
+            (m, i) => `
+          <div class="confirm-row">
+            <span class="confirm-label">${escapeHTML(m.name)} ${escapeHTML(m.lastName)}</span>
+            <span class="confirm-value">${escapeHTML(m.relationship || "-")}</span>
+          </div>
+        `,
+          )
+          .join("")}
+      </div>
+      `
+          : ""
+      }
+
+      <div class="wizard-footer-card" style="margin-top:1.5rem">
+        <button id="card-confirm-back-btn" class="btn-outline">${t("stripe_back_btn")}</button>
+        <button id="card-confirm-next-btn" class="btn-gold">${t("stripe_confirm_btn")}</button>
+      </div>
+    </div>`;
+  bindWizardStepEvents();
+}
+
+function updateCardConfirmFooter() {
+  // Hide normal wizard footer when in card confirm flow
+  const normalFooter = $("#wizard-footer");
+  if (normalFooter) normalFooter.style.display = "none";
+}
 function validateAge(dateStr, maxAge) {
   if (!dateStr) return true;
   const birth = new Date(dateStr);
@@ -1386,6 +1504,187 @@ function bindWizardStepEvents() {
       });
     });
   }
+
+  // Card confirmation step events
+  if (wizardCardConfirmStep === "confirmation") {
+    const confirmBtn = $("#card-confirm-next-btn");
+    const backBtn = $("#card-confirm-back-btn");
+    if (confirmBtn) {
+      confirmBtn.addEventListener("click", async () => {
+        // Call webhook to get client_secret
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = t("stripe_processing");
+        try {
+          const payload = {
+            intent: "create_payment_intent",
+            paymentMethod: wizardPaymentMethod,
+            plan: wizardSelectedPlan,
+            paymentType: wizardPaymentType,
+            buyer: wizardBuyer,
+            family: wizardFamily,
+            timestamp: new Date().toISOString(),
+          };
+          window.__lastWizardPayload = payload;
+
+          const resp = await fetch(WIZARD_WEBHOOK_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          if (!resp.ok) throw new Error("HTTP " + resp.status);
+          const data = await resp.json().catch(() => ({}));
+
+          if (data?.client_secret) {
+            wizardCardConfirmStep = "stripe-form";
+            __wizardClientSecret = data.client_secret;
+            renderCardConfirmStep();
+            updateCardConfirmFooter();
+          } else if (data?.checkoutUrl) {
+            window.open(data.checkoutUrl, "_blank");
+            showToast(
+              currentLang === "es"
+                ? "Abriendo pasarela de pago..."
+                : "Opening payment gateway...",
+              "info",
+            );
+          } else {
+            // Fallback: proceed to stripe form anyway (for testing)
+            wizardCardConfirmStep = "stripe-form";
+            renderCardConfirmStep();
+            updateCardConfirmFooter();
+          }
+        } catch (err) {
+          console.error("Payment intent error:", err);
+          showToast(
+            currentLang === "es"
+              ? "Error al procesar. Intenta de nuevo."
+              : "Error processing. Try again.",
+            "error",
+          );
+        } finally {
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = t("stripe_confirm_btn");
+        }
+      });
+    }
+    if (backBtn) {
+      backBtn.addEventListener("click", () => {
+        wizardCardConfirmStep = false;
+        $("#wizard-footer").style.display = "";
+        renderWizardStep();
+        updateWizardFooter();
+      });
+    }
+  }
+
+  // Stripe form step events
+  if (wizardCardConfirmStep === "stripe-form") {
+    const payBtn = $("#stripe-pay-btn");
+    const backBtn = $("#stripe-back-btn");
+    const errEl = $("#stripe-error-msg");
+
+    // Initialize Stripe Elements
+    if (!__stripe) __stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+    if (!__elements) __elements = __stripe.elements();
+
+    if (__cardElement) {
+      __cardElement.unmount();
+    }
+    __cardElement = __elements.create("card", {
+      style: {
+        base: {
+          fontSize: "16px",
+          color: "#1f2937",
+          fontFamily: "system-ui, sans-serif",
+          "::placeholder": { color: "#9ca3af" },
+        },
+        invalid: { color: "#ef4444" },
+      },
+    });
+    __cardElement.mount("#stripe-card-element");
+    __cardElement.on("change", (e) => {
+      if (errEl) {
+        errEl.textContent = e.error ? e.error.message : "";
+        errEl.style.display = e.error ? "block" : "none";
+      }
+      if (payBtn) payBtn.disabled = false;
+    });
+
+    if (payBtn) {
+      payBtn.addEventListener("click", async () => {
+        payBtn.disabled = true;
+        payBtn.textContent = t("stripe_processing");
+        if (errEl) errEl.style.display = "none";
+
+        try {
+          const result = await __stripe.confirmCardPayment(
+            __wizardClientSecret,
+            {
+              payment_method: {
+                card: __cardElement,
+                billing_details: {
+                  name: wizardBuyer.name + " " + wizardBuyer.lastName,
+                  email: wizardBuyer.email,
+                  phone: wizardBuyer.phone,
+                },
+              },
+            },
+          );
+
+          if (result.error) {
+            if (errEl) {
+              errEl.textContent = result.error.message;
+              errEl.style.display = "block";
+            }
+            payBtn.disabled = false;
+            payBtn.textContent = t("stripe_pay_btn");
+            return;
+          }
+
+          if (result.paymentIntent?.status === "succeeded") {
+            // Payment successful - notify webhook and close
+            try {
+              await fetch(WIZARD_WEBHOOK_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  ...window.__lastWizardPayload,
+                  intent: "payment_success",
+                  paymentIntentId: result.paymentIntent.id,
+                }),
+              });
+            } catch (e) {
+              console.error("Notify success error:", e);
+            }
+            showToast(t("stripe_payment_success"), "success");
+            wizardCardConfirmStep = false;
+            $("#wizard-footer").style.display = "";
+            closeWizard();
+          }
+        } catch (err) {
+          console.error("Payment error:", err);
+          if (errEl) {
+            errEl.textContent =
+              currentLang === "es"
+                ? "Error en el pago. Intenta de nuevo."
+                : "Payment error. Try again.";
+            errEl.style.display = "block";
+          }
+          payBtn.disabled = false;
+          payBtn.textContent = t("stripe_pay_btn");
+        }
+      });
+    }
+
+    if (backBtn) {
+      backBtn.addEventListener("click", () => {
+        wizardCardConfirmStep = "confirmation";
+        renderCardConfirmStep();
+        updateCardConfirmFooter();
+      });
+    }
+  }
   if (wizardStep === 3) {
     $("#terms-check")?.addEventListener("change", (e) => {
       wizardAcceptedTerms = e.target.checked;
@@ -1420,6 +1719,16 @@ function canWizardNext() {
 }
 
 function updateWizardFooter() {
+  // Ocultar footer cuando estamos en flujo de confirmación de tarjeta
+  if (wizardCardConfirmStep) {
+    const footer = $("#wizard-footer");
+    if (footer) footer.style.display = "none";
+    return;
+  }
+
+  const footer = $("#wizard-footer");
+  if (footer) footer.style.display = "";
+
   const backBtn = $("#wizard-back-btn");
   const nextBtn = $("#wizard-next-btn");
   if (backBtn) backBtn.classList.toggle("hidden", wizardStep === 0);
@@ -1437,15 +1746,36 @@ function updateWizardFooter() {
 
 function wizardNext() {
   if (!canWizardNext()) return;
+
+  // Si estamos en el paso 2 (pago) y se seleccionó tarjeta
+  if (wizardStep === 2 && wizardPaymentMethod === "card") {
+    // Mostrar pantalla de confirmación de datos
+    wizardCardConfirmStep = "confirmation";
+    renderCardConfirmStep();
+    updateCardConfirmFooter();
+    return;
+  }
+
+  // Si estamos en paso normal
   if (wizardStep < 3) {
     wizardStep++;
     renderWizardContent();
   } else {
+    // Paso 3 - solo Zelle o bank, no tarjeta (tarjeta ya pasó por su flujo)
     submitWizard();
   }
 }
 
 function wizardBack() {
+  // Si estamos en el flujo de confirmación de tarjeta
+  if (wizardCardConfirmStep) {
+    wizardCardConfirmStep = false;
+    $("#wizard-footer").style.display = "";
+    renderWizardStep();
+    updateWizardFooter();
+    return;
+  }
+
   if (wizardStep > 0) {
     wizardStep--;
     renderWizardContent();

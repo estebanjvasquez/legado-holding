@@ -2391,3 +2391,106 @@ footer {
         padding: 0.5rem;
     }
 }
+
+/* =============================================================================
+   CARD CONFIRM STEP — flujo de confirmación de datos para pago con tarjeta
+   ══════════════════════════════════════════════════════════════════════════ */
+.card-confirm-box,
+.stripe-card-form {
+    max-width: 100%;
+}
+
+.card-confirm-box h3,
+.stripe-card-form h3 {
+    font-family: var(--font-heading);
+    font-size: 1.35rem;
+    color: var(--foreground);
+    margin-bottom: 0.5rem;
+}
+
+.confirm-section {
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.confirm-section-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--muted-foreground);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.75rem;
+}
+
+.confirm-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.confirm-row:last-child {
+    border-bottom: none;
+}
+
+.confirm-label {
+    font-size: 0.875rem;
+    color: var(--muted-foreground);
+}
+
+.confirm-value {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--foreground);
+    text-align: right;
+}
+
+.confirm-value.highlight {
+    color: var(--accent);
+    font-weight: 700;
+}
+
+.wizard-footer-card {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.wizard-footer-card .btn-outline,
+.wizard-footer-card .btn-gold {
+    flex: 1;
+    padding: 0.875rem 1rem;
+    font-size: 0.95rem;
+}
+
+#stripe-card-element {
+    min-height: 48px;
+}
+
+#stripe-error-msg {
+    font-size: 0.875rem;
+    color: var(--destructive);
+    padding: 0.5rem 0.75rem;
+    background: rgba(239, 68, 68, 0.08);
+    border-radius: var(--radius);
+}
+
+@media (max-width: 480px) {
+    .wizard-footer-card {
+        flex-direction: column-reverse;
+    }
+
+    .confirm-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+    }
+
+    .confirm-value {
+        text-align: left;
+    }
+}
