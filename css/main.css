@@ -446,13 +446,72 @@ select {
         background 0.2s,
         border-color 0.2s;
 }
-.btn-outline-white:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.6);
-}
 .btn-outline-white svg {
     width: 20px;
     height: 20px;
+}
+
+/* =============================================================================
+   WIZARD INFO / ERROR / PROCESSING STYLES
+   ============================================================================= */
+.wizard-processing {
+    pointer-events: none;
+}
+.wizard-processing::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.7);
+    border-radius: inherit;
+    z-index: 10;
+}
+.wizard-info-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--foreground);
+    margin-bottom: 0.5rem;
+    text-align: center;
+}
+.wizard-info-text {
+    font-size: 0.9rem;
+    color: var(--muted-foreground);
+    text-align: center;
+    line-height: 1.6;
+    margin-bottom: 0.5rem;
+}
+.wizard-info-link {
+    text-align: center;
+    margin: 1rem 0;
+}
+.wizard-info-link a {
+    color: var(--accent);
+    word-break: break-all;
+    font-size: 0.85rem;
+}
+.wizard-error {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid var(--destructive);
+    border-radius: var(--radius);
+    padding: 1rem;
+    color: var(--destructive);
+    font-size: 0.9rem;
+    text-align: center;
+}
+.wizard-chip {
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+}
+.payment-intent-box {
+    padding: 1rem;
+}
+.payment-intent-box #card-element {
+    padding: 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--background);
+}
+#card-pay-btn {
+    width: 100%;
 }
 
 /* =============================================================================

@@ -32,9 +32,9 @@ const CHAT_WEBHOOK_URL = "https://TU-N8N-WEBHOOK-URL/webhook/chat"; // ← CAMBI
 
 /* Stripe configuration */
 const STRIPE_PUBLISHABLE_KEY =
-  "pk_test_51JB2MWIOEbttUcdVHyahKFZ6Np2BSQivPzopyjhftPVyqPt1U0s1JklUIVGZeWiydvCB3DLxC9tcBMCuefM4wAVy00RwEMEs8Z";
+  "pk_test_51TD0wWIZ8iB3diEjBitOKaGv7OPDilCvCtpOTsA47DiIiVw9lqmZlki1wzDdkOrFRLGiXhdnPULKbuI8ErOmvUQS00ehj9nJZU";
 const WIZARD_WEBHOOK_URL =
-  "https://vmi2945958.contaboserver.net/webhook/legado-wizard";
+  "https://vmi2945958.contaboserver.net/webhook/legado-chat";
 
 /* =============================================================================
    i18n / LANG — Diccionario bilingüe ES / EN
@@ -297,11 +297,20 @@ const LANG = {
     "Select your payment method",
   ],
   wiz_monthly_title: ["Suscripción mensual", "Monthly subscription"],
-  wiz_select_billing: ["Selecciona tu modalidad de pago", "Select your billing mode"],
-  wiz_payment_method: ["Selecciona tu método de pago", "Select your payment method"],
+  wiz_select_billing: [
+    "Selecciona tu modalidad de pago",
+    "Select your billing mode",
+  ],
+  wiz_payment_method: [
+    "Selecciona tu método de pago",
+    "Select your payment method",
+  ],
   wiz_method_card: ["Tarjeta de crédito/débito", "Credit/Debit card"],
   wiz_method_zelle: ["Zelle", "Zelle"],
-  wiz_method_card_info: ["Serás redirigido a Stripe para completar el pago seguro", "You will be redirected to Stripe to complete secure payment"],
+  wiz_method_card_info: [
+    "Serás redirigido a Stripe para completar el pago seguro",
+    "You will be redirected to Stripe to complete secure payment",
+  ],
   wiz_method_bank: ["Transferencia bancaria", "Bank transfer"],
   wiz_monthly_sub: ["Tarjeta de crédito", "Credit card"],
   wiz_annual_title: ["Pago anual", "Annual payment"],
@@ -344,6 +353,39 @@ const LANG = {
     "¡Solicitud enviada! Nos pondremos en contacto pronto.",
     "Request submitted! We'll get in touch soon.",
   ],
+
+  /* ── Stripe Payment Flow ───────────────────────────────────────────────── */
+  stripe_card_title: ["Confirmar datos de pago", "Confirm payment details"],
+  stripe_card_subtitle: [
+    "Verifica que todos los datos sean correctos antes de continuar",
+    "Verify all details are correct before continuing",
+  ],
+  stripe_confirm_btn: [
+    "Continuar al pago seguro",
+    "Continue to secure payment",
+  ],
+  stripe_back_btn: ["Volver", "Go back"],
+  stripe_processing: [
+    "Procesando tu información...",
+    "Processing your information...",
+  ],
+  stripe_enter_card: [
+    "Ingresa los datos de tu tarjeta",
+    "Enter your card details",
+  ],
+  stripe_pay_btn: ["Pagar ahora", "Pay now"],
+  stripe_payment_success: [
+    "¡Pago exitoso! Procesando tu solicitud...",
+    "Payment successful! Processing your request...",
+  ],
+  stripe_payment_error: [
+    "Error en el pago. Por favor intenta de nuevo.",
+    "Payment error. Please try again.",
+  ],
+  stripe_verify_title: ["Verifica tu información", "Verify your information"],
+  stripe_plan_label: ["Plan seleccionado", "Selected plan"],
+  stripe_amount_label: ["Monto a pagar", "Amount to pay"],
+  stripe_method_label: ["Método de pago", "Payment method"],
 };
 
 /* =============================================================================
@@ -525,6 +567,7 @@ let wizardSelectedPlan = null;
 let wizardPaymentType = "monthly";
 let wizardPaymentMethod = "card"; // "card" | "zelle" | "bank"
 let wizardAcceptedTerms = false;
+let wizardCardConfirmStep = false; // "confirmation" | "stripe-form" | false
 let wizardBuyer = {
   name: "",
   lastName: "",
@@ -535,6 +578,11 @@ let wizardBuyer = {
 };
 let wizardFamily = [];
 let revealObserver = null;
+
+// Stripe Elements instances (created on demand)
+let __stripe = null;
+let __elements = null;
+let __cardElement = null;
 
 /* =============================================================================
    HELPERS
@@ -1155,11 +1203,15 @@ function renderStep2() {
 
   // Get method display name
   const getMethodName = (method) => {
-    switch(method) {
-      case "card": return t("wiz_method_card");
-      case "zelle": return t("wiz_method_zelle");
-      case "bank": return t("wiz_method_bank");
-      default: return method;
+    switch (method) {
+      case "card":
+        return t("wiz_method_card");
+      case "zelle":
+        return t("wiz_method_zelle");
+      case "bank":
+        return t("wiz_method_bank");
+      default:
+        return method;
     }
   };
 
@@ -1211,17 +1263,22 @@ function renderStep3() {
         (currentLang === "es" ? " (oferta lanzamiento)" : " (launch offer)");
 
   // Get billing mode display
-  const billingMode = wizardPaymentType === "monthly"
-    ? t("wiz_monthly_title")
-    : t("wiz_annual_title");
+  const billingMode =
+    wizardPaymentType === "monthly"
+      ? t("wiz_monthly_title")
+      : t("wiz_annual_title");
 
   // Get payment method display
   const getMethodDisplay = () => {
-    switch(wizardPaymentMethod) {
-      case "card": return t("wiz_method_card");
-      case "zelle": return t("wiz_method_zelle");
-      case "bank": return t("wiz_method_bank");
-      default: return wizardPaymentMethod || "-";
+    switch (wizardPaymentMethod) {
+      case "card":
+        return t("wiz_method_card");
+      case "zelle":
+        return t("wiz_method_zelle");
+      case "bank":
+        return t("wiz_method_bank");
+      default:
+        return wizardPaymentMethod || "-";
     }
   };
 
@@ -1356,7 +1413,8 @@ function canWizardNext() {
     );
   }
   if (wizardStep === 1) return true;
-  if (wizardStep === 2) return !!(wizardSelectedPlan && wizardPaymentType && wizardPaymentMethod);
+  if (wizardStep === 2)
+    return !!(wizardSelectedPlan && wizardPaymentType && wizardPaymentMethod);
   if (wizardStep === 3) return wizardAcceptedTerms;
   return true;
 }
@@ -1395,7 +1453,7 @@ function wizardBack() {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-INCLUSION DEL WEBHOOK AL FLUJO
+   INCLUSION DEL WEBHOOK AL FLUJO
    ══════════════════════════════════════════════════════════════════════════ */
 async function submitWizard() {
   const payload = {
@@ -1407,18 +1465,352 @@ async function submitWizard() {
     timestamp: new Date().toISOString(),
   };
 
+  // Save payload globally so follow-up functions can reference it
+  window.__lastWizardPayload = payload;
+
+  setWizardProcessing(true);
+
   try {
-    await fetch("https://vmi2945958.contaboserver.net/webhook/legado-wizard", {
+    const resp = await fetch(WIZARD_WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
+
+    // If developer didn't set the webhook URL placeholder, avoid firing a request
+    if (
+      WIZARD_WEBHOOK_URL.includes("TU-N8N") ||
+      !WIZARD_WEBHOOK_URL.startsWith("http")
+    ) {
+      setWizardProcessing(false);
+      showWizardInfo(
+        currentLang === "es"
+          ? "Webhook no configurado"
+          : "Webhook not configured",
+        null,
+        currentLang === "es"
+          ? "Por favor actualiza WIZARD_WEBHOOK_URL en js/main.js con la URL de tu n8n"
+          : "Please update WIZARD_WEBHOOK_URL in js/main.js with your n8n URL",
+      );
+      return;
+    }
+
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+
+    // Try to parse as JSON; if it fails, treat as success
+    let data;
+    try {
+      data = await resp.json();
+    } catch {
+      data = null;
+    }
+
+    // If webhook returned chips (quick replies), show them
+    if (data?.chips) {
+      const chips = Array.isArray(data.chips) ? data.chips : [];
+      showWizardMessageWithChips(
+        data.message ||
+          (currentLang === "es" ? "Respuesta del servidor" : "Server response"),
+        chips,
+      );
+      setWizardProcessing(false);
+      return;
+    }
+
+    // If webhook returned a client_secret (PaymentIntent flow), render Stripe Elements to collect card
+    if (data?.client_secret) {
+      showPaymentIntentForm(data.client_secret, data.message || null);
+      setWizardProcessing(false);
+      return;
+    }
+
+    // If webhook suggests a redirect to checkout (e.g., Stripe Checkout), handle it
+    const checkoutUrl = data?.checkoutUrl || data?.redirectUrl || data?.url;
+    const success =
+      data?.success === true || data?.ok === true || resp.status === 200;
+
+    if (checkoutUrl) {
+      const opened = window.open(checkoutUrl, "_blank");
+      if (opened) {
+        showToast(
+          currentLang === "es"
+            ? "Abriendo pasarela de pago..."
+            : "Opening payment gateway...",
+          "info",
+        );
+        setWizardProcessing(false);
+        closeWizard();
+        return;
+      } else {
+        showWizardInfo(
+          currentLang === "es"
+            ? "Se ha generado la pasarela de pago. Haz click en el enlace para continuar."
+            : "A payment session was created. Click the link to continue.",
+          checkoutUrl,
+        );
+        setWizardProcessing(false);
+        return;
+      }
+    }
+
+    if (success) {
+      showToast(t("toast_confirm"), "success");
+      setWizardProcessing(false);
+      closeWizard();
+      return;
+    }
+
+    // Fallback: show webhook response as info for debugging
+    console.warn("Webhook response:", data);
+    if (data?.instructions) {
+      showWizardInfo(
+        currentLang === "es"
+          ? "Instrucciones de pago:"
+          : "Payment instructions:",
+        null,
+        data.instructions,
+      );
+      setWizardProcessing(false);
+      return;
+    }
+    showToast(
+      currentLang === "es"
+        ? "Solicitud enviada. Revisaremos y contactaremos."
+        : "Request submitted. We'll review and contact you.",
+      "success",
+    );
+    setWizardProcessing(false);
+    closeWizard();
   } catch (e) {
     console.error("Webhook error:", e);
+    showWizardError(
+      currentLang === "es"
+        ? "Error de conexión. Por favor intenta de nuevo."
+        : "Connection error. Please try again.",
+    );
+    setWizardProcessing(false);
   }
+}
 
-  showToast(t("toast_confirm"), "success");
-  closeWizard();
+/* Helper para controlar estado de processing dentro del wizard */
+function setWizardProcessing(on) {
+  const overlay = $("#wizard-overlay");
+  const nextBtn = $("#wizard-next-btn");
+  const backBtn = $("#wizard-back-btn");
+  if (nextBtn) nextBtn.disabled = on;
+  if (backBtn) backBtn.disabled = on;
+  if (overlay) overlay.classList.toggle("wizard-processing", !!on);
+}
+
+/* Muestra un mensaje informativo dentro del wizard */
+function showWizardInfo(title, link, text) {
+  const body = $("#wizard-body");
+  if (!body) {
+    showToast(text || title, "info");
+    return;
+  }
+  const htmlParts = [];
+  if (title)
+    htmlParts.push(`<div class="wizard-info-title">${escapeHTML(title)}</div>`);
+  if (text)
+    htmlParts.push(`<div class="wizard-info-text">${escapeHTML(text)}</div>`);
+  if (link)
+    htmlParts.push(
+      `<div class="wizard-info-link"><a href="${escapeHTML(link)}" target="_blank" rel="noopener">${link}</a></div>`,
+    );
+  htmlParts.push(
+    '<div style="margin-top:1rem"><button id="wizard-retry-btn" class="btn-outline">Volver a intentar</button></div>',
+  );
+  body.innerHTML = htmlParts.join("");
+  $("#wizard-retry-btn")?.addEventListener("click", () => {
+    renderWizardContent();
+  });
+}
+
+/* Muestra un error dentro del wizard con botón reintentar */
+function showWizardError(msg) {
+  const body = $("#wizard-body");
+  if (!body) {
+    showToast(msg, "error");
+    return;
+  }
+  body.innerHTML = `<div class="wizard-error">${escapeHTML(msg)}</div><div style="margin-top:1rem"><button id="wizard-retry-btn" class="btn-outline">Reintentar</button></div>`;
+  $("#wizard-retry-btn")?.addEventListener("click", () => {
+    renderWizardContent();
+  });
+}
+
+/* Muestra un mensaje con "chips" (opciones rápidas) devueltas por el webhook */
+function showWizardMessageWithChips(message, chips) {
+  const body = $("#wizard-body");
+  if (!body) {
+    showToast(message, "info");
+    return;
+  }
+  const parts = [];
+  parts.push(`<div class="wizard-info-title">${escapeHTML(message)}</div>`);
+  if (chips && chips.length) {
+    parts.push(
+      '<div class="wizard-chips" style="margin-top:1rem;display:flex;gap:0.5rem;flex-wrap:wrap">',
+    );
+    chips.forEach((c, i) => {
+      parts.push(
+        `<button class="wizard-chip btn-outline" data-chip-idx="${i}">${escapeHTML(c)}</button>`,
+      );
+    });
+    parts.push("</div>");
+  }
+  parts.push(
+    '<div style="margin-top:1rem"><button id="wizard-retry-btn" class="btn-outline">Cancelar</button></div>',
+  );
+  body.innerHTML = parts.join("");
+
+  $$(".wizard-chip").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const idx = parseInt(btn.dataset.chipIdx);
+      const text = chips[idx];
+      try {
+        setWizardProcessing(true);
+        const follow = {
+          ...window.__lastWizardPayload,
+          reply: text,
+        };
+        const resp = await fetch(WIZARD_WEBHOOK_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(follow),
+        });
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        const data = await resp.json().catch(() => null);
+        const checkoutUrl = data?.checkoutUrl || data?.redirectUrl || data?.url;
+        if (checkoutUrl) {
+          window.open(checkoutUrl, "_blank");
+          showToast(
+            currentLang === "es"
+              ? "Abriendo pasarela de pago..."
+              : "Opening payment gateway...",
+            "info",
+          );
+          setWizardProcessing(false);
+          closeWizard();
+          return;
+        }
+        if (data?.message || data?.instructions) {
+          showWizardInfo(
+            data.message ||
+              (currentLang === "es" ? "Instrucciones:" : "Instructions:"),
+            null,
+            data.instructions || data.message,
+          );
+          setWizardProcessing(false);
+          return;
+        }
+        if (data?.success) {
+          showToast(t("toast_confirm"), "success");
+          setWizardProcessing(false);
+          closeWizard();
+          return;
+        }
+        if (data?.message)
+          showWizardMessageWithChips(data.message, data.chips || []);
+        else renderWizardContent();
+      } catch (e) {
+        console.error("Follow-up webhook error:", e);
+        showWizardError(
+          currentLang === "es"
+            ? "Error al procesar la opción. Intenta de nuevo."
+            : "Error processing option. Try again.",
+        );
+        setWizardProcessing(false);
+      }
+    });
+  });
+
+  $("#wizard-retry-btn")?.addEventListener("click", () => {
+    renderWizardContent();
+  });
+}
+
+/* Render Stripe Elements form inside the wizard when server returns client_secret */
+function showPaymentIntentForm(clientSecret, message) {
+  const body = $("#wizard-body");
+  if (!body) return showToast("Payment init error", "error");
+
+  body.innerHTML = `
+    <div class="payment-intent-box">
+      ${message ? `<div class="wizard-info-text">${escapeHTML(message)}</div>` : ""}
+      <div id="card-element" style="margin-top:1rem"></div>
+      <div id="card-errors" class="form-error" style="margin-top:0.75rem"></div>
+      <div style="margin-top:1rem"><button id="card-pay-btn" class="btn-gold">${t("wiz_confirm")}</button></div>
+    </div>`;
+
+  if (!__stripe) __stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+  if (!__elements) __elements = __stripe.elements();
+  if (__cardElement) {
+    __cardElement.unmount();
+    __cardElement = null;
+  }
+  __cardElement = __elements.create("card", {
+    style: { base: { fontSize: "16px" } },
+  });
+  __cardElement.mount("#card-element");
+
+  const payBtn = $("#card-pay-btn");
+  payBtn?.addEventListener("click", async (e) => {
+    e.preventDefault();
+    payBtn.disabled = true;
+    $("#card-errors").textContent = "";
+    setWizardProcessing(true);
+    try {
+      const res = await __stripe.confirmCardPayment(clientSecret, {
+        payment_method: { card: __cardElement },
+      });
+      if (res.error) {
+        $("#card-errors").textContent = res.error.message || "Payment failed";
+        setWizardProcessing(false);
+        payBtn.disabled = false;
+        return;
+      }
+      if (res.paymentIntent && res.paymentIntent.status === "succeeded") {
+        const notify = {
+          ...window.__lastWizardPayload,
+          intent: "payment_success",
+          paymentIntentId: res.paymentIntent.id,
+        };
+        try {
+          const r = await fetch(WIZARD_WEBHOOK_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(notify),
+          });
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          const data = await r.json().catch(() => null);
+          if (data?.message)
+            showWizardInfo(data.message, null, data.instructions || null);
+          else if (data?.success) {
+            showToast(t("toast_confirm"), "success");
+            closeWizard();
+          } else {
+            showToast(t("toast_confirm"), "success");
+            closeWizard();
+          }
+        } catch (err) {
+          console.error("Notify payment success error:", err);
+          showToast(
+            "Pago realizado, pero error al notificar al servidor. Contacta soporte.",
+            "error",
+          );
+        }
+      }
+    } catch (err) {
+      console.error("confirmCardPayment error", err);
+      $("#card-errors").textContent =
+        "Error procesando pago. Intenta de nuevo.";
+    } finally {
+      setWizardProcessing(false);
+      payBtn.disabled = false;
+    }
+  });
 }
 
 function initWizard() {
