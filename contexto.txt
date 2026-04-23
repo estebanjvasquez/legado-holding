@@ -1,0 +1,256 @@
+================================================================================
+CONTEXTO DE LA SESIÓN - LEGADO Holding
+================================================================================
+
+Fecha: 2026-04-23
+Última actualización: 2026-04-23 (post-sesión)
+Proyecto: Legado Holding - Aplicación de Previsión Funeraria
+Descripción: App web para compra de planes funerarios para venezolamos en USA
+
+================================================================================
+ESTRUCTURA DEL PROYECTO
+================================================================================
+
+legado-holding/
+├── index.html                 # Página principal
+├── css/main.css            # Estilos
+├── js/
+│   ├── main.js            # Lógica principal
+│   └── wizard-generic.js # Componente wizard
+├── images/                # Imágenes
+├── n8n/                  # Workflows de n8n
+├── README.md
+├── IMPLEMENTACION_GUIA.md
+├── n8n_workflow_legado_wizard_v2.json
+├── contexto.txt           # Este archivo
+├── payloads_config.json   # Configuración de payloads
+├── test_webhooks.ps1      # Script PowerShell para pruebas
+├── test_webhooks.sh       # Script Bash para pruebas
+└── [otros archivos de docs]
+
+================================================================================
+CONFIGURACIÓN DE ENDPOINTS
+================================================================================
+
+Webhooks n8n:
+- Payment: https://vmi2945958.contaboserver.net/webhook/legado-payment
+- Stripe Webhook: https://vmi2945958.contaboserver.net/webhook/stripe-webhook-legado
+
+Stripe:
+- Publishable Key: pk_test_51TD0wWIZ8iB3diEjBitOKaGv7OPDilCvCtpOTsA47DiIiVw9lqmZlki1wzDdkOrFRLGiXhdnPULKbuI8ErOmvUQS00ehj9nJZU
+- Secret Key: (configurada en n8n como credencial 'stripe')
+
+Planes y Precios (EUR cents):
+- esencial-zulia: monthly=1499, annual=14388
+- vanguardia-zulia: monthly=2499, annual=23988
+- esencial-selecto: monthly=2999, annual=28788
+- vanguardia-selecto: monthly=4999, annual=47988
+
+================================================================================
+FLUJO DEL SISTEMA
+================================================================================
+
+1. Usuario abre index.html
+2. Click en "Comenzar" abre wizard modal
+3. Wizard Step 0: Recopila datos del comprador (nombre, email, teléfono, etc.)
+4. Wizard Step 1: Recopila datos familiares (nombre, parentesco, fecha nacimiento)
+5. Wizard Step 2: Selección de plan y tipo de pago (mensual/anual)
+6. Wizard Step 3: Resumen y confirmación
+7. Al confirmar:
+   a. Frontend envía POST a /webhook/legado-payment
+   b. n8n recibe request y genera sessionId
+   c. n8n crea PaymentIntent en Stripe
+   d. n8n responde con {client_secret, sessionId}
+   e. Frontend recibe client_secret y muestra formulario Stripe Elements
+   f. Usuario ingresa datos de tarjeta
+   g. Stripe procesa el pago
+   h. Stripe webhook notifica a n8n sobre resultado
+   i. n8n guarda datos en Google Sheets (o responde)
+
+================================================================================
+ARCHIVOS PRINCIPALES
+================================================================================
+
+index.html
+---------------------------------------------------------------------------
+- Página principal con hero, planes, testimonios, FAQ, footer
+- Modal de wizard para proceso de compra
+- Chat de emergencia
+- Configuración global en window.LEGADO_CONFIG:
+  * WIZARD_WEBHOOK_URL
+  * STRIPE_WEBHOOK_URL
+  * STRIPE_PUBLISHABLE_KEY
+
+js/main.js
+---------------------------------------------------------------------------
+- Lógica principal de la aplicación
+- Gestión de idioma (ES/EN)
+- Wizard flow (6 pasos)
+- Chat functionality
+- Integración con Stripe Elements
+- URLs configurables via window.LEGADO_CONFIG
+
+n8n_workflow_legado_wizard_v2.json
+---------------------------------------------------------------------------
+- Workflow principal para procesamiento de pagos
+- Nodos principales:
+  * Legado Webhook (POST /webhook/legado-payment)
+  * Generate sessionId (función JS)
+  * Create PaymentIntent (HTTP Request a Stripe API)
+  * Respond Show Payment (responde con client_secret)
+  * Stripe Webhook (recibe eventos de Stripe)
+  * Verify Stripe Signature
+  * Route by Stripe Event (switch)
+- Credenciales: stripe (apiKey)
+
+================================================================================
+CAMBIOS RECIENTES (2026-04-23)
+================================================================================
+
+1. Cambio de path de webhook
+   - Anterior: legado-wizard (conflictivo con workflow de chat)
+   - Nuevo: legado-payment
+   - Archivos actualizados:
+     * index.html (WIZARD_WEBHOOK_URL)
+     * js/main.js (DEFAULT_WIZARD_WEBHOOK)
+     * n8n_workflow_legado_wizard_v2.json (path del webhook)
+     * contexto.txt
+
+2. Corrección del nodo Respond en n8n
+   - Error: Respondía con toda la respuesta de Stripe (lista de PaymentIntents)
+   - Solución: Configurar Response Data como expression con formato correcto
+   - Formato correcto: {"client_secret": "{{ $json.client_secret }}", "sessionId": "{{ $json.sessionId }}"}
+
+================================================================================
+ESTADO DE IMPLEMENTACIÓN
+================================================================================
+
+✅ Frontend (index.html)
+   - Estructura HTML completa
+   - Estilos CSS aplicados
+   - Modal de wizard funcional
+   - Chat de emergencia
+
+✅ JavaScript (main.js)
+   - Navegación y revelación animada
+   - Cambio de idioma ES/EN
+   - Wizard de 6 pasos
+   - Integración con webhook
+   - Stripe Elements para pago con tarjeta
+
+✅ n8n Workflow
+   - Webhook receptor de requests
+   - Generación de sessionId
+   - Creación de PaymentIntent en Stripe
+   - Respuesta con client_secret
+   - Manejo de webhooks de Stripe
+
+✅ Stripe Integration
+   - Publishable Key configurada
+   - Secret Key en n8n
+   - PaymentIntents funcionando
+
+⚠️ Pendiente:
+   - Guardar datos en Google Sheets tras pago exitoso
+   - Configurar webhook de Stripe en dashboard de Stripe
+   - Testing completo del flujo desde el navegador
+
+================================================================================
+PRUEBAS REALIZADAS
+================================================================================
+
+Postman - POST /webhook/legado-payment
+---------------------------------------------------------------------------
+Request:
+{
+  "intent": "create_payment_intent",
+  "plan": "esencial-zulia",
+  "paymentType": "monthly",
+  "buyer": {
+    "name": "Test User",
+    "email": "test@example.com"
+  }
+}
+
+Response (CORRECTO):
+{
+  "client_secret": "pi_3TOytIIZ8iB3diEj1k8mGOW1_secret_QyKU8yxEGV9gPKvA9XIo4tpD0",
+  "sessionId": "sess_1776931532061_uxp9i5vhv"
+}
+
+================================================================================
+CONFIGURACIÓN DE STRIPE DASHBOARD
+================================================================================
+
+Para que los webhooks de Stripe funcionen completamente:
+
+1. Ir a https://dashboard.stripe.com/settings/webhooks
+2. Agregar endpoint: https://vmi2945958.contaboserver.net/webhook/stripe-webhook-legado
+3. Seleccionar eventos:
+   - payment_intent.succeeded
+   - payment_intent.payment_failed
+   - payment_intent.canceled
+
+================================================================================
+VARIABLES DE ENTORNO / CONFIG
+================================================================================
+
+// En index.html (window.LEGADO_CONFIG)
+WIZARD_WEBHOOK_URL: "https://vmi2945958.contaboserver.net/webhook/legado-payment"
+STRIPE_WEBHOOK_URL: "https://vmi2945958.contaboserver.net/webhook/stripe-webhook-legado"
+STRIPE_PUBLISHABLE_KEY: "pk_test_51TD0wWIZ8iB3diEjBitOKaGv7OPDilCvCtpOTsA47DiIiVw9lqmZlki1wzDdkOrFRLGiXhdnPULKbuI8ErOmvUQS00ehj9nJZU"
+
+// En js/main.js
+DEFAULT_STRIPE_KEY: "pk_test_51TD0wWIZ8iB3diEjBitOKaGv7OPDilCvCtpOTsA47DiIiVw9lqmZlki1wzDdkOrFRLGiXhdnPULKbuI8ErOmvUQS00ehj9nJZU"
+DEFAULT_WIZARD_WEBHOOK: "https://vmi2945958.contaboserver.net/webhook/legado-payment"
+DEFAULT_STRIPE_WEBHOOK: "https://vmi2945958.contaboserver.net/webhook/stripe-webhook-legado"
+
+// En n8n (Credentials > stripe)
+apiKey: sk_test_... (Secret Key de Stripe)
+
+================================================================================
+TOKENS/KEYS IMPORTANTES
+================================================================================
+
+Stripe Publishable Key (test):
+pk_test_51TD0wWIZ8iB3diEjBitOKaGv7OPDilCvCtpOTsA47DiIiVw9lqmZlki1wzDdkOrFRLGiXhdnPULKbuI8ErOmvUQS00ehj9nJZU
+
+Stripe Secret Key (test):
+sk_test_... (configurada en n8n, NO compartir)
+
+n8n Webhook URL (payment):
+https://vmi2945958.contaboserver.net/webhook/legado-payment
+
+n8n Webhook URL (stripe events):
+https://vmi2945958.contaboserver.net/webhook/stripe-webhook-legado
+
+================================================================================
+NOTAS IMPORTANTES
+================================================================================
+
+1. El webhook de payment usa el path "legado-payment" para evitar conflicto
+   con workflows de chat que usaban "legado-wizard"
+
+2. Los PaymentIntents se crean en USD (currency: usd)
+
+3. El wizard espera una respuesta exacta con {client_secret, sessionId}
+
+4. El frontend usa Stripe Elements para capturar datos de tarjeta de forma segura
+
+5. Los precios están en EUR cents en el workflow de n8n, pero Stripe usa USD
+
+================================================================================
+COMANDOS DE PRUEBA
+================================================================================
+
+cURL para probar webhook:
+curl -X POST "https://vmi2945958.contaboserver.net/webhook/legado-payment" \
+  -H "Content-Type: application/json" \
+  -d '{"intent":"create_payment_intent","plan":"esencial-zulia","paymentType":"monthly","buyer":{"name":"Test","email":"test@test.com"}}'
+
+PowerShell (desde test_webhooks.ps1):
+.\test_webhooks.ps1
+
+================================================================================
+FIN DEL CONTEXTO
+================================================================================
