@@ -1,0 +1,678 @@
+{
+  "name": "LEGADO_Wizard v2",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "stripe-webhook-legado",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "c0ec4775-2ee5-4b6b-8561-ea78d29a8bfe",
+      "name": "Stripe Payment Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        464,
+        1712
+      ],
+      "webhookId": "b8e2d4f6-a1c3-5790-bcde-f01234567890"
+    },
+    {
+      "parameters": {
+        "jsCode": "// STEP 5: Parsear evento de Stripe\nconst body = $input.first().json.body || {};\n\nconst eventType = body.type || '';\nconst dataObj = (body.data && body.data.object) ? body.data.object : {};\nconst chargesArr = (dataObj.charges && dataObj.charges.data && dataObj.charges.data.length > 0) ? dataObj.charges.data[0] : {};\nconst meta = dataObj.metadata || {};\n\nreturn [{\n  json: {\n    eventType: eventType,\n    paymentIntentId: dataObj.id || '',\n    status: dataObj.status || '',\n    amount: dataObj.amount || 0,\n    amountReceived: dataObj.amount_received || 0,\n    currency: dataObj.currency || 'usd',\n    sessionId: meta.sessionId || '',\n    plan: meta.plan || '',\n    paymentType: meta.paymentType || '',\n    customerEmail: meta.customerEmail || '',\n    succeeded: dataObj.status === 'succeeded',\n    created: dataObj.created || 0,\n    chargeId: chargesArr.id || '',\n    chargeStatus: chargesArr.status || '',\n    receiptUrl: chargesArr.receipt_url || ''\n  }\n}];\n"
+      },
+      "id": "bcf7d706-b09f-41ae-b742-1e560d9e487a",
+      "name": "Parse Stripe Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        704,
+        1712
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.succeeded }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "26d3aa17-ee09-4c21-a8f4-51c2454aa216",
+      "name": "Validate Payment",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        928,
+        1712
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, message: 'El pago no se pudo procesar. Por favor intenta nuevamente con otra tarjeta.', status: $json.status, sessionId: $json.sessionId, paymentIntentId: $json.paymentIntentId }) }}",
+        "options": {}
+      },
+      "id": "c5662c35-86de-4fa4-874d-dbdc920e9169",
+      "name": "Handle Payment Failure",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1152,
+        1872
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "legado-wizard",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "822fbe9f-c73f-4608-91ae-bb987785331b",
+      "name": "Chat Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        448,
+        1376
+      ],
+      "webhookId": "7d95a1be-8afe-49bc-bc4e-520848097115"
+    },
+    {
+      "parameters": {
+        "jsCode": "// STEP 1: Generar Session ID unico\nconst sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);\n\nconst body = $input.first().json.body || {};\n\nconst intent = (body.intent || '').toLowerCase();\nconst plan = body.plan || body.formPayload?.plan || null;\nconst paymentType = body.paymentType || body.formPayload?.paymentType || 'monthly';\nconst buyer = body.buyer || body.formPayload?.buyer || body.formPayload?.titular || {};\nconst family = body.family || body.formPayload?.family || [];\nconst timestamp = body.timestamp || new Date().toISOString();\n\nlet resolvedIntent = 'other';\n\nif (intent === 'confirm') {\n  resolvedIntent = 'confirm';\n} else if (intent === 'payment_success') {\n  resolvedIntent = 'payment_success';\n} else if (intent === 'chat' || intent === 'other') {\n  resolvedIntent = intent;\n}\n\nreturn [{\n  json: {\n    sessionId,\n    intent: resolvedIntent,\n    plan,\n    paymentType,\n    buyer,\n    family,\n    timestamp,\n    email: buyer.email || ''\n  }\n}];\n"
+      },
+      "id": "2f1b0928-c0cc-414f-84a6-c867b1f9976e",
+      "name": "Classify Message1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        704,
+        1376
+      ]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.intent }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "confirm"
+            },
+            {
+              "value2": "payment_success",
+              "output": 1
+            }
+          ]
+        },
+        "fallbackOutput": 2
+      },
+      "id": "5963f042-3ae7-4cfa-80e1-8389104f1a50",
+      "name": "Route by Intent1",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        928,
+        1376
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.stripe.com/v1/payment_intents",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "stripeApi",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "amount",
+              "value": "={{\n  (() => {\n    const plan = $('Classify Message1').item.json.plan;\n    const paymentType = $('Classify Message1').item.json.paymentType;\n    const amounts = {\n      'esencial-zulia': { monthly: 947, annual: 9470 },\n      'vanguardia-zulia': { monthly: 1470, annual: 14700 },\n      'esencial-selecto': { monthly: 947, annual: 20200 },\n      'vanguardia-selecto': { monthly: 1470, annual: 12970 }\n    };\n    const planAmounts = amounts[plan] || amounts['esencial-zulia'];\n    return paymentType === 'annual' ? planAmounts.annual : planAmounts.monthly;\n  })()\n}}"
+            },
+            {
+              "name": "currency",
+              "value": "usd"
+            },
+            {
+              "name": "receipt_email",
+              "value": "={{ $('Classify Message1').item.json.email }}"
+            },
+            {
+              "name": "metadata[sessionId]",
+              "value": "={{ $('Classify Message1').item.json.sessionId }}"
+            },
+            {
+              "name": "metadata[plan]",
+              "value": "={{ $('Classify Message1').item.json.plan }}"
+            },
+            {
+              "name": "metadata[paymentType]",
+              "value": "={{ $('Classify Message1').item.json.paymentType }}"
+            },
+            {
+              "name": "metadata[customerEmail]",
+              "value": "={{ $('Classify Message1').item.json.email }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "77ea1749-ff6e-4e4d-b92a-77d6b15a577d",
+      "name": "Stripe Create PaymentIntent1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1152,
+        1152
+      ],
+      "credentials": {
+        "stripeApi": {
+          "id": "AfTWqPg4UqSBCr4p",
+          "name": "Stripe account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ sessionId: $('Classify Message1').item.json.sessionId, client_secret: $json.client_secret, paymentIntentId: $json.id, amount: $json.amount, currency: $json.currency, metadata: $json.metadata, message: 'Datos confirmados. Ingresa los datos de tu tarjeta para completar el pago.', created: $json.created }) }}",
+        "options": {}
+      },
+      "id": "b8504532-ee83-4ebc-af73-b27a6e956983",
+      "name": "Respond Show Payment1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1472,
+        1152
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "options": {}
+      },
+      "id": "53df3b8e-056f-414a-897d-5c60b9a71550",
+      "name": "Get All IN Clients1",
+      "type": "n8n-nodes-base.invoiceNinja",
+      "typeVersion": 1,
+      "position": [
+        1152,
+        1584
+      ],
+      "credentials": {
+        "invoiceNinjaApi": {
+          "id": "OGGlj1QvDIPdp7Jz",
+          "name": "Invoice Ninja account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst email = $('Parse Stripe Event').item.json.customerEmail;\nconst match = items.find(function(i) {\n  return i.json.contacts && i.json.contacts[0] && i.json.contacts[0].email === email;\n});\nif (match) {\n  return [{ json: { clientId: match.json.id, isNew: false } }];\n}\nreturn [{ json: { clientId: null, isNew: true } }];\n"
+      },
+      "id": "e4596d12-c628-4d5b-b765-a6764b0eeedc",
+      "name": "Find Matching Client1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        1584
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.isNew }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "648942d9-95bb-4def-999a-fc22a29645eb",
+      "name": "Client Is New1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1584,
+        1584
+      ]
+    },
+    {
+      "parameters": {
+        "apiVersion": "v4",
+        "resource": "client",
+        "operation": "create",
+        "additionalFields": {},
+        "billingAddressUi": {},
+        "contactsUi": {},
+        "shippingAddressUi": {}
+      },
+      "id": "9f417c6d-5e4e-41eb-9577-0c851b11b3a8",
+      "name": "Create IN Client1",
+      "type": "n8n-nodes-base.invoiceNinja",
+      "typeVersion": 1,
+      "position": [
+        1808,
+        1472
+      ],
+      "credentials": {
+        "invoiceNinjaApi": {
+          "id": "OGGlj1QvDIPdp7Jz",
+          "name": "Invoice Ninja account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "clientId",
+              "value": "={{ $json.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "19fefa8d-fb54-4ae9-bd3f-19f64a08158c",
+      "name": "Set New Client ID1",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        2032,
+        1472
+      ]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "clientId",
+              "value": "={{ $json.clientId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "bd3b72e4-f934-4b8c-9267-e869a2d37b13",
+      "name": "Set Existing Client ID1",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        1808,
+        1712
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "passThrough"
+      },
+      "id": "bc9c889d-33a1-4ba7-99d5-2e2f7d28e184",
+      "name": "Merge Client Paths1",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 1,
+      "position": [
+        2240,
+        1584
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "invoice",
+        "additionalFields": {}
+      },
+      "id": "ff75747b-95c2-4c53-b6e0-b8a8a594d495",
+      "name": "Create IN Invoice1",
+      "type": "n8n-nodes-base.invoiceNinja",
+      "typeVersion": 1,
+      "position": [
+        2464,
+        1584
+      ],
+      "credentials": {
+        "invoiceNinjaApi": {
+          "id": "OGGlj1QvDIPdp7Jz",
+          "name": "Invoice Ninja account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://invoicing.legadoholding.com/api/v1/clients/' + $('Merge Client Paths1').item.json.clientId + '/invite' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Token",
+              "value": "jPiS6kR2fge6JVHWbHPxEuknwu4thTQtGh6IG2li1AFKJ0nFdfU4MYcK53gcnYpg"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d0941f90-ef01-48d0-a4ae-1ae35a0aaa58",
+      "name": "Send Portal Invite1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        2688,
+        1584
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, sessionId: $('Parse Stripe Event').item.json.sessionId, paymentIntentId: $('Parse Stripe Event').item.json.paymentIntentId, chargeId: $('Parse Stripe Event').item.json.chargeId, status: $('Parse Stripe Event').item.json.status, amount: $('Parse Stripe Event').item.json.amount, currency: $('Parse Stripe Event').item.json.currency, message: 'Tu plan ha sido activado. Recibiras un correo en ' + $('Parse Stripe Event').item.json.customerEmail + ' con instrucciones para acceder al portal de clientes. Gracias por confiar en LEGADO.', action: 'payment_success', created: $('Parse Stripe Event').item.json.created }) }}",
+        "options": {}
+      },
+      "id": "d55e197b-60cf-41cf-992e-f657775b335c",
+      "name": "Respond Success1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        2912,
+        1584
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ message: 'Cuando estes listo, escribe SI para confirmar los datos y proceder al pago.', chips: ['Si, confirmo los datos', 'Necesito corregir algo'] }) }}",
+        "options": {}
+      },
+      "id": "4c23bd8e-6ee8-4366-b5b5-124ca51626fd",
+      "name": "Respond Fallback1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1152,
+        1376
+      ]
+    }
+  ],
+  "pinData": {
+    "Chat Webhook": [
+      {
+        "json": {
+          "headers": {
+            "host": "vmi2945958.contaboserver.net",
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36 Edg/147.0.0.0",
+            "content-length": "310",
+            "accept": "*/*",
+            "accept-encoding": "gzip, deflate, br, zstd",
+            "accept-language": "es,es-ES;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
+            "content-type": "application/json",
+            "origin": "http://127.0.0.1:8080",
+            "priority": "u=1, i",
+            "referer": "http://127.0.0.1:8080/",
+            "sec-ch-ua": "\"Microsoft Edge\";v=\"147\", \"Not.A/Brand\";v=\"8\", \"Chromium\";v=\"147\"",
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": "\"Windows\"",
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "cross-site",
+            "via": "2.0 Caddy",
+            "x-forwarded-for": "20.107.186.133",
+            "x-forwarded-host": "vmi2945958.contaboserver.net",
+            "x-forwarded-proto": "https"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "intent": "create_payment_intent",
+            "paymentMethod": "card",
+            "plan": "vanguardia-zulia",
+            "paymentType": "annual",
+            "buyer": {
+              "name": "Esteban",
+              "lastName": "Vasquez",
+              "cedula": "V-6748677",
+              "phone": "+34645572821",
+              "email": "estebanjvasquez@gmail.com",
+              "birthDate": "1971-11-10"
+            },
+            "family": [],
+            "timestamp": "2026-04-22T11:50:48.655Z"
+          },
+          "webhookUrl": "https://vmi2945958.contaboserver.net/webhook/legado-wizard",
+          "executionMode": "production"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Stripe Payment Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Stripe Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Stripe Event": {
+      "main": [
+        [
+          {
+            "node": "Validate Payment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Payment": {
+      "main": [
+        [
+          {
+            "node": "Get All IN Clients1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Payment Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat Webhook": {
+      "main": [
+        [
+          {
+            "node": "Classify Message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Message1": {
+      "main": [
+        [
+          {
+            "node": "Route by Intent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Intent1": {
+      "main": [
+        [
+          {
+            "node": "Stripe Create PaymentIntent1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Fallback1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Fallback1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stripe Create PaymentIntent1": {
+      "main": [
+        [
+          {
+            "node": "Respond Show Payment1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All IN Clients1": {
+      "main": [
+        [
+          {
+            "node": "Find Matching Client1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Matching Client1": {
+      "main": [
+        [
+          {
+            "node": "Client Is New1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Client Is New1": {
+      "main": [
+        [
+          {
+            "node": "Create IN Client1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Existing Client ID1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create IN Client1": {
+      "main": [
+        [
+          {
+            "node": "Set New Client ID1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set New Client ID1": {
+      "main": [
+        [
+          {
+            "node": "Merge Client Paths1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Existing Client ID1": {
+      "main": [
+        [
+          {
+            "node": "Merge Client Paths1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Client Paths1": {
+      "main": [
+        [
+          {
+            "node": "Create IN Invoice1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create IN Invoice1": {
+      "main": [
+        [
+          {
+            "node": "Send Portal Invite1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Portal Invite1": {
+      "main": [
+        [
+          {
+            "node": "Respond Success1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "f77098ae-d912-4bb9-b222-84799df10acf",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "0869bb34a40714e1449fc63bb52eef3512c31ec145f008f9f8a559029d0d652e"
+  },
+  "id": "Pykq4DuLOptY4TmO",
+  "tags": []
+}
