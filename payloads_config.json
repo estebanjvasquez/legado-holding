@@ -1,3 +1,5 @@
+
+legado-holding\payloads_config.json#L1-310
 {
   "test_payloads": {
     "wizard_webhook": {
@@ -81,9 +83,7 @@
             "next_action": null,
             "on_behalf_of": null,
             "payment_method": "pm_1234567890ABCDEF",
-            "payment_method_types": [
-              "card"
-            ],
+            "payment_method_types": ["card"],
             "receipt_email": "cliente@example.com",
             "setup_future_usage": null,
             "statement_descriptor": null,
@@ -160,6 +160,45 @@
           "retryUrl": "https://portal.legado.com/retry?session=sess_1682502901_b2c3d4e5"
         }
       }
+    }
+  },
+  "invoice_ninja": {
+    "base_url": "https://invoicing.legadoholding.com",
+    "api_token": "WXngbLQXx5RPDsH0APTEopqf4Ja9U6Jdyt8MQK5qoVicK6jfNUCXDqDy5mXprtTV",
+    "headers": {
+      "X-API-TOKEN": "WXngbLQXx5RPDsH0APTEopqf4Ja9U6Jdyt8MQK5qoVicK6jfNUCXDqDy5mXprtTV",
+      "Accept": "application/json",
+      "Content-Type": "application/json"
+    },
+    "endpoints": {
+      "clients": {
+        "list": "/api/v1/clients",
+        "get": "/api/v1/clients/{id}",
+        "create": "/api/v1/clients",
+        "update": "/api/v1/clients/{id}"
+      },
+      "invoices": {
+        "list": "/api/v1/invoices",
+        "get": "/api/v1/invoices/{id}",
+        "create": "/api/v1/invoices",
+        "send": "/api/v1/invoices/{id}/send"
+      },
+      "payments": {
+        "list": "/api/v1/payments",
+        "get": "/api/v1/payments/{id}",
+        "create": "/api/v1/payments"
+      },
+      "products": {
+        "list": "/api/v1/products",
+        "get": "/api/v1/products/{id}",
+        "create": "/api/v1/products"
+      }
+    },
+    "curl_examples": {
+      "list_clients": "curl -s -X GET \"https://invoicing.legadoholding.com/api/v1/clients\" -H \"X-API-TOKEN: WXngbLQXx5RPDsH0APTEopqf4Ja9U6Jdyt8MQK5qoVicK6jfNUCXDqDy5mXprtTV\" -H \"Accept: application/json\" -k",
+      "list_invoices": "curl -s -X GET \"https://invoicing.legadoholding.com/api/v1/invoices\" -H \"X-API-TOKEN: WXngbLQXx5RPDsH0APTEopqf4Ja9U6Jdyt8MQK5qoVicK6jfNUCXDqDy5mXprtTV\" -H \"Accept: application/json\" -k",
+      "list_products": "curl -s -X GET \"https://invoicing.legadoholding.com/api/v1/products\" -H \"X-API-TOKEN: WXngbLQXx5RPDsH0APTEopqf4Ja9U6Jdyt8MQK5qoVicK6jfNUCXDqDy5mXprtTV\" -H \"Accept: application/json\" -k",
+      "create_client": "curl -s -X POST \"https://invoicing.legadoholding.com/api/v1/clients\" -H \"X-API-TOKEN: WXngbLQXx5RPDsH0APTEopqf4Ja9U6Jdyt8MQK5qoVicK6jfNUCXDqDy5mXprtTV\" -H \"Accept: application/json\" -H \"Content-Type: application/json\" -d '{\"name\":\"Nombre Cliente\",\"email\":\"cliente@example.com\"}' -k"
     }
   },
   "test_scenarios": [
@@ -269,11 +308,18 @@
       "item": "Failed payment flow",
       "test": "Send payment_intent.payment_failed event",
       "expected": "Session marked failed, email sent to customer"
+    },
+    {
+      "item": "InvoiceNinja API connectivity",
+      "test": "curl to /api/v1/clients endpoint",
+      "expected": "Returns client list with 200 OK"
     }
   ],
   "curl_test_examples": {
     "test_wizard_webhook": "curl -X POST https://vmi2945958.contaboserver.net/webhook/legado-wizard -H 'Content-Type: application/json' -d '{\"plan\":\"esencial-zulia\",\"email\":\"test@example.com\",\"amount\":4990,\"currency\":\"usd\"}'",
     "test_stripe_webhook": "curl -X POST https://vmi2945958.contaboserver.net/webhook/stripe-webhook-legado -H 'Content-Type: application/json' -H 'X-Stripe-Signature: test' -d '@payload.json'",
-    "check_n8n_logs": "# Login to n8n → Workflow: LEGADO_Wizard → Logs tab → Filter by timestamp"
+    "check_n8n_logs": "# Login to n8n → Workflow: LEGADO_Wizard → Logs tab → Filter by timestamp",
+    "test_invoice_ninja_clients": "curl -s -X GET \"https://invoicing.legadoholding.com/api/v1/clients\" -H \"X-API-TOKEN: WXngbLQXx5RPDsH0APTEopqf4Ja9U6Jdyt8MQK5qoVicK6jfNUCXDqDy5mXprtTV\" -H \"Accept: application/json\" -k",
+    "test_invoice_ninja_invoices": "curl -s -X GET \"https://invoicing.legadoholding.com/api/v1/invoices\" -H \"X-API-TOKEN: WXngbLQXx5RPDsH0APTEopqf4Ja9U6Jdyt8MQK5qoVicK6jfNUCXDqDy5mXprtTV\" -H \"Accept: application/json\" -k"
   }
 }

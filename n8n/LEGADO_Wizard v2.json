@@ -14,10 +14,7 @@
       "name": "Stripe Payment Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
-      "position": [
-        464,
-        1712
-      ],
+      "position": [464, 1712],
       "webhookId": "b8e2d4f6-a1c3-5790-bcde-f01234567890"
     },
     {
@@ -28,10 +25,7 @@
       "name": "Parse Stripe Event",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        704,
-        1712
-      ]
+      "position": [704, 1712]
     },
     {
       "parameters": {
@@ -48,10 +42,7 @@
       "name": "Validate Payment",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [
-        928,
-        1712
-      ]
+      "position": [928, 1712]
     },
     {
       "parameters": {
@@ -63,15 +54,12 @@
       "name": "Handle Payment Failure",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [
-        1152,
-        1872
-      ]
+      "position": [1152, 1872]
     },
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "legado-wizard",
+        "path": "legado-payment",
         "responseMode": "responseNode",
         "options": {
           "allowedOrigins": "*"
@@ -81,10 +69,7 @@
       "name": "Chat Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
-      "position": [
-        448,
-        1376
-      ],
+      "position": [448, 1376],
       "webhookId": "7d95a1be-8afe-49bc-bc4e-520848097115"
     },
     {
@@ -95,10 +80,7 @@
       "name": "Classify Message1",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        704,
-        1376
-      ]
+      "position": [704, 1376]
     },
     {
       "parameters": {
@@ -121,10 +103,7 @@
       "name": "Route by Intent1",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 1,
-      "position": [
-        928,
-        1376
-      ]
+      "position": [928, 1376]
     },
     {
       "parameters": {
@@ -172,10 +151,7 @@
       "name": "Stripe Create PaymentIntent1",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [
-        1152,
-        1152
-      ],
+      "position": [1152, 1152],
       "credentials": {
         "stripeApi": {
           "id": "AfTWqPg4UqSBCr4p",
@@ -193,10 +169,7 @@
       "name": "Respond Show Payment1",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [
-        1472,
-        1152
-      ]
+      "position": [1472, 1152]
     },
     {
       "parameters": {
@@ -207,10 +180,7 @@
       "name": "Get All IN Clients1",
       "type": "n8n-nodes-base.invoiceNinja",
       "typeVersion": 1,
-      "position": [
-        1152,
-        1584
-      ],
+      "position": [1152, 1584],
       "credentials": {
         "invoiceNinjaApi": {
           "id": "OGGlj1QvDIPdp7Jz",
@@ -226,10 +196,7 @@
       "name": "Find Matching Client1",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        1360,
-        1584
-      ]
+      "position": [1360, 1584]
     },
     {
       "parameters": {
@@ -246,10 +213,7 @@
       "name": "Client Is New1",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [
-        1584,
-        1584
-      ]
+      "position": [1584, 1584]
     },
     {
       "parameters": {
@@ -265,10 +229,7 @@
       "name": "Create IN Client1",
       "type": "n8n-nodes-base.invoiceNinja",
       "typeVersion": 1,
-      "position": [
-        1808,
-        1472
-      ],
+      "position": [1808, 1472],
       "credentials": {
         "invoiceNinjaApi": {
           "id": "OGGlj1QvDIPdp7Jz",
@@ -292,10 +253,7 @@
       "name": "Set New Client ID1",
       "type": "n8n-nodes-base.set",
       "typeVersion": 1,
-      "position": [
-        2032,
-        1472
-      ]
+      "position": [2032, 1472]
     },
     {
       "parameters": {
@@ -313,10 +271,7 @@
       "name": "Set Existing Client ID1",
       "type": "n8n-nodes-base.set",
       "typeVersion": 1,
-      "position": [
-        1808,
-        1712
-      ]
+      "position": [1808, 1712]
     },
     {
       "parameters": {
@@ -326,10 +281,7 @@
       "name": "Merge Client Paths1",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 1,
-      "position": [
-        2240,
-        1584
-      ]
+      "position": [2240, 1584]
     },
     {
       "parameters": {
@@ -340,10 +292,7 @@
       "name": "Create IN Invoice1",
       "type": "n8n-nodes-base.invoiceNinja",
       "typeVersion": 1,
-      "position": [
-        2464,
-        1584
-      ],
+      "position": [2464, 1584],
       "credentials": {
         "invoiceNinjaApi": {
           "id": "OGGlj1QvDIPdp7Jz",
@@ -370,10 +319,7 @@
       "name": "Send Portal Invite1",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [
-        2688,
-        1584
-      ]
+      "position": [2688, 1584]
     },
     {
       "parameters": {
@@ -385,10 +331,7 @@
       "name": "Respond Success1",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [
-        2912,
-        1584
-      ]
+      "position": [2912, 1584]
     },
     {
       "parameters": {
@@ -400,10 +343,7 @@
       "name": "Respond Fallback1",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [
-        1152,
-        1376
-      ]
+      "position": [1152, 1376]
     }
   ],
   "pinData": {

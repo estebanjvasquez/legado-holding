@@ -1,0 +1,346 @@
+{
+  "name": "LEGADO_Payment_Flow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "legado-payment",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook-payment",
+      "name": "Legado Payment Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [250, 300],
+      "webhookId": "legado-payment-main"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate unique session ID and process payment request\nconst sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);\n\nconst body = $input.first().json.body || {};\n\nconst intent = (body.intent || '').toLowerCase();\nconst plan = body.plan || body.formPayload?.plan || null;\nconst paymentType = body.paymentType || body.formPayload?.paymentType || 'monthly';\nconst buyer = body.buyer || body.formPayload?.buyer || body.formPayload?.titular || {};\nconst family = body.family || body.formPayload?.family || [];\nconst timestamp = body.timestamp || new Date().toISOString();\n\nconst buyerName = buyer.name || '';\nconst buyerLastName = buyer.lastName || '';\nconst buyerEmail = buyer.email || '';\nconst buyerPhone = buyer.phone || '';\n\nreturn [{\n  json: {\n    sessionId,\n    intent,\n    plan,\n    paymentType,\n    buyer: {\n      name: buyerName,\n      lastName: buyerLastName,\n      email: buyerEmail,\n      phone: buyerPhone\n    },\n    family: family,\n    timestamp,\n    email: buyerEmail,\n    customerName: buyerName + ' ' + buyerLastName\n  }\n}];"
+      },
+      "id": "process-payment-request",
+      "name": "Process Payment Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Calculate amount based on plan and payment type\nconst plan = $('Process Payment Request').item.json.plan;\nconst paymentType = $('Process Payment Request').item.json.paymentType;\n\nconst amounts = {\n  'esencial-zulia': { monthly: 947, annual: 9470 },\n  'vanguardia-zulia': { monthly: 1470, annual: 14700 },\n  'esencial-selecto': { monthly: 947, annual: 20200 },\n  'vanguardia-selecto': { monthly: 1470, annual: 12970 }\n};\n\nconst planAmounts = amounts[plan] || amounts['esencial-zulia'];\nconst amount = paymentType === 'annual' ? planAmounts.annual : planAmounts.monthly;\n\nreturn [{\n  json: {\n    ...$('Process Payment Request').item.json,\n    amount: amount\n  }\n}];"
+      },
+      "id": "calculate-amount",
+      "name": "Calculate Amount",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 500]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.stripe.com/v1/payment_intents",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "stripeApi",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {"name": "amount", "value": "={{ $('Calculate Amount').item.json.amount }}"},
+            {"name": "currency", "value": "usd"},
+            {"name": "receipt_email", "value": "={{ $('Process Payment Request').item.json.email }}"},
+            {"name": "metadata[sessionId]", "value": "={{ $('Process Payment Request').item.json.sessionId }}"},
+            {"name": "metadata[plan]", "value": "={{ $('Process Payment Request').item.json.plan }}"},
+            {"name": "metadata[paymentType]", "value": "={{ $('Process Payment Request').item.json.paymentType }}"},
+            {"name": "metadata[customerEmail]", "value": "={{ $('Process Payment Request').item.json.email }}"},
+            {"name": "metadata[customerName]", "value": "={{ $('Process Payment Request').item.json.customerName }}"}
+          ]
+        },
+        "options": {}
+      },
+      "id": "create-stripe-payment-intent",
+      "name": "Create Stripe PaymentIntent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [750, 300],
+      "credentials": {"stripeApi": {"id": "stripe-creds", "name": "Stripe account"}}
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, sessionId: $('Process Payment Request').item.json.sessionId, client_secret: $json.client_secret, paymentIntentId: $json.id, amount: $json.amount, currency: $json.currency, message: 'Datos confirmados. Ingresa los datos de tu tarjeta para completar el pago.', created: $json.created }) }}",
+        "options": {}
+      },
+      "id": "respond-payment-created",
+      "name": "Respond - Payment Created",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "stripe-webhook-legado",
+        "responseMode": "responseNode",
+        "options": {"allowedOrigins": "*"}
+      },
+      "id": "webhook-stripe-event",
+      "name": "Stripe Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [250, 900],
+      "webhookId": "stripe-webhook-legado"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Stripe webhook event\nconst body = $input.first().json.body || {};\n\nconst eventType = body.type || '';\nconst dataObj = (body.data && body.data.object) ? body.data.object : {};\n\nlet chargeData = {};\nif (dataObj.charges && dataObj.charges.data && dataObj.charges.data.length > 0) {\n  chargeData = dataObj.charges.data[0];\n} else if (dataObj.latest_charge) {\n  chargeData = { id: dataObj.latest_charge };\n}\n\nconst meta = dataObj.metadata || {};\n\nreturn [{\n  json: {\n    eventType,\n    eventId: body.id || '',\n    paymentIntentId: dataObj.id || '',\n    status: dataObj.status || '',\n    amount: dataObj.amount || 0,\n    amountReceived: dataObj.amount_received || 0,\n    currency: dataObj.currency || 'usd',\n    sessionId: meta.sessionId || '',\n    plan: meta.plan || '',\n    paymentType: meta.paymentType || '',\n    customerEmail: meta.customerEmail || '',\n    customerName: meta.customerName || '',\n    succeeded: dataObj.status === 'succeeded',\n    created: dataObj.created || 0,\n    chargeId: chargeData.id || '',\n    chargeStatus: chargeData.status || '',\n    receiptUrl: chargeData.receipt_url || '',\n    failureMessage: dataObj.last_payment_error?.message || '',\n    failureCode: dataObj.last_payment_error?.code || ''\n  }\n}];"
+      },
+      "id": "parse-stripe-event",
+      "name": "Parse Stripe Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 900]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [{"value1": "={{ $json.succeeded }}", "value2": true}]
+        }
+      },
+      "id": "validate-payment-success",
+      "name": "Validate Payment Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [750, 900]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, message: 'El pago no se completo. ' + ($json.failureMessage || 'Por favor intenta nuevamente.') }) }}",
+        "options": {}
+      },
+      "id": "respond-payment-failed",
+      "name": "Respond - Payment Failed",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [2000, 700]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "options": {"limit": 1000}
+      },
+      "id": "get-all-clients",
+      "name": "Get All IN Clients",
+      "type": "n8n-nodes-base.invoiceNinja",
+      "typeVersion": 1.2,
+      "position": [1000, 1100],
+      "credentials": {"invoiceNinjaApi": {"id": "invoice-ninja-creds", "name": "Invoice Ninja account"}}
+    },
+    {
+      "parameters": {
+        "jsCode": "// Find client by email or prepare for new client\nconst inputData = $('Parse Stripe Event').item.json;\nconst clients = $input.all();\n\nconst customerEmail = inputData.customerEmail;\n\nconst existingClient = clients.find(client => {\n  const contacts = client.json.contacts || [];\n  return contacts.some(contact => contact.email === customerEmail);\n});\n\n// Generate temporary password for new client\nconst tempPassword = generateTempPassword();\n\nif (existingClient) {\n  return [{\n    json: {\n      ...inputData,\n      clientId: existingClient.json.id,\n      isNewClient: false\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    ...inputData,\n    clientId: null,\n    isNewClient: true,\n    tempPassword: tempPassword\n  }\n}];\n\nfunction generateTempPassword() {\n  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';\n  let password = '';\n  for (let i = 0; i < 12; i++) {\n    password += chars.charAt(Math.floor(Math.random() * chars.length));\n  }\n  return password;\n}"
+      },
+      "id": "find-or-create-client",
+      "name": "Find or Create Client",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 1100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [{"value1": "={{ $json.isNewClient }}", "value2": true}]
+        }
+      },
+      "id": "check-if-new-client",
+      "name": "Check If New Client",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1500, 1100]
+    },
+    {
+      "parameters": {
+        "apiVersion": "v5",
+        "resource": "client",
+        "operation": "create",
+        "clientFields": {
+          "values": {
+            "name": "={{ $('Parse Stripe Event').item.json.customerName }}",
+            "email": "={{ $('Parse Stripe Event').item.json.customerEmail }}"
+          }
+        },
+        "contactsFieldsUi": {
+          "contactValues": [
+            {
+              "firstName": "={{ $('Parse Stripe Event').item.json.customerName.split(' ')[0] }}",
+              "lastName": "={{ ($('Parse Stripe Event').item.json.customerName.split(' ').slice(1)).join(' ') }}",
+              "email": "={{ $('Parse Stripe Event').item.json.customerEmail }}",
+              "customValue1": "={{ $('Find or Create Client').item.json.tempPassword }}"
+            }
+          ]
+        }
+      },
+      "id": "create-invoice-ninja-client",
+      "name": "Create IN Client",
+      "type": "n8n-nodes-base.invoiceNinja",
+      "typeVersion": 1.2,
+      "position": [1750, 950],
+      "credentials": {"invoiceNinjaApi": {"id": "invoice-ninja-creds", "name": "Invoice Ninja account"}}
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract the created client ID\nconst input = $('Create IN Client').item.json;\nreturn [{\n  json: {\n    ...$('Find or Create Client').item.json,\n    clientId: input.id,\n    clientCreated: true\n  }\n}];"
+      },
+      "id": "set-new-client-id",
+      "name": "Set New Client ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 950]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Use existing client ID\nconst input = $('Find or Create Client').item.json;\nreturn [{\n  json: {\n    ...input,\n    clientCreated: false\n  }\n}];"
+      },
+      "id": "set-existing-client-id",
+      "name": "Set Existing Client ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 1300]
+    },
+    {
+      "parameters": {"mode": "passThrough"},
+      "id": "merge-client-paths",
+      "name": "Merge Client Paths",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [2250, 1100]
+    },
+    {
+      "parameters": {
+        "resource": "invoice",
+        "invoiceMode": "create",
+        "invoiceFields": {
+          "values": {
+            "client_id": "={{ $('Merge Client Paths').item.json.clientId }}",
+            "status_id": 4,
+            "date": "={{ new Date().toISOString().split('T')[0] }}",
+            "due_date": "={{ new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] }}",
+            "po_number": "={{ $('Merge Client Paths').item.json.sessionId }}",
+            "public_notes": "={{ 'Plan: ' + $('Merge Client Paths').item.json.plan + ' (' + $('Merge Client Paths').item.json.paymentType + ')' }}"
+          }
+        },
+        "lineItems": {
+          "lineItemValues": [
+            {
+              "item": "={{ 'Plan ' + $('Merge Client Paths').item.json.plan }}",
+              "description": "={{ 'Plan funerario ' + $('Merge Client Paths').item.json.plan + ' - ' + $('Merge Client Paths').item.json.paymentType }}",
+              "quantity": 1,
+              "cost": "={{ $('Merge Client Paths').item.json.amount / 100 }}",
+              "tax_rate": 0
+            }
+          ]
+        }
+      },
+      "id": "create-invoice",
+      "name": "Create Invoice",
+      "type": "n8n-nodes-base.invoiceNinja",
+      "typeVersion": 1.2,
+      "position": [2500, 1100],
+      "credentials": {"invoiceNinjaApi": {"id": "invoice-ninja-creds", "name": "Invoice Ninja account"}}
+    },
+    {
+      "parameters": {
+        "operation": "sendInvite",
+        "clientId": "={{ $('Merge Client Paths').item.json.clientId }}",
+        "sendEmail": true
+      },
+      "id": "send-portal-invite",
+      "name": "Send Portal Invite",
+      "type": "n8n-nodes-base.invoiceNinja",
+      "typeVersion": 1.2,
+      "position": [2750, 1100],
+      "credentials": {"invoiceNinjaApi": {"id": "invoice-ninja-creds", "name": "Invoice Ninja account"}}
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare email content based on client status\nconst input = $('Merge Client Paths').item.json;\n\nlet emailSubject, emailBody;\n\nif (input.isNewClient && input.tempPassword) {\n  emailSubject = 'Bienvenido a LEGADO! Tu cuenta ha sido creada';\n  emailBody = 'Felicidades! Tu pago ha sido procesado exitosamente.\\n\\n' +\n    'DETALLES DE TU PLAN:\\n' +\n    '- Plan: ' + input.plan + '\\n' +\n    '- Tipo: ' + input.paymentType + '\\n' +\n    '- Monto: $' + (input.amount / 100).toFixed(2) + ' USD\\n' +\n    '- ID de Transaccion: ' + input.paymentIntentId + '\\n\\n' +\n    'TUS CREDENCIALES DE ACCESO AL PORTAL:\\n\\n' +\n    'URL: https://invoicing.legadoholding.com/client/login\\n' +\n    'Email: ' + input.customerEmail + '\\n' +\n    'Contrasena temporal: ' + input.tempPassword + '\\n\\n' +\n    'Por seguridad, te recomendamos cambiar tu contrasena despues de iniciar sesion.\\n\\n' +\n    'El equipo de LEGADO';\n} else {\n  emailSubject = 'Confirmacion de pago - LEGADO';\n  emailBody = 'Tu pago ha sido procesado exitosamente.\\n\\n' +\n    'DETALLES:\\n' +\n    '- Plan: ' + input.plan + '\\n' +\n    '- Tipo: ' + input.paymentType + '\\n' +\n    '- Monto: $' + (input.amount / 100).toFixed(2) + ' USD\\n\\n' +\n    'ACCEDE A TU PORTAL:\\n' +\n    'URL: https://invoicing.legadoholding.com/client/login\\n' +\n    'Email: ' + input.customerEmail + '\\n\\n' +\n    'El equipo de LEGADO';\n}\n\nreturn [{\n  json: {\n    ...input,\n    emailSubject,\n    emailBody,\n    invoiceId: $('Create Invoice').item.json.id,\n    invoiceNumber: $('Create Invoice').item.json.invoice_number\n  }\n}];"
+      },
+      "id": "prepare-email-content",
+      "name": "Prepare Email Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3000, 1100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, message: 'Pago procesado y cliente registrado exitosamente.', sessionId: $('Parse Stripe Event').item.json.sessionId, paymentIntentId: $('Parse Stripe Event').item.json.paymentIntentId, chargeId: $('Parse Stripe Event').item.json.chargeId, amount: $('Parse Stripe Event').item.json.amount, currency: $('Parse Stripe Event').item.json.currency, plan: $('Parse Stripe Event').item.json.plan, clientId: $('Merge Client Paths').item.json.clientId, invoiceNumber: $('Prepare Email Content').item.json.invoiceNumber, isNewClient: $('Merge Client Paths').item.json.isNewClient, tempPassword: $('Merge Client Paths').item.json.tempPassword || null, portalUrl: 'https://invoicing.legadoholding.com/client/login', created: $('Parse Stripe Event').item.json.created }) }}",
+        "options": {}
+      },
+      "id": "respond-payment-success",
+      "name": "Respond - Payment Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [3250, 1100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ received: true, message: 'Evento procesado' }) }}",
+        "options": {}
+      },
+      "id": "respond-webhook-received",
+      "name": "Respond - Webhook Received",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [2000, 1200]
+    }
+  ],
+  "connections": {
+    "Legado Payment Webhook": {"main": [[{"node": "Process Payment Request", "type": "main", "index": 0}]]},
+    "Process Payment Request": {"main": [[{"node": "Calculate Amount", "type": "main", "index": 0}]]},
+    "Calculate Amount": {"main": [[{"node": "Create Stripe PaymentIntent", "type": "main", "index": 0}]]},
+    "Create Stripe PaymentIntent": {"main": [[{"node": "Respond - Payment Created", "type": "main", "index": 0}]]},
+    "Stripe Webhook": {"main": [[{"node": "Parse Stripe Event", "type": "main", "index": 0}]]},
+    "Parse Stripe Event": {"main": [[{"node": "Validate Payment Success", "type": "main", "index": 0}]]},
+    "Validate Payment Success": {
+      "main": [
+        [{"node": "Get All IN Clients", "type": "main", "index": 0}],
+        [{"node": "Respond - Payment Failed", "type": "main", "index": 0}]
+      ]
+    },
+    "Get All IN Clients": {"main": [[{"node": "Find or Create Client", "type": "main", "index": 0}]]},
+    "Find or Create Client": {"main": [[{"node": "Check If New Client", "type": "main", "index": 0}]]},
+    "Check If New Client": {
+      "main": [
+        [{"node": "Create IN Client", "type": "main", "index": 0}],
+        [{"node": "Set Existing Client ID", "type": "main", "index": 0}]
+      ]
+    },
+    "Create IN Client": {"main": [[{"node": "Set New Client ID", "type": "main", "index": 0}]]},
+    "Set New Client ID": {"main": [[{"node": "Merge Client Paths", "type": "main", "index": 0}]]},
+    "Set Existing Client ID": {"main": [[{"node": "Merge Client Paths", "type": "main", "index": 1}]]},
+    "Merge Client Paths": {"main": [[{"node": "Create Invoice", "type": "main", "index": 0}]]},
+    "Create Invoice": {"main": [[{"node": "Send Portal Invite", "type": "main", "index": 0}]]},
+    "Send Portal Invite": {"main": [[{"node": "Prepare Email Content", "type": "main", "index": 0}]]},
+    "Prepare Email Content": {"main": [[{"node": "Respond - Payment Success", "type": "main", "index": 0}]]}
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "1",
+  "meta": {"templateCredsSetupCompleted": false},
+  "id": "legado-payment-flow-v1",
+  "tags": [
+    {"name": "legado", "color": "green"},
+    {"name": "payments", "color": "blue"},
+    {"name": "stripe", "color": "purple"},
+    {"name": "invoice-ninja", "color": "orange"}
+  ],
+  "updatedAt": "2026-04-23T00:00:00.000Z"
+}

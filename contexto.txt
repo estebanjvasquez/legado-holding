@@ -3,7 +3,7 @@ CONTEXTO DE LA SESIÓN - LEGADO Holding
 ================================================================================
 
 Fecha: 2026-04-23
-Última actualización: 2026-04-23 (post-sesión)
+Última actualización: 2026-04-23 (sesión vespertina)
 Proyecto: Legado Holding - Aplicación de Previsión Funeraria
 Descripción: App web para compra de planes funerarios para venezolamos en USA
 
@@ -12,24 +12,33 @@ ESTRUCTURA DEL PROYECTO
 ================================================================================
 
 legado-holding/
-├── index.html                 # Página principal
-├── css/main.css            # Estilos
+├── index.html                    # Página principal
+├── css/main.css                 # Estilos
 ├── js/
-│   ├── main.js            # Lógica principal
-│   └── wizard-generic.js # Componente wizard
-├── images/                # Imágenes
-├── n8n/                  # Workflows de n8n
-├── README.md
+│   ├── main.js                  # Lógica principal
+│   └── wizard-generic.js        # Componente wizard
+├── images/                      # Imágenes
+├── n8n/
+│   └── LEGADO_Wizard v2.json    # Workflow principal (CORREGIDO)
+├── n8n_workflow_legado_wizard_v2.json  # Copia en raíz (sincronizado)
+├── contexto.txt                 # Este archivo
+├── payloads_config.json         # Configuración de payloads
+├── test_webhooks.ps1            # Script PowerShell para pruebas
+├── test_webhooks.sh             # Script Bash para pruebas
+├── contexto.txt
+├── DOCUMENTACION.md
+├── DELIVERABLES_SUMMARY.md
+├── DEPLOYMENT_CHECKLIST.md
+├── FILES_MANIFEST.md
 ├── IMPLEMENTACION_GUIA.md
-├── n8n_workflow_legado_wizard_v2.json
-├── contexto.txt           # Este archivo
-├── payloads_config.json   # Configuración de payloads
-├── test_webhooks.ps1      # Script PowerShell para pruebas
-├── test_webhooks.sh       # Script Bash para pruebas
-└── [otros archivos de docs]
+├── IMPLEMENTATION_AUTOMATION.md
+├── IMPLEMENTATION_STATUS.txt
+├── SUMMARY_CHANGES_N8N.md
+├── TEST_REPORT.md
+└── WORKFLOW_CORRECTIONS_SPEC.md
 
 ================================================================================
-CONFIGURACIÓN DE ENDPOINTS
+CONFIGURACIÓN DE ENDPOINTS (VERIFICADA Y CORREGIDA)
 ================================================================================
 
 Webhooks n8n:
@@ -38,16 +47,30 @@ Webhooks n8n:
 
 Stripe:
 - Publishable Key: pk_test_51TD0wWIZ8iB3diEjBitOKaGv7OPDilCvCtpOTsA47DiIiVw9lqmZlki1wzDdkOrFRLGiXhdnPULKbuI8ErOmvUQS00ehj9nJZU
-- Secret Key: (configurada en n8n como credencial 'stripe')
+- Secret Key: (configurada en n8n como credencial 'Stripe account')
 
-Planes y Precios (EUR cents):
-- esencial-zulia: monthly=1499, annual=14388
-- vanguardia-zulia: monthly=2499, annual=23988
-- esencial-selecto: monthly=2999, annual=28788
-- vanguardia-selecto: monthly=4999, annual=47988
+Planes y Precios (USD cents):
+- esencial-zulia: monthly=947, annual=9470
+- vanguardia-zulia: monthly=1470, annual=14700
+- esencial-selecto: monthly=947, annual=20200
+- vanguardia-selecto: monthly=1470, annual=12970
 
 ================================================================================
-FLUJO DEL SISTEMA
+CORRECCIÓN APLICADA (2026-04-23)
+================================================================================
+
+PROBLEMA ENCONTRADO:
+- Frontend apuntaba a: /webhook/legado-payment
+- Workflow usaba path antiguo: /webhook/legado-wizard
+
+SOLUCIÓN APLICADA:
+- Workflow LEGADO_Wizard v2.json corregido para usar path: legado-payment
+- Archivos actualizados:
+  * n8n/LEGADO_Wizard v2.json (path: legado-payment)
+  * n8n_workflow_legado_wizard_v2.json (path: legado-payment)
+
+================================================================================
+FLUJO DEL SISTEMA (ACTUALIZADO)
 ================================================================================
 
 1. Usuario abre index.html
@@ -64,100 +87,75 @@ FLUJO DEL SISTEMA
    e. Frontend recibe client_secret y muestra formulario Stripe Elements
    f. Usuario ingresa datos de tarjeta
    g. Stripe procesa el pago
-   h. Stripe webhook notifica a n8n sobre resultado
-   i. n8n guarda datos en Google Sheets (o responde)
+   h. Stripe webhook notifica a n8n en /webhook/stripe-webhook-legado
+   i. n8n VALIDA el pago exitoso
+   j. n8n registra cliente en Invoice Ninja (busca o crea)
+   k. n8n genera factura en Invoice Ninja
+   l. n8n envía invitación al portal de clientes
+   m. n8n responde al frontend con éxito
 
 ================================================================================
-ARCHIVOS PRINCIPALES
+WORKFLOW: LEGADO_Wizard v2 (EN n8n/)
 ================================================================================
 
-index.html
----------------------------------------------------------------------------
-- Página principal con hero, planes, testimonios, FAQ, footer
-- Modal de wizard para proceso de compra
-- Chat de emergencia
-- Configuración global en window.LEGADO_CONFIG:
-  * WIZARD_WEBHOOK_URL
-  * STRIPE_WEBHOOK_URL
-  * STRIPE_PUBLISHABLE_KEY
+Nodos del workflow:
+1. Stripe Payment Webhook (POST /webhook/stripe-webhook-legado)
+2. Parse Stripe Event (procesa evento de Stripe)
+3. Validate Payment (verifica succeeded === true)
+4. Handle Payment Failure (responde error)
+5. Chat Webhook (POST /webhook/legado-payment) ← CORREGIDO
+6. Classify Message1 (genera sessionId, clasifica intent)
+7. Route by Intent1 (bifurca: confirm, payment_success, other)
+8. Stripe Create PaymentIntent1 (crea PaymentIntent en Stripe)
+9. Respond Show Payment1 (responde con client_secret)
+10. Get All IN Clients1 (obtiene clientes de Invoice Ninja)
+11. Find Matching Client1 (busca cliente por email)
+12. Client Is New1 (bifurca: cliente nuevo vs existente)
+13. Create IN Client1 (crea cliente en Invoice Ninja)
+14. Set New Client ID1 (establece ID del nuevo cliente)
+15. Set Existing Client ID1 (establece ID del cliente existente)
+16. Merge Client Paths1 (une flujos)
+17. Create IN Invoice1 (genera factura)
+18. Send Portal Invite1 (envía invitación al portal)
+19. Respond Success1 (responde éxito al webhook de Stripe)
 
-js/main.js
----------------------------------------------------------------------------
-- Lógica principal de la aplicación
-- Gestión de idioma (ES/EN)
-- Wizard flow (6 pasos)
-- Chat functionality
-- Integración con Stripe Elements
-- URLs configurables via window.LEGADO_CONFIG
-
-n8n_workflow_legado_wizard_v2.json
----------------------------------------------------------------------------
-- Workflow principal para procesamiento de pagos
-- Nodos principales:
-  * Legado Webhook (POST /webhook/legado-payment)
-  * Generate sessionId (función JS)
-  * Create PaymentIntent (HTTP Request a Stripe API)
-  * Respond Show Payment (responde con client_secret)
-  * Stripe Webhook (recibe eventos de Stripe)
-  * Verify Stripe Signature
-  * Route by Stripe Event (switch)
-- Credenciales: stripe (apiKey)
+Credenciales configuradas:
+- Stripe account (apiKey)
+- Invoice Ninja account (API token)
 
 ================================================================================
-CAMBIOS RECIENTES (2026-04-23)
+INTEGRACIÓN INVOICE NINJA
 ================================================================================
 
-1. Cambio de path de webhook
-   - Anterior: legado-wizard (conflictivo con workflow de chat)
-   - Nuevo: legado-payment
-   - Archivos actualizados:
-     * index.html (WIZARD_WEBHOOK_URL)
-     * js/main.js (DEFAULT_WIZARD_WEBHOOK)
-     * n8n_workflow_legado_wizard_v2.json (path del webhook)
-     * contexto.txt
+URL del portal de clientes: https://invoicing.legadoholding.com/client/login
+API Token: jPiS6kR2fge6JVHWbHPxEuknwu4thTQtGh6IG2li1AFKJ0nFdfU4MYcK53gcnYpg
 
-2. Corrección del nodo Respond en n8n
-   - Error: Respondía con toda la respuesta de Stripe (lista de PaymentIntents)
-   - Solución: Configurar Response Data como expression con formato correcto
-   - Formato correcto: {"client_secret": "{{ $json.client_secret }}", "sessionId": "{{ $json.sessionId }}"}
+Flujo de registro:
+1. Pago exitoso en Stripe
+2. Buscar cliente por email en Invoice Ninja
+3. Si no existe, crear nuevo cliente
+4. Generar factura con datos del plan y pago
+5. Enviar invitación al portal con link de acceso
 
 ================================================================================
-ESTADO DE IMPLEMENTACIÓN
+FRONTEND (index.html + js/main.js)
 ================================================================================
 
-✅ Frontend (index.html)
-   - Estructura HTML completa
-   - Estilos CSS aplicados
-   - Modal de wizard funcional
-   - Chat de emergencia
+Configuración de webhooks:
+const DEFAULT_WIZARD_WEBHOOK = "https://vmi2945958.contaboserver.net/webhook/legado-payment";
+const DEFAULT_STRIPE_WEBHOOK = "https://vmi2945958.contaboserver.net/webhook/stripe-webhook-legado";
+const STRIPE_PUBLISHABLE_KEY = "pk_test_51TD0wWIZ8iB3diEjBitOKaGv7OPDilCvCtpOTsA47DiIiVw9lqmZlki1wzDdkOrFRLGiXhdnPULKbuI8ErOmvUQS00ehj9nJZU";
 
-✅ JavaScript (main.js)
-   - Navegación y revelación animada
-   - Cambio de idioma ES/EN
-   - Wizard de 6 pasos
-   - Integración con webhook
-   - Stripe Elements para pago con tarjeta
-
-✅ n8n Workflow
-   - Webhook receptor de requests
-   - Generación de sessionId
-   - Creación de PaymentIntent en Stripe
-   - Respuesta con client_secret
-   - Manejo de webhooks de Stripe
-
-✅ Stripe Integration
-   - Publishable Key configurada
-   - Secret Key en n8n
-   - PaymentIntents funcionando
-
-⚠️ Pendiente:
-   - Guardar datos en Google Sheets tras pago exitoso
-   - Configurar webhook de Stripe en dashboard de Stripe
-   - Testing completo del flujo desde el navegador
+Wizard Steps:
+- Step 0: Datos personales del comprador
+- Step 1: Datos familiares (beneficiarios)
+- Step 2: Selección de plan y frecuencia
+- Step 3: Resumen y confirmación
+- Card Confirm: Formulario de Stripe Elements
 
 ================================================================================
 PRUEBAS REALIZADAS
-================================================================================
+===================================================================
 
 Postman - POST /webhook/legado-payment
 ---------------------------------------------------------------------------
@@ -192,65 +190,66 @@ Para que los webhooks de Stripe funcionen completamente:
    - payment_intent.canceled
 
 ================================================================================
-VARIABLES DE ENTORNO / CONFIG
+PENDIENTE
 ================================================================================
 
-// En index.html (window.LEGADO_CONFIG)
-WIZARD_WEBHOOK_URL: "https://vmi2945958.contaboserver.net/webhook/legado-payment"
-STRIPE_WEBHOOK_URL: "https://vmi2945958.contaboserver.net/webhook/stripe-webhook-legado"
-STRIPE_PUBLISHABLE_KEY: "pk_test_51TD0wWIZ8iB3diEjBitOKaGv7OPDilCvCtpOTsA47DiIiVw9lqmZlki1wzDdkOrFRLGiXhdnPULKbuI8ErOmvUQS00ehj9nJZU"
-
-// En js/main.js
-DEFAULT_STRIPE_KEY: "pk_test_51TD0wWIZ8iB3diEjBitOKaGv7OPDilCvCtpOTsA47DiIiVw9lqmZlki1wzDdkOrFRLGiXhdnPULKbuI8ErOmvUQS00ehj9nJZU"
-DEFAULT_WIZARD_WEBHOOK: "https://vmi2945958.contaboserver.net/webhook/legado-payment"
-DEFAULT_STRIPE_WEBHOOK: "https://vmi2945958.contaboserver.net/webhook/stripe-webhook-legado"
-
-// En n8n (Credentials > stripe)
-apiKey: sk_test_... (Secret Key de Stripe)
-
-================================================================================
-TOKENS/KEYS IMPORTANTES
-================================================================================
-
-Stripe Publishable Key (test):
-pk_test_51TD0wWIZ8iB3diEjBitOKaGv7OPDilCvCtpOTsA47DiIiVw9lqmZlki1wzDdkOrFRLGiXhdnPULKbuI8ErOmvUQS00ehj9nJZU
-
-Stripe Secret Key (test):
-sk_test_... (configurada en n8n, NO compartir)
-
-n8n Webhook URL (payment):
-https://vmi2945958.contaboserver.net/webhook/legado-payment
-
-n8n Webhook URL (stripe events):
-https://vmi2945958.contaboserver.net/webhook/stripe-webhook-legado
-
-================================================================================
-NOTAS IMPORTANTES
-================================================================================
-
-1. El webhook de payment usa el path "legado-payment" para evitar conflicto
-   con workflows de chat que usaban "legado-wizard"
-
-2. Los PaymentIntents se crean en USD (currency: usd)
-
-3. El wizard espera una respuesta exacta con {client_secret, sessionId}
-
-4. El frontend usa Stripe Elements para capturar datos de tarjeta de forma segura
-
-5. Los precios están en EUR cents en el workflow de n8n, pero Stripe usa USD
-
-================================================================================
-COMANDOS DE PRUEBA
-================================================================================
-
-cURL para probar webhook:
-curl -X POST "https://vmi2945958.contaboserver.net/webhook/legado-payment" \
-  -H "Content-Type: application/json" \
-  -d '{"intent":"create_payment_intent","plan":"esencial-zulia","paymentType":"monthly","buyer":{"name":"Test","email":"test@test.com"}}'
-
-PowerShell (desde test_webhooks.ps1):
-.\test_webhooks.ps1
+- [ ] Generar contraseña temporal para clientes nuevos en Invoice Ninja
+- [ ] Enviar email con credenciales y URL del portal
+- [ ] Verificar que las facturas se generen correctamente
+- [ ] Probar flujo completo end-to-end
 
 ================================================================================
 FIN DEL CONTEXTO
 ================================================================================
+
+================================================================================
+NUEVO WORKFLOW: LEGADO_Payment_Flow.json (2026-04-23)
+================================================================================
+
+Archivo: n8n/LEGADO_Payment_Flow.json
+Workflow unificado con 2 webhooks y funcionalidad completa de Invoice Ninja
+
+WEBHOOKS:
+1. legado-payment (POST) - Recibe requests del frontend para crear PaymentIntent
+2. stripe-webhook-legado (POST) - Recibe confirmacion de pago de Stripe
+
+FLUJO:
+Frontend -> legado-payment -> Crea PaymentIntent -> Responde client_secret
+Stripe -> stripe-webhook-legado -> Valida pago -> Busca/Crea cliente IN -> Genera factura -> Envía invitación portal
+
+NODOS (21 total):
+1. Legado Payment Webhook - Recibe request inicial
+2. Process Payment Request - Genera sessionId, procesa datos
+3. Calculate Amount - Calcula monto según plan
+4. Create Stripe PaymentIntent - Crea PaymentIntent en Stripe
+5. Respond - Payment Created - Responde al frontend
+6. Stripe Webhook - Recibe evento de Stripe
+7. Parse Stripe Event - Parsea datos del evento
+8. Validate Payment Success - Valida pago exitoso
+9. Respond - Payment Failed - Responde si falla
+10. Get All IN Clients - Obtiene clientes de Invoice Ninja
+11. Find or Create Client - Busca cliente o prepara creación
+12. Check If New Client - Bifurca según exista o no
+13. Create IN Client - Crea cliente en Invoice Ninja
+14. Set New Client ID - Establece ID del nuevo cliente
+15. Set Existing Client ID - Establece ID del cliente existente
+16. Merge Client Paths - Une flujos
+17. Create Invoice - Genera factura
+18. Send Portal Invite - Envía invitación al portal
+19. Prepare Email Content - Prepara contenido del email
+20. Respond - Payment Success - Responde éxito final
+21. Respond - Webhook Received - Confirma recepción
+
+CREDENCIALES NECESARIAS:
+- stripeApi: "Stripe account"
+- invoiceNinjaApi: "Invoice Ninja account"
+
+RESPUESTA EXITOSA INCLUYE:
+- success, message, sessionId, paymentIntentId, chargeId
+- amount, currency, plan, clientId, invoiceNumber
+- isNewClient, tempPassword, portalUrl
+
+PASSWORD TEMPORAL:
+- Generada automáticamente (12 caracteres alfanuméricos)
+- Almacenada en customValue1 del contacto en Invoice Ninja
+- Enviada al cliente en email de bienvenida (nuevos clientes)
