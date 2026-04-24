@@ -253,3 +253,7 @@ PASSWORD TEMPORAL:
 - Generada automáticamente (12 caracteres alfanuméricos)
 - Almacenada en customValue1 del contacto en Invoice Ninja
 - Enviada al cliente en email de bienvenida (nuevos clientes)
+
+================================================================================
+FIN DEL CONTEXTO - Guardado: 2026-04-24 17:20:54
+================================================================================
