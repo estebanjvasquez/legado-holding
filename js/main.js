@@ -1081,8 +1081,10 @@ function showPaymentSuccessScreen(email) {
     $("#wizard-success-close-btn")?.addEventListener("click", closeWizard);
   }
 
-  $("#wizard-footer").style.display = "none";
-  $("#wizard-steps").style.display = "none";
+  const footer = $(".wizard-footer");
+  if (footer) footer.style.display = "none";
+  const steps = $("#wizard-steps");
+  if (steps) steps.style.display = "none";
 }
 
 function renderWizardContent() {
@@ -1579,11 +1581,13 @@ function bindWizardStepEvents() {
           });
 
           if (!resp.ok) throw new Error("HTTP " + resp.status);
-          const data = await resp.json().catch(() => ({}));
+          const raw = await resp.json().catch(() => ({}));
+          // n8n can return either an object or a single-item array
+          const data = Array.isArray(raw) ? raw[0] : raw;
 
           if (data?.client_secret) {
-            wizardCardConfirmStep = "stripe-form";
             __wizardClientSecret = data.client_secret;
+            wizardCardConfirmStep = "stripe-form";
             renderCardConfirmStep();
             updateCardConfirmFooter();
           } else if (data?.checkoutUrl) {
@@ -1595,10 +1599,7 @@ function bindWizardStepEvents() {
               "info",
             );
           } else {
-            // Fallback: proceed to stripe form anyway (for testing)
-            wizardCardConfirmStep = "stripe-form";
-            renderCardConfirmStep();
-            updateCardConfirmFooter();
+            throw new Error("No client_secret in response: " + JSON.stringify(data));
           }
         } catch (err) {
           console.error("Payment intent error:", err);
@@ -1688,7 +1689,8 @@ function bindWizardStepEvents() {
             return;
           }
 
-          if (result.paymentIntent?.status === "succeeded") {
+          const status = result.paymentIntent?.status;
+          if (status === "succeeded" || status === "processing") {
             showPaymentSuccessScreen(wizardBuyer.email);
           }
         } catch (err) {
