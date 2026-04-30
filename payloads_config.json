@@ -1,0 +1,325 @@
+
+legado-holding\payloads_config.json#L1-310
+{
+  "test_payloads": {
+    "wizard_webhook": {
+      "description": "User initiates purchase in wizard (step 1-4)",
+      "endpoint": "https://vmi2945958.contaboserver.net/webhook/legado-wizard",
+      "method": "POST",
+      "payload": {
+        "plan": "esencial-zulia",
+        "email": "cliente@example.com",
+        "firstName": "Juan",
+        "lastName": "Pérez",
+        "phone": "+34612345678",
+        "amount": 4990,
+        "currency": "usd",
+        "paymentType": "card"
+      },
+      "expected_response": {
+        "statusCode": 200,
+        "body": {
+          "client_secret": "pi_xxxx_secret_xxxx",
+          "sessionId": "sess_xxxxxxxx_xxxxxxx",
+          "next": "waiting_for_confirmation"
+        }
+      }
+    },
+    "stripe_webhook_succeeded": {
+      "description": "Stripe payment_intent.succeeded event (after Stripe approves payment)",
+      "endpoint": "https://vmi2945958.contaboserver.net/webhook/stripe-webhook-legado",
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Stripe-Signature": "t=timestamp,v1=signature_hash"
+      },
+      "payload": {
+        "id": "evt_1234567890",
+        "object": "event",
+        "api_version": "2020-08-27",
+        "created": 1234567890,
+        "type": "payment_intent.succeeded",
+        "data": {
+          "object": {
+            "id": "pi_1234567890ABCDEF",
+            "object": "payment_intent",
+            "amount": 4990,
+            "amount_capturable": 0,
+            "amount_received": 4990,
+            "application": null,
+            "application_fee_amount": null,
+            "canceled_at": null,
+            "cancellation_reason": null,
+            "capture_method": "automatic",
+            "charges": {
+              "object": "list",
+              "data": [
+                {
+                  "id": "ch_1234567890ABCDEF",
+                  "object": "charge",
+                  "amount": 4990,
+                  "currency": "usd",
+                  "status": "succeeded"
+                }
+              ],
+              "has_more": false,
+              "total_count": 1,
+              "url": "/v1/charges?payment_intent=pi_1234567890ABCDEF"
+            },
+            "client_secret": "pi_1234567890ABCDEF_secret_xxxxxxxxxxxx",
+            "confirmation_method": "automatic",
+            "created": 1234567890,
+            "currency": "usd",
+            "customer": "cus_1234567890ABCDEF",
+            "description": "Compra de plan LEGADO",
+            "last_payment_error": null,
+            "livemode": false,
+            "metadata": {
+              "sessionId": "sess_1682502900_a1b2c3d4",
+              "plan": "esencial-zulia",
+              "paymentType": "card",
+              "customerEmail": "cliente@example.com"
+            },
+            "next_action": null,
+            "on_behalf_of": null,
+            "payment_method": "pm_1234567890ABCDEF",
+            "payment_method_types": ["card"],
+            "receipt_email": "cliente@example.com",
+            "setup_future_usage": null,
+            "statement_descriptor": null,
+            "statement_descriptor_suffix": null,
+            "status": "succeeded"
+          }
+        }
+      },
+      "expected_response": {
+        "statusCode": 200,
+        "body": {
+          "success": true,
+          "message": "Payment processed successfully",
+          "sessionId": "sess_1682502900_a1b2c3d4",
+          "invoiceId": "invoice_xxxxx",
+          "portalAccessUrl": "https://portal.legado.com/access?session=sess_1682502900_a1b2c3d4"
+        }
+      }
+    },
+    "stripe_webhook_failed": {
+      "description": "Stripe payment_intent.payment_failed event (after Stripe declines payment)",
+      "endpoint": "https://vmi2945958.contaboserver.net/webhook/stripe-webhook-legado",
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Stripe-Signature": "t=timestamp,v1=signature_hash"
+      },
+      "payload": {
+        "id": "evt_0987654321",
+        "object": "event",
+        "api_version": "2020-08-27",
+        "created": 1234567890,
+        "type": "payment_intent.payment_failed",
+        "data": {
+          "object": {
+            "id": "pi_0987654321FEDCBA",
+            "object": "payment_intent",
+            "amount": 4990,
+            "currency": "usd",
+            "status": "requires_payment_method",
+            "last_payment_error": {
+              "charge": "ch_0987654321FEDCBA",
+              "code": "card_declined",
+              "decline_code": "generic_decline",
+              "doc_url": "https://stripe.com/docs/declines/codes#generic_decline",
+              "message": "Your card was declined",
+              "payment_intent": {
+                "id": "pi_0987654321FEDCBA",
+                "object": "payment_intent",
+                "amount": 4990,
+                "currency": "usd"
+              },
+              "payment_method": "pm_0987654321FEDCBA",
+              "type": "card_error"
+            },
+            "metadata": {
+              "sessionId": "sess_1682502901_b2c3d4e5",
+              "plan": "esencial-zulia",
+              "paymentType": "card",
+              "customerEmail": "cliente@example.com"
+            },
+            "receipt_email": "cliente@example.com",
+            "status": "requires_payment_method"
+          }
+        }
+      },
+      "expected_response": {
+        "statusCode": 200,
+        "body": {
+          "success": true,
+          "message": "Payment failure recorded",
+          "sessionId": "sess_1682502901_b2c3d4e5",
+          "error": "card_declined",
+          "retryUrl": "https://portal.legado.com/retry?session=sess_1682502901_b2c3d4e5"
+        }
+      }
+    }
+  },
+  "invoice_ninja": {
+    "base_url": "https://invoicing.legadoholding.com",
+    "api_token": "WXngbLQXx5RPDsH0APTEopqf4Ja9U6Jdyt8MQK5qoVicK6jfNUCXDqDy5mXprtTV",
+    "headers": {
+      "X-API-TOKEN": "WXngbLQXx5RPDsH0APTEopqf4Ja9U6Jdyt8MQK5qoVicK6jfNUCXDqDy5mXprtTV",
+      "Accept": "application/json",
+      "Content-Type": "application/json"
+    },
+    "endpoints": {
+      "clients": {
+        "list": "/api/v1/clients",
+        "get": "/api/v1/clients/{id}",
+        "create": "/api/v1/clients",
+        "update": "/api/v1/clients/{id}"
+      },
+      "invoices": {
+        "list": "/api/v1/invoices",
+        "get": "/api/v1/invoices/{id}",
+        "create": "/api/v1/invoices",
+        "send": "/api/v1/invoices/{id}/send"
+      },
+      "payments": {
+        "list": "/api/v1/payments",
+        "get": "/api/v1/payments/{id}",
+        "create": "/api/v1/payments"
+      },
+      "products": {
+        "list": "/api/v1/products",
+        "get": "/api/v1/products/{id}",
+        "create": "/api/v1/products"
+      }
+    },
+    "curl_examples": {
+      "list_clients": "curl -s -X GET \"https://invoicing.legadoholding.com/api/v1/clients\" -H \"X-API-TOKEN: WXngbLQXx5RPDsH0APTEopqf4Ja9U6Jdyt8MQK5qoVicK6jfNUCXDqDy5mXprtTV\" -H \"Accept: application/json\" -k",
+      "list_invoices": "curl -s -X GET \"https://invoicing.legadoholding.com/api/v1/invoices\" -H \"X-API-TOKEN: WXngbLQXx5RPDsH0APTEopqf4Ja9U6Jdyt8MQK5qoVicK6jfNUCXDqDy5mXprtTV\" -H \"Accept: application/json\" -k",
+      "list_products": "curl -s -X GET \"https://invoicing.legadoholding.com/api/v1/products\" -H \"X-API-TOKEN: WXngbLQXx5RPDsH0APTEopqf4Ja9U6Jdyt8MQK5qoVicK6jfNUCXDqDy5mXprtTV\" -H \"Accept: application/json\" -k",
+      "create_client": "curl -s -X POST \"https://invoicing.legadoholding.com/api/v1/clients\" -H \"X-API-TOKEN: WXngbLQXx5RPDsH0APTEopqf4Ja9U6Jdyt8MQK5qoVicK6jfNUCXDqDy5mXprtTV\" -H \"Accept: application/json\" -H \"Content-Type: application/json\" -d '{\"name\":\"Nombre Cliente\",\"email\":\"cliente@example.com\"}' -k"
+    }
+  },
+  "test_scenarios": [
+    {
+      "name": "Happy Path - Full Purchase Flow",
+      "steps": [
+        "1. User clicks 'Buy' on wizard",
+        "2. Client sends wizard_webhook payload",
+        "3. n8n creates sessionId and PaymentIntent",
+        "4. Returns client_secret to client",
+        "5. Client opens Stripe payment form",
+        "6. Client enters card and completes payment",
+        "7. Stripe fires payment_intent.succeeded webhook",
+        "8. n8n verifies signature and processes event",
+        "9. n8n creates client in InvoiceNinja",
+        "10. n8n creates invoice",
+        "11. n8n marks session as active",
+        "12. Client can now access portal with sessionId"
+      ]
+    },
+    {
+      "name": "Failed Payment - Retry Flow",
+      "steps": [
+        "1-6. Same as above but card is declined",
+        "7. Stripe fires payment_intent.payment_failed webhook",
+        "8. n8n verifies signature and processes event",
+        "9. n8n marks session as failed",
+        "10. n8n sends email to client with retry link",
+        "11. Client receives email and retries with different card",
+        "12. If successful, goes back to Happy Path step 7"
+      ]
+    },
+    {
+      "name": "Idempotence - Stripe Retry",
+      "steps": [
+        "1. Stripe fires payment_intent.succeeded event",
+        "2. n8n processes and creates invoice",
+        "3. n8n response timeout or network error",
+        "4. Stripe automatically retries the webhook (same event ID)",
+        "5. n8n receives duplicate event",
+        "6. n8n checks if sessionId already processed",
+        "7. Returns 200 OK but does NOT create duplicate invoice",
+        "8. idempotency_key or sessionId ensures only 1 invoice exists"
+      ]
+    },
+    {
+      "name": "Webhook Signature Verification Failure",
+      "steps": [
+        "1. Attacker sends fake webhook to /webhook/stripe-webhook-legado",
+        "2. n8n receives webhook",
+        "3. n8n extracts X-Stripe-Signature header",
+        "4. n8n verifies against Stripe webhook secret",
+        "5. Verification fails (invalid signature)",
+        "6. n8n returns 400 Bad Request",
+        "7. Event is NOT processed",
+        "8. n8n logs security event for audit"
+      ]
+    }
+  ],
+  "validation_checklist": [
+    {
+      "item": "Webhook reachability",
+      "test": "curl -I https://vmi2945958.contaboserver.net/webhook/legado-wizard",
+      "expected": "HTTP 200 or 405 (method not allowed for OPTIONS is OK)"
+    },
+    {
+      "item": "Session ID generation",
+      "test": "Check n8n logs: Generate sessionId node output",
+      "expected": "sess_[timestamp]_[random] format visible in logs"
+    },
+    {
+      "item": "PaymentIntent metadata",
+      "test": "Check Stripe Dashboard: Payment Intent details",
+      "expected": "metadata.sessionId, metadata.plan, metadata.customerEmail populated"
+    },
+    {
+      "item": "Webhook signature verification",
+      "test": "Send invalid X-Stripe-Signature header",
+      "expected": "n8n returns 400, event not processed"
+    },
+    {
+      "item": "Invoice creation",
+      "test": "Check InvoiceNinja: Invoices list",
+      "expected": "New invoice created with sessionId reference"
+    },
+    {
+      "item": "Session activation",
+      "test": "Check database: session.status = 'active'",
+      "expected": "Session marked as active only after invoice created"
+    },
+    {
+      "item": "Portal access",
+      "test": "Use sessionId to access portal",
+      "expected": "Portal shows customer details and plan info"
+    },
+    {
+      "item": "Error handling & logging",
+      "test": "Send malformed payload",
+      "expected": "n8n logs error, moves to DLQ, retry scheduled"
+    },
+    {
+      "item": "Idempotence",
+      "test": "Send same event twice with 2sec delay",
+      "expected": "First creates invoice, second returns 200 but no duplicate"
+    },
+    {
+      "item": "Failed payment flow",
+      "test": "Send payment_intent.payment_failed event",
+      "expected": "Session marked failed, email sent to customer"
+    },
+    {
+      "item": "InvoiceNinja API connectivity",
+      "test": "curl to /api/v1/clients endpoint",
+      "expected": "Returns client list with 200 OK"
+    }
+  ],
+  "curl_test_examples": {
+    "test_wizard_webhook": "curl -X POST https://vmi2945958.contaboserver.net/webhook/legado-wizard -H 'Content-Type: application/json' -d '{\"plan\":\"esencial-zulia\",\"email\":\"test@example.com\",\"amount\":4990,\"currency\":\"usd\"}'",
+    "test_stripe_webhook": "curl -X POST https://vmi2945958.contaboserver.net/webhook/stripe-webhook-legado -H 'Content-Type: application/json' -H 'X-Stripe-Signature: test' -d '@payload.json'",
+    "check_n8n_logs": "# Login to n8n → Workflow: LEGADO_Wizard → Logs tab → Filter by timestamp",
+    "test_invoice_ninja_clients": "curl -s -X GET \"https://invoicing.legadoholding.com/api/v1/clients\" -H \"X-API-TOKEN: WXngbLQXx5RPDsH0APTEopqf4Ja9U6Jdyt8MQK5qoVicK6jfNUCXDqDy5mXprtTV\" -H \"Accept: application/json\" -k",
+    "test_invoice_ninja_invoices": "curl -s -X GET \"https://invoicing.legadoholding.com/api/v1/invoices\" -H \"X-API-TOKEN: WXngbLQXx5RPDsH0APTEopqf4Ja9U6Jdyt8MQK5qoVicK6jfNUCXDqDy5mXprtTV\" -H \"Accept: application/json\" -k"
+  }
+}
