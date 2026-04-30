@@ -1042,7 +1042,6 @@ function openWizard(planId) {
 
 function closeWizard() {
   wizardOpen = false;
-  // Reset card payment flow state
   wizardCardConfirmStep = false;
   __wizardClientSecret = null;
   if (__cardElement) {
@@ -1050,6 +1049,40 @@ function closeWizard() {
     __cardElement = null;
   }
   $("#wizard-overlay").classList.add("hidden");
+}
+
+function showPaymentSuccessScreen(email) {
+  wizardCardConfirmStep = false;
+  __wizardClientSecret = null;
+  if (__cardElement) {
+    __cardElement.unmount();
+    __cardElement = null;
+  }
+
+  const portalUrl = "https://invoicing.legadoholding.com/client/login";
+  const isEs = currentLang === "es";
+  const msg = isEs
+    ? `Tu plan ha sido activado. Recibirás un correo en <strong>${email}</strong> con tu factura y acceso al portal.`
+    : `Your plan has been activated. You will receive an email at <strong>${email}</strong> with your invoice and portal access.`;
+  const btnLabel = isEs ? "Ir al portal" : "Go to portal";
+  const closeLabel = isEs ? "Cerrar" : "Close";
+
+  const body = $("#wizard-body");
+  if (body) {
+    body.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;gap:1.5rem;padding:2rem 1rem;text-align:center;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/></svg>
+        <p style="font-size:1rem;color:#374151;line-height:1.6;">${msg}</p>
+        <div style="display:flex;gap:1rem;flex-wrap:wrap;justify-content:center;">
+          <a href="${portalUrl}" target="_blank" rel="noopener" class="btn-primary" style="text-decoration:none;">${btnLabel}</a>
+          <button class="btn-back" id="wizard-success-close-btn">${closeLabel}</button>
+        </div>
+      </div>`;
+    $("#wizard-success-close-btn")?.addEventListener("click", closeWizard);
+  }
+
+  $("#wizard-footer").style.display = "none";
+  $("#wizard-steps").style.display = "none";
 }
 
 function renderWizardContent() {
@@ -1531,7 +1564,6 @@ function bindWizardStepEvents() {
         try {
           const payload = {
             intent: "create_payment_intent",
-            paymentMethod: wizardPaymentMethod,
             plan: wizardSelectedPlan,
             paymentType: wizardPaymentType,
             buyer: wizardBuyer,
@@ -1657,24 +1689,7 @@ function bindWizardStepEvents() {
           }
 
           if (result.paymentIntent?.status === "succeeded") {
-            // Payment successful - notify webhook and close
-            try {
-              await fetch(WIZARD_WEBHOOK_URL, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  ...window.__lastWizardPayload,
-                  intent: "payment_success",
-                  paymentIntentId: result.paymentIntent.id,
-                }),
-              });
-            } catch (e) {
-              console.error("Notify success error:", e);
-            }
-            showToast(t("stripe_payment_success"), "success");
-            wizardCardConfirmStep = false;
-            $("#wizard-footer").style.display = "";
-            closeWizard();
+            showPaymentSuccessScreen(wizardBuyer.email);
           }
         } catch (err) {
           console.error("Payment error:", err);
