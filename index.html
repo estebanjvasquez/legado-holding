@@ -38,10 +38,6 @@
             window.LEGADO_CONFIG = {
                 WIZARD_WEBHOOK_URL:
                     "https://vmi2945958.contaboserver.net/webhook/legado-payment",
-                STRIPE_WEBHOOK_URL:
-                    "https://vmi2945958.contaboserver.net/webhook/stripe-webhook-legado",
-                STRIPE_PUBLISHABLE_KEY:
-                    "pk_test_51TD0wWIZ8iB3diEjBitOKaGv7OPDilCvCtpOTsA47DiIiVw9lqmZlki1wzDdkOrFRLGiXhdnPULKbuI8ErOmvUQS00ehj9nJZU",
             };
         </script>
     </head>
@@ -1128,9 +1124,8 @@
         <!-- ════════════════════════════════════════════════════════════
      SCRIPT — cargado al final del body
      ════════════════════════════════════════════════════════════ -->
-        <!-- Stripe.js para pagos -->
-        <script src="https://js.stripe.com/v3/"></script>
         <script src="js/main.js"></script>
-        <script src="js/wizard-generic.js"></script>
+        <script src="js/wizard.js"></script>
+        <script src="js/chatbot.js"></script>
     </body>
 </html>
