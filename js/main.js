@@ -295,10 +295,12 @@ const LANG = {
     "Selecciona tu forma de pago",
     "Select your payment method",
   ],
+  wiz_select_billing: ["Selecciona tu modalidad de pago", "Select your billing mode"],
   wiz_monthly_title: ["Suscripción mensual", "Monthly subscription"],
   wiz_monthly_sub: ["Suscripción mensual", "Monthly subscription"],
   wiz_annual_title: ["Pago anual", "Annual payment"],
   wiz_annual_sub: ["¡Ahorra 2 meses!", "Save 2 months!"],
+  wiz_yr: ["/año", "/yr"],
   wiz_summary_title: ["Resumen de compra", "Purchase summary"],
   wiz_sum_billing: ["Modalidad", "Billing mode"],
   wiz_sum_method: ["Método de pago", "Payment method"],
@@ -552,14 +554,28 @@ async function loadPlansFromAPI() {
     /* Agrupar productos por familia de plan.
        Prioridad: custom_value3 (slug explícito) > inferir del product_key.
        isMonthly: acepta "mensual" (legacy) y "monthly" (nuevo). */
+    /* Tabla de alias: normaliza slugs alternativos que pueden venir de Invoice Ninja
+       hacia el slug canónico que usa el renderizador.
+       Ejemplo: "esencial-ven" (mal configurado) → "esencial-selecto" */
+    const SLUG_ALIASES = {
+      "esencial-ven":    "esencial-selecto",
+      "vanguardia-ven":  "vanguardia-selecto",
+    };
+
     const grouped = {};
     products.forEach((p) => {
-      const family = (p.custom_value3 && p.custom_value3.trim()) || getPlanFamily(p.product_key);
+      const rawFamily = (p.custom_value3 && p.custom_value3.trim()) || getPlanFamily(p.product_key);
+      const family = SLUG_ALIASES[rawFamily] || rawFamily;
       if (!grouped[family]) grouped[family] = {};
       const cv2 = (p.custom_value2 || "").toLowerCase();
       const isMonthly = cv2 === "mensual" || cv2 === "monthly";
+      /* "Unico" = cuota inicial obligatoria (se paga siempre, independiente
+         de si la suscripción es mensual o anual) */
+      const isUnico   = cv2 === "unico";
       if (isMonthly) {
         grouped[family].monthly = p;
+      } else if (isUnico) {
+        grouped[family].initial = p;   // ← cuota inicial, NO anual
       } else {
         grouped[family].annual = p;
       }
@@ -567,39 +583,61 @@ async function loadPlansFromAPI() {
 
     /* Construir el objeto PLANS desde los grupos */
     const newPlans = {};
-    Object.entries(grouped).forEach(([slug, { monthly, annual }]) => {
-      if (!monthly && !annual) return;
-      const anchor       = monthly || annual;
-      const monthlyPrice = monthly ? monthly.price : null;
-      const annualPrice  = annual  ? annual.price  : null;
+    Object.entries(grouped).forEach(([slug, { monthly, annual, initial }]) => {
+      if (!monthly && !annual && !initial) return;
+      const anchor        = monthly || annual || initial;
+      const monthlyPrice  = monthly ? monthly.price : null;
+      const annualPrice   = annual  ? annual.price  : null;
+      /* initialPrice: cuota única obligatoria (custom_value2 = 'Unico') */
+      const initialPrice  = initial ? initial.price : null;
 
       newPlans[slug] = {
-        monthly:    monthlyPrice !== null ? formatPrice(monthlyPrice) : null,
-        annual:     annualPrice  !== null ? formatPrice(annualPrice)  : null,
-        mo_save:    monthlyPrice !== null ? formatPrice(monthlyPrice * 2) : null,
-        maxAge:     extractMaxAge(anchor.notes),
-        id_monthly: monthly ? monthly.id : null,
-        id_annual:  annual  ? annual.id  : null,
+        monthly:     monthlyPrice  !== null ? formatPrice(monthlyPrice)  : null,
+        annual:      annualPrice   !== null ? formatPrice(annualPrice)   : null,
+        mo_save:     monthlyPrice  !== null ? formatPrice(monthlyPrice * 2) : null,
+        /* 'initial' solo se define si existe — renderPlans usa (plan.initial !== undefined)
+           para activar el bloque de precios Selecto */
+        ...(initialPrice !== null && { initial: formatPrice(initialPrice) }),
+        maxAge:      extractMaxAge(anchor.notes),
+        id_monthly:  monthly ? monthly.id : null,
+        id_annual:   annual  ? annual.id  : null,
+        id_initial:  initial ? initial.id : null,
       };
     });
 
     if (Object.keys(newPlans).length === 0) return;
 
+    /* ── Merge con fallback ─────────────────────────────────────────────────
+       Si la API no devuelve algún plan que está en PLAN_GROUPS original
+       (ej.: vanguardia-selecto faltante), conservamos el precio de respaldo
+       para que la tarjeta siga visible. Así la API solo ACTUALIZA precios,
+       nunca ELIMINA tarjetas. */
+    const ORIGINAL_SLUGS = PLAN_GROUPS.flatMap((g) => g.plans);
+    const FALLBACK_PLANS_SNAPSHOT = { ...PLANS }; // copia de los datos de respaldo
+    ORIGINAL_SLUGS.forEach((slug) => {
+      if (!newPlans[slug] && FALLBACK_PLANS_SNAPSHOT[slug]) {
+        newPlans[slug] = FALLBACK_PLANS_SNAPSHOT[slug];
+        console.warn(`Plan "${slug}" no devuelto por la API — usando datos de respaldo.`);
+      }
+    });
+
     PLANS = newPlans;
 
-    /* Reconstruir PLAN_GROUPS dinámicamente desde los slugs devueltos por la API */
+    /* Reconstruir PLAN_GROUPS: usamos la estructura original como referencia
+       canónica de grupos/planes, solo reemplazando precios desde la API.
+       Esto garantiza siempre 4 tarjetas aunque la API devuelva datos parciales. */
     const FAMILY_REGION = {
       "esencial-zulia":    "region_zulia",
       "vanguardia-zulia":  "region_zulia",
-      "esencial-ven":      "region_ven",
-      "vanguardia-ven":    "region_ven",
+      /* "esencial-ven" y "vanguardia-ven" ya se normalizan a "-selecto" antes de llegar aquí */
       "esencial-selecto":  "region_selecto",
       "vanguardia-selecto":"region_selecto",
     };
-    const REGION_ORDER = ["region_zulia", "region_ven", "region_selecto"];
+    /* region_ven eliminado: era un alias de region_selecto que causaba
+       el grupo huérfano con una sola tarjeta */
+    const REGION_ORDER = ["region_zulia", "region_selecto"];
     const SLUG_ORDER   = [
       "esencial-zulia", "vanguardia-zulia",
-      "esencial-ven",   "vanguardia-ven",
       "esencial-selecto", "vanguardia-selecto",
     ];
     const regionMap = {};
@@ -827,10 +865,18 @@ function renderPlans() {
       let priceHTML = "";
       let subPriceHTML = "";
       if (isSelecto) {
-        priceHTML    = plan.monthly ? `<div class="plan-price-monthly">${plan.monthly}<span>${t("plan_mo")}</span></div>` : "";
+        /* Suscripción disponible: mensual tiene prioridad; si no hay, usar anual */
+        const recurringAmt   = plan.monthly ?? plan.annual;
+        const recurringLabel = plan.monthly ? t("plan_mo") : t("plan_yr");
+
+        priceHTML = recurringAmt
+          ? `<div class="plan-price-monthly">${recurringAmt}<span>${recurringLabel}</span></div>`
+          : "";
+
+        /* Cuota inicial: obligatoria, independiente del tipo de suscripción */
         subPriceHTML = `<p class="plan-price-annual plan-price-initial">
-          ${currentLang === "es" ? "Cuota inicial" : "Initial fee"}: <strong>${plan.initial}</strong> +
-          ${currentLang === "es" ? "pago contado" : "lump sum"}: ${plan.annual}${t("plan_yr")}
+          ${currentLang === "es" ? "Cuota inicial obligatoria" : "Mandatory initial fee"}:
+          <strong>${plan.initial}</strong>
         </p>`;
       } else {
         priceHTML    = plan.monthly
@@ -1081,7 +1127,8 @@ function openWizard(planId) {
   wizardSubmitted = false;
   wizardStep = 0;
   wizardSelectedPlan = planId;
-  wizardPaymentType = "monthly";
+  const _plan = PLANS[planId] || {};
+  wizardPaymentType = _plan.monthly ? "monthly" : (_plan.annual ? "annual" : "monthly");
   wizardAcceptedTerms = false;
   wizardBuyer = {
     name: "",
@@ -1332,22 +1379,30 @@ function renderStep2() {
     }
   };
 
-  return `
-    <p style="color:var(--muted-foreground);font-size:0.875rem;margin-bottom:0.5rem">${t("wiz_select_billing")}</p>
-    <button class="payment-option${wizardPaymentType === "monthly" ? " selected" : ""}" data-type="monthly">
+  const prefix = isSelecto ? plan.initial + " + " : "";
+  const monthlyBtn = plan.monthly
+    ? `<button class="payment-option${wizardPaymentType === "monthly" ? " selected" : ""}" data-type="monthly">
       <div>
         <p class="payment-option-title">${t("wiz_monthly_title")}</p>
         <p class="payment-option-sub">${monthlyLabel}</p>
       </div>
-      <div class="payment-option-price">${isSelecto ? plan.initial + " + " : ""}${plan.monthly}<span>${t("plan_mo")}</span></div>
-    </button>
-    <button class="payment-option${wizardPaymentType === "annual" ? " selected" : ""}" data-type="annual">
+      <div class="payment-option-price">${prefix}${plan.monthly}<span>${t("plan_mo")}</span></div>
+    </button>`
+    : "";
+  const annualBtn = plan.annual
+    ? `<button class="payment-option${wizardPaymentType === "annual" ? " selected" : ""}" data-type="annual">
       <div>
         <p class="payment-option-title">${t("wiz_annual_title")}</p>
         <p class="payment-option-sub highlight">${annualSub}</p>
       </div>
-      <div class="payment-option-price">${isSelecto ? plan.initial + " + " : ""}${plan.annual}<span>${t("wiz_yr")}</span></div>
-    </button>
+      <div class="payment-option-price">${prefix}${plan.annual}<span>${t("wiz_yr")}</span></div>
+    </button>`
+    : "";
+
+  return `
+    <p style="color:var(--muted-foreground);font-size:0.875rem;margin-bottom:0.5rem">${t("wiz_select_billing")}</p>
+    ${monthlyBtn}
+    ${annualBtn}
     `;
 }
 

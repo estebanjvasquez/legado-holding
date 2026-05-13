@@ -6,7 +6,9 @@
       "Bash(curl -s -H \"X-API-TOKEN: WXngbLQXx5RPDsH0APTEopqf4Ja9U6Jdyt8MQK5qoVicK6jfNUCXDqDy5mXprtTV\" \"https://invoicing.legadoholding.com/api/v1/products?per_page=100\")",
       "Bash(python3 -c \"import json,sys; data=json.load\\(sys.stdin\\); products=data.get\\('data',[]\\); filtered=[p for p in products if p.get\\('custom_value1'\\)=='legadoweb']; print\\(json.dumps\\(filtered, indent=2\\)\\)\")",
       "mcp__claude_ai_n8n__search_workflows",
-      "mcp__claude_ai_n8n__get_workflow_details"
+      "mcp__claude_ai_n8n__get_workflow_details",
+      "mcp__claude_ai_n8n__execute_workflow",
+      "mcp__claude_ai_n8n__get_execution"
     ]
   }
 }
