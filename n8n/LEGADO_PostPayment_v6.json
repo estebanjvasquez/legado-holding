@@ -1,0 +1,272 @@
+{
+  "name": "LEGADO - Post-Payment Pipeline v6",
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "tags": [],
+  "nodes": [
+
+    {
+      "id": "11111111-1111-1111-1111-111111111111",
+      "name": "Legado Payment Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [560, 300],
+      "webhookId": "11111111-1111-1111-1111-111111111111",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "legado-payment",
+        "responseMode": "responseNode",
+        "options": { "allowedOrigins": "*" }
+      }
+    },
+
+    {
+      "id": "22222222-2222-2222-2222-222222222222",
+      "name": "Parse & Validate Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, 300],
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\nconst intent     = (body.intent || '').toLowerCase();\nconst plan       = body.plan       || null;\nconst paymentType = (body.paymentType || 'monthly').toLowerCase();\nconst buyer      = body.buyer      || {};\n\nconst buyerName     = (buyer.name     || '').trim();\nconst buyerLastName = (buyer.lastName || '').trim();\nconst buyerEmail    = (buyer.email    || '').toLowerCase().trim();\n\nif (!buyerEmail) throw new Error('Email del comprador es requerido');\nif (!plan)       throw new Error('Plan es requerido');\n\n// custom_value3 en Invoice Ninja == slug del plan\nconst planFamily = plan;\n\n// Planes '-ven' requieren cuota inicial (Unico) + primer mes + recurrente mensual\nconst isVen = planFamily.endsWith('-ven');\n\n// Mapear paymentType al custom_value2 de Invoice Ninja\nconst frequencyLabel = paymentType === 'annual' ? 'Annualy' : 'Monthly';\n\n// frequency_id de Invoice Ninja: 4 = mensual, 9 = anual\nconst frequencyId = paymentType === 'annual' ? 9 : 4;\n\nreturn [{ json: {\n  intent,\n  plan,\n  planFamily,\n  paymentType,\n  isVen,\n  frequencyLabel,\n  frequencyId,\n  buyer: {\n    name:      buyerName,\n    lastName:  buyerLastName,\n    email:     buyerEmail,\n    phone:     buyer.phone     || '',\n    cedula:    buyer.cedula    || '',\n    birthDate: buyer.birthDate || '',\n    zip:       buyer.zip       || '',\n  },\n  family:         body.family    || [],\n  timestamp:      body.timestamp || new Date().toISOString(),\n  customerEmail:  buyerEmail,\n  customerName:   (buyerName + ' ' + buyerLastName).trim(),\n  firstName:      buyerName,\n  lastName:       buyerLastName,\n  customerPhone:  buyer.phone   || '',\n  customerCedula: buyer.cedula  || '',\n} }];"
+      }
+    },
+
+    {
+      "id": "33333333-3333-3333-3333-333333333333",
+      "name": "Route by Intent",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1040, 300],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "typeValidation": "strict", "version": 1 },
+          "conditions": [{
+            "id": "intent-check",
+            "leftValue": "={{ $json.intent }}",
+            "rightValue": "create_payment_intent",
+            "operator": { "type": "string", "operation": "equals" }
+          }],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+
+    {
+      "id": "44444444-4444-4444-4444-444444444444",
+      "name": "Respond - Unknown Intent",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [1040, 500],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, message: 'Intent no reconocido: ' + $json.intent }) }}",
+        "options": { "responseCode": 400 }
+      }
+    },
+
+    {
+      "id": "55555555-5555-5555-5555-555555555555",
+      "name": "Search Client by Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1280, 300],
+      "parameters": {
+        "url": "https://invoicing.legadoholding.com/api/v1/clients",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [{ "name": "email", "value": "={{ $json.customerEmail }}" }]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-API-TOKEN", "value": "WXngbLQXx5RPDsH0APTEopqf4Ja9U6Jdyt8MQK5qoVicK6jfNUCXDqDy5mXprtTV" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Accept",       "value": "application/json" }
+          ]
+        },
+        "options": { "allowUnauthorizedCerts": true }
+      }
+    },
+
+    {
+      "id": "66666666-6666-6666-6666-666666666666",
+      "name": "Evaluate Client Exists",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1520, 300],
+      "parameters": {
+        "jsCode": "const inResponse = $input.first().json;\nconst ctx        = $('Parse & Validate Request').item.json;\n\nconst clientsArr = (inResponse.data && Array.isArray(inResponse.data))\n  ? inResponse.data : [];\n\nconst existing = clientsArr.find(c => {\n  const contacts = c.contacts || [];\n  return contacts.some(ct =>\n    ct.email && ct.email.toLowerCase().trim() === ctx.customerEmail\n  );\n});\n\nif (existing) {\n  return [{ json: { ...ctx, clientId: existing.id, isNewClient: false } }];\n} else {\n  return [{ json: { ...ctx, clientId: null,        isNewClient: true  } }];\n}"
+      }
+    },
+
+    {
+      "id": "77777777-7777-7777-7777-777777777777",
+      "name": "Is New Client?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1760, 300],
+      "parameters": {
+        "conditions": {
+          "options": { "typeValidation": "strict", "version": 1 },
+          "conditions": [{
+            "id": "new-client-check",
+            "leftValue": "={{ $json.isNewClient }}",
+            "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+          }],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+
+    {
+      "id": "88888888-8888-8888-8888-888888888888",
+      "name": "Create Client in Invoice Ninja",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2000, 160],
+      "parameters": {
+        "method": "POST",
+        "url": "https://invoicing.legadoholding.com/api/v1/clients",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-API-TOKEN", "value": "WXngbLQXx5RPDsH0APTEopqf4Ja9U6Jdyt8MQK5qoVicK6jfNUCXDqDy5mXprtTV" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Accept",       "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ name: $json.customerName, vat_number: $json.customerCedula, contacts: [{ first_name: $json.firstName, last_name: $json.lastName, email: $json.customerEmail, phone: $json.customerPhone, send_email: true }] }) }}",
+        "options": { "allowUnauthorizedCerts": true }
+      }
+    },
+
+    {
+      "id": "99999999-9999-9999-9999-999999999999",
+      "name": "Resolve Client ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2240, 300],
+      "parameters": {
+        "jsCode": "// Convergencia: viene de 'Create Client' (nuevo) o de 'Is New Client?' false (existente)\nconst inputJson = $input.first().json;\nlet clientId, ctx;\n\n// Caso A: respuesta de Invoice Ninja al crear cliente\nif (inputJson.data && inputJson.data.id) {\n  clientId = inputJson.data.id;\n  ctx      = $('Evaluate Client Exists').item.json;\n}\n// Caso A alternativo: IN devuelve objeto directo sin wrapper .data\nelse if (inputJson.id && !inputJson.planFamily) {\n  clientId = inputJson.id;\n  ctx      = $('Evaluate Client Exists').item.json;\n}\n// Caso B: cliente existente — ya tiene clientId en el json\nelse if (inputJson.clientId) {\n  clientId = inputJson.clientId;\n  ctx      = inputJson;\n}\nelse {\n  throw new Error('No se pudo resolver clientId. Input: ' + JSON.stringify(inputJson));\n}\n\nif (!clientId) throw new Error('clientId es null o undefined');\nreturn [{ json: { ...ctx, clientId } }];"
+      }
+    },
+
+    {
+      "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      "name": "Build Invoice Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2480, 300],
+      "parameters": {
+        "jsCode": "// Consulta productos de Invoice Ninja y determina la estrategia de facturación\nconst ctx = $input.first().json;\n\nconst BASE    = 'https://invoicing.legadoholding.com/api/v1';\nconst TOKEN   = 'WXngbLQXx5RPDsH0APTEopqf4Ja9U6Jdyt8MQK5qoVicK6jfNUCXDqDy5mXprtTV';\nconst HEADERS = { 'X-API-TOKEN': TOKEN, 'Accept': 'application/json' };\n\n// Obtener catálogo de productos\nconst resp = await $helpers.httpRequest({\n  method: 'GET',\n  url: BASE + '/products?per_page=100',\n  headers: HEADERS,\n});\nconst data = typeof resp === 'string' ? JSON.parse(resp) : resp;\nconst allProducts = (data.data || []).filter(p => !p.is_deleted && p.custom_value1 === 'legadoweb');\n\n// Filtrar por familia del plan (custom_value3 == planFamily)\nconst familyProducts = allProducts.filter(p => p.custom_value3 === ctx.planFamily);\n\nif (familyProducts.length === 0) {\n  throw new Error(`Sin productos para la familia '${ctx.planFamily}'. Verifica custom_value3 en Invoice Ninja.`);\n}\n\nlet strategy, lineItems1, lineItems2, frequencyId2;\n\nif (ctx.isVen) {\n  // Planes Venezuela: buscar producto Unico (cuota inicial) y Monthly (mensualidad)\n  const unicoProd   = familyProducts.find(p => (p.custom_value2 || '').toLowerCase() === 'unico');\n  const monthlyProd = familyProducts.find(p => (p.custom_value2 || '').toLowerCase() === 'monthly');\n\n  if (!unicoProd)   throw new Error(`Producto 'Unico' no encontrado para '${ctx.planFamily}'`);\n  if (!monthlyProd) throw new Error(`Producto 'Monthly' no encontrado para '${ctx.planFamily}'`);\n\n  strategy = 'ven';\n\n  // Factura única: cuota inicial + primer mes\n  lineItems1 = [\n    { product_key: unicoProd.product_key,   notes: unicoProd.notes   || 'Cuota inicial del plan',   cost: unicoProd.price,   qty: 1 },\n    { product_key: monthlyProd.product_key, notes: 'Primer mes de mensualidad',                      cost: monthlyProd.price, qty: 1 },\n  ];\n\n  // Factura recurrente mensual (mensualidades siguientes)\n  lineItems2   = [{ product_key: monthlyProd.product_key, notes: monthlyProd.notes || 'Mensualidad del plan', cost: monthlyProd.price, qty: 1 }];\n  frequencyId2 = 4; // mensual\n\n} else {\n  // Planes Zulia: buscar producto que coincida con la frecuencia seleccionada\n  const targetProd = familyProducts.find(p =>\n    (p.custom_value2 || '').toLowerCase() === ctx.frequencyLabel.toLowerCase()\n  );\n\n  if (!targetProd) {\n    throw new Error(`Producto no encontrado para familia '${ctx.planFamily}' con frecuencia '${ctx.frequencyLabel}'`);\n  }\n\n  strategy     = ctx.paymentType === 'annual' ? 'zulia-annual' : 'zulia-monthly';\n  lineItems1   = [{ product_key: targetProd.product_key, notes: targetProd.notes || '', cost: targetProd.price, qty: 1 }];\n  lineItems2   = null;\n  frequencyId2 = null;\n}\n\nreturn [{ json: { ...ctx, strategy, lineItems1, lineItems2, frequencyId2 } }];"
+      }
+    },
+
+    {
+      "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+      "name": "Create Invoices",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2720, 300],
+      "parameters": {
+        "jsCode": "// Crea la factura de primer pago (siempre una factura regular para obtener enlace de pago)\n// y una factura recurrente para los pagos futuros.\nconst ctx = $input.first().json;\n\nconst BASE    = 'https://invoicing.legadoholding.com/api/v1';\nconst TOKEN   = 'WXngbLQXx5RPDsH0APTEopqf4Ja9U6Jdyt8MQK5qoVicK6jfNUCXDqDy5mXprtTV';\nconst HEADERS = { 'X-API-TOKEN': TOKEN, 'Content-Type': 'application/json', 'Accept': 'application/json' };\n\nconst post = async (path, body) => {\n  const r = await $helpers.httpRequest({\n    method:  'POST',\n    url:     BASE + path,\n    headers: HEADERS,\n    body:    JSON.stringify(body),\n  });\n  return typeof r === 'string' ? JSON.parse(r) : r;\n};\n\nconst toLineItems = (items) => items.map(li => ({\n  product_key: li.product_key,\n  notes:       li.notes    || '',\n  cost:        li.cost,\n  quantity:    li.qty      || 1,\n}));\n\n// ── Calcular total del primer pago ────────────────────────────────────────────\nconst invoiceTotal = ctx.lineItems1\n  .reduce((sum, li) => sum + (li.cost * (li.qty || 1)), 0)\n  .toFixed(2);\n\n// ── 1. Factura regular para el PRIMER pago (tiene enlace de pago) ────────────\nconst firstResp    = await post('/invoices', {\n  client_id:  ctx.clientId,\n  line_items: toLineItems(ctx.lineItems1),\n});\nconst firstInvoice = firstResp.data || firstResp;\nconst invLink      = (firstInvoice.invitations && firstInvoice.invitations[0])\n  ? firstInvoice.invitations[0].link\n  : '';\n\n// ── 2. Factura recurrente para pagos futuros ─────────────────────────────────\nconst recurringFreqId = ctx.strategy === 'ven' ? ctx.frequencyId2 : ctx.frequencyId;\nconst recurringItems  = ctx.strategy === 'ven' ? ctx.lineItems2   : ctx.lineItems1;\n\n// Para planes ven, la recurrente empieza el mes siguiente\nlet nextSendDate = undefined;\nif (ctx.strategy === 'ven') {\n  const now  = new Date();\n  const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);\n  nextSendDate = next.toISOString().split('T')[0];\n}\n\nconst recurringBody = {\n  client_id:    ctx.clientId,\n  frequency_id: recurringFreqId,\n  status_id:    2,       // activo\n  auto_bill:    'off',   // el cliente paga manualmente vía enlace\n  line_items:   toLineItems(recurringItems),\n};\nif (nextSendDate) recurringBody.next_send_date = nextSendDate;\n\nawait post('/recurring_invoices', recurringBody);\n\n// ── Descripción legible de la estrategia (para el email) ─────────────────────\nconst strategyLabel = {\n  'zulia-monthly': 'Suscripción mensual',\n  'zulia-annual':  'Suscripción anual',\n  'ven':           'Pago inicial + primer mes',\n}[ctx.strategy] || ctx.strategy;\n\nreturn [{ json: {\n  ...ctx,\n  invoiceId:      firstInvoice.id     || '',\n  invoiceNumber:  firstInvoice.number || '',\n  invitationLink: invLink,\n  invoiceTotal,\n  strategyLabel,\n} }];"
+      }
+    },
+
+    {
+      "id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+      "name": "Send Payment Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [2960, 300],
+      "parameters": {
+        "sendTo":  "={{ $json.customerEmail }}",
+        "subject": "={{ 'Tu plan LEGADO está listo — Factura ' + $json.invoiceNumber }}",
+        "message": "=<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"es\">\n<head>\n  <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <style type=\"text/css\">\n    #content h1 { font-family: Arial, Helvetica, sans-serif; font-weight: 600; font-size: 26px; color: #3b3b3b; margin: 0; }\n    .button-link { text-decoration: none; border: 1px solid #c8a05a; display: inline-block; border-radius: 4px; padding: 15px 30px; font-size: 16px; color: #ffffff; background-color: #c8a05a; font-weight: bold; }\n    .data-table td { padding: 8px 0; border-bottom: 1px solid #eeeeee; }\n  </style>\n</head>\n<body style=\"margin:0;padding:0;font-family:Arial,sans-serif;color:#3b3b3b;background-color:#f9f9f9;\">\n  <table role=\"presentation\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\">\n    <tr><td style=\"padding:20px 0;\">\n      <table align=\"center\" border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"570\"\n             style=\"border:1px solid #e0e0e0;background-color:#ffffff;border-radius:8px;overflow:hidden;\">\n\n        <!-- Logo -->\n        <tr><td align=\"center\" style=\"padding:30px 0;background-color:#ffffff;\">\n          <img src=\"https://legadoholding.com/images/LogoLegado.png\" alt=\"Legado Holding LLC\"\n               style=\"display:block;max-width:220px;height:auto;\">\n        </td></tr>\n\n        <!-- Body -->\n        <tr><td style=\"padding:20px 40px;text-align:center;\">\n          <h1>¡Tu solicitud fue registrada!</h1>\n          <p style=\"font-size:16px;line-height:1.6;color:#666666;\">\n            Hola <strong>{{ $json.customerName }}</strong>,<br>\n            hemos registrado tu solicitud de afiliación al plan <strong>{{ $json.plan }}</strong>\n            (<em>{{ $json.strategyLabel }}</em>).<br><br>\n            Se ha generado la factura <strong>{{ $json.invoiceNumber }}</strong> a tu nombre.\n            Haz clic en el botón para completar el pago de forma segura.\n          </p>\n\n          <!-- Resumen -->\n          <table class=\"data-table\" align=\"center\" style=\"margin:25px 0;width:100%;border-collapse:collapse;\">\n            <tr>\n              <td align=\"left\" style=\"color:#888888;\">Plan:</td>\n              <td align=\"right\"><strong>{{ $json.plan }}</strong></td>\n            </tr>\n            <tr>\n              <td align=\"left\" style=\"color:#888888;\">Modalidad:</td>\n              <td align=\"right\"><strong>{{ $json.strategyLabel }}</strong></td>\n            </tr>\n            <tr>\n              <td align=\"left\" style=\"color:#888888;\">Total a pagar ahora:</td>\n              <td align=\"right\" style=\"color:#c8a05a;font-size:18px;\"><strong>{{ $json.invoiceTotal }} USD</strong></td>\n            </tr>\n            <tr>\n              <td align=\"left\" style=\"color:#888888;\">Estado:</td>\n              <td align=\"right\" style=\"color:#d9534f;\"><strong>Pendiente de pago</strong></td>\n            </tr>\n          </table>\n\n          <!-- CTA -->\n          <div style=\"margin:35px 0;\">\n            <a href=\"{{ $json.invitationLink }}\" class=\"button-link\">PAGAR FACTURA AHORA</a>\n          </div>\n\n          <p style=\"font-size:13px;color:#999999;\">\n            Si el botón no funciona, copia este enlace en tu navegador:<br>\n            <a href=\"{{ $json.invitationLink }}\" style=\"color:#c8a05a;word-break:break-all;\">{{ $json.invitationLink }}</a>\n          </p>\n        </td></tr>\n\n        <!-- Footer promo -->\n        <tr><td style=\"background-color:#c8a05a;padding:30px;text-align:center;color:#ffffff;\">\n          <h2 style=\"margin:0;font-size:18px;font-weight:500;\">¿Necesitas ayuda?</h2>\n          <p style=\"font-size:14px;opacity:0.9;margin:8px 0 0;\">\n            Escríbenos a <a href=\"mailto:info@legadoholding.com\" style=\"color:#ffffff;\">info@legadoholding.com</a>\n          </p>\n        </td></tr>\n\n        <!-- Legal -->\n        <tr><td style=\"background-color:#242424;padding:20px;text-align:center;color:#999999;font-size:11px;\">\n          &copy; 2026 Legado Holding LLC. Todos los derechos reservados.<br>\n          Este es un mensaje automático relacionado con tu solicitud de afiliación.\n        </td></tr>\n\n      </table>\n    </td></tr>\n  </table>\n</body>\n</html>",
+        "options": {
+          "appendAttribution": false,
+          "senderName": "Legado Holding",
+          "replyTo":    "info@legadoholding.com"
+        }
+      }
+    },
+
+    {
+      "id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+      "name": "Respond - Payment Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [3200, 300],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, message: 'Tu solicitud fue registrada. Recibirás un correo en ' + $('Create Invoices').item.json.customerEmail + ' con el enlace de pago.', invoiceNumber: $('Create Invoices').item.json.invoiceNumber, plan: $('Create Invoices').item.json.plan, strategy: $('Create Invoices').item.json.strategy }) }}",
+        "options": {}
+      }
+    }
+
+  ],
+
+  "connections": {
+    "Legado Payment Webhook": {
+      "main": [[
+        { "node": "Parse & Validate Request", "type": "main", "index": 0 }
+      ]]
+    },
+    "Parse & Validate Request": {
+      "main": [[
+        { "node": "Route by Intent", "type": "main", "index": 0 }
+      ]]
+    },
+    "Route by Intent": {
+      "main": [
+        [{ "node": "Search Client by Email",  "type": "main", "index": 0 }],
+        [{ "node": "Respond - Unknown Intent", "type": "main", "index": 0 }]
+      ]
+    },
+    "Search Client by Email": {
+      "main": [[
+        { "node": "Evaluate Client Exists", "type": "main", "index": 0 }
+      ]]
+    },
+    "Evaluate Client Exists": {
+      "main": [[
+        { "node": "Is New Client?", "type": "main", "index": 0 }
+      ]]
+    },
+    "Is New Client?": {
+      "main": [
+        [{ "node": "Create Client in Invoice Ninja", "type": "main", "index": 0 }],
+        [{ "node": "Resolve Client ID",              "type": "main", "index": 0 }]
+      ]
+    },
+    "Create Client in Invoice Ninja": {
+      "main": [[
+        { "node": "Resolve Client ID", "type": "main", "index": 0 }
+      ]]
+    },
+    "Resolve Client ID": {
+      "main": [[
+        { "node": "Build Invoice Context", "type": "main", "index": 0 }
+      ]]
+    },
+    "Build Invoice Context": {
+      "main": [[
+        { "node": "Create Invoices", "type": "main", "index": 0 }
+      ]]
+    },
+    "Create Invoices": {
+      "main": [[
+        { "node": "Send Payment Email", "type": "main", "index": 0 }
+      ]]
+    },
+    "Send Payment Email": {
+      "main": [[
+        { "node": "Respond - Payment Success", "type": "main", "index": 0 }
+      ]]
+    }
+  }
+}

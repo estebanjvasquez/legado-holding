@@ -1,0 +1,191 @@
+TÉRMINOS Y CONDICIONES / TERMS AND CONDITIONS
+══════════════════════════════════════════════════════════════════════════════
+
+TÍTULO: Contrato de Servicios de Previsión Funeraria / Funeral Pre-Planning Service Contract
+
+IDIOMA / LANGUAGE: Este contrato está disponible en español e inglés. This contract is available in Spanish and English.
+
+══════════════════════════════════════════════════════════════════════════════
+
+1. OBJETO DEL CONTRATO / CONTRACT PURPOSE
+══════════════════════════════════════════════════════════════════════════════
+
+ES: El presente contrato tiene por objeto establecer los términos y condiciones bajo los cuales LEGADO HOLDING (en adelante "la Empresa") prestará servicios de previsión funeraria al Cliente, incluyendo la gestión y coordinación de servicios funerarios en Venezuela para los familiares designados por el Cliente.
+
+EN: This contract establishes the terms and conditions under which LEGADO HOLDING (hereinafter "the Company") will provide funeral pre-planning services to the Customer, including the management and coordination of funeral services in Venezuela for the family members designated by the Customer.
+
+══════════════════════════════════════════════════════════════════════════════
+
+2. DEFINICIONES / DEFINITIONS
+══════════════════════════════════════════════════════════════════════════════
+
+• Cliente: La persona titular que contrata el servicio y realiza los pagos.
+  (Customer: The policyholder who contracts the service and makes payments)
+
+• Familiar-designado: La(s) persona(s) en Venezuela que recibirán los servicios funerarios.
+  (Designated family member: The person(s) in Venezuela who will receive funeral services)
+
+• Plan: El paquete de servicios seleccionado por el Cliente.
+  (Plan: The service package selected by the Customer)
+
+══════════════════════════════════════════════════════════════════════════════
+
+3. SERVICIOS INCLUIDOS / INCLUDED SERVICES
+══════════════════════════════════════════════════════════════════════════════
+
+ES: Los servicios incluidos en el plan seleccionado son:
+EN: The services included in the selected plan are:
+
+• Traslado del fallecido desde el lugar de fallecimiento hasta la funeraria
+  (Transportation of the deceased from the place of death to the funeral home)
+
+• Preparación y embalsamamiento del cuerpo
+  (Preparation and embalming of the body)
+
+• Ataúd oUrna según corresponda
+  (Coffin or urn as appropriate)
+
+• Sala de velatorio
+  (Viewing room)
+
+• Ceremonia funeraria (religiosa o civil)
+  (Funeral ceremony (religious or civil))
+
+• Traslado al cementerio o crematorio
+  (Transportation to cemetery or crematorium)
+
+• Inhumación o cremación según preferencia
+  (Inhumation or cremation according to preference)
+
+• Documentación legal necesaria
+  (Necessary legal documentation)
+
+• Servicio de nekroticio (avisos mortuorios)
+  (Obituary service)
+
+══════════════════════════════════════════════════════════════════════════════
+
+4. PAGO Y PLANES / PAYMENT AND PLANS
+══════════════════════════════════════════════════════════════════════════════
+
+ES:
+4.1 El Cliente puede seleccionar entre plan mensual o anual.
+4.2 El pago mensual incluye una cuota inicial más pagos mensuales recurrentes.
+4.3 El pago anual incluye un descuento por pago anticipado (2 meses gratis).
+4.4 Los precios son en dólares estadounidenses (USD).
+4.5 Los pagos se procesan a través de Stripe con tarjeta de crédito/débito.
+
+EN:
+4.1 The Customer can choose between monthly or annual plan.
+4.2 The monthly payment includes an initial fee plus recurring monthly payments.
+4.3 The annual payment includes a discount for early payment (2 months free).
+4.4 Prices are in US dollars (USD).
+4.5 Payments are processed through Stripe with credit/debit card.
+
+══════════════════════════════════════════════════════════════════════════════
+
+5. LÍMITE DE EDAD PARA FAMILIARES / AGE LIMIT FOR FAMILY MEMBERS
+══════════════════════════════════════════════════════════════════════════════
+
+ES: Los familiares designados deben tener máximo 65 años al momento del registro. Excepciones requieren aprobación especial de la Empresa.
+
+EN: Designated family members must be maximum 65 years old at the time of registration. Exceptions require special approval from the Company.
+
+══════════════════════════════════════════════════════════════════════════════
+
+6. VIGENCIA Y TERMINACIÓN / TERM AND TERMINATION
+══════════════════════════════════════════════════════════════════════════════
+
+ES:
+6.1 El contrato entra en vigencia al realizar el primer pago.
+6.2 El Cliente puede cancelar en cualquier momento con 30 días de aviso previo.
+6.3 Si el Cliente incumple el pago por más de 30 días, los servicios serán suspendidos.
+6.4 No hay reembolso por pagos realizados previamente.
+
+EN:
+6.1 The contract becomes effective upon making the first payment.
+6.2 The Customer may cancel at any time with 30 days prior notice.
+6.3 If the Customer defaults on payment for more than 30 days, services will be suspended.
+6.4 No refunds for previously made payments.
+
+══════════════════════════════════════════════════════════════════════════════
+
+7. EXCLUSIONES / EXCLUSIONS
+══════════════════════════════════════════════════════════════════════════════
+
+ES: No están cubiertos por este contrato:
+EN: The following are not covered by this contract:
+
+• Servicios no especificados en el plan seleccionado
+  (Services not specified in the selected plan)
+
+• Servicios殡葬 adicionales requeridos por la familia
+  (Additional funeral services required by the family)
+
+• Costos de exhumación o إعادة棺 (si aplica)
+  (Exhumation or reburial costs (if applicable))
+
+• Servicios de nekroticio adicionales
+  (Additional obituary services)
+
+• Traslados internacionales especiales
+  (Special international transfers)
+
+══════════════════════════════════════════════════════════════════════════════
+
+8. RESPONSABILIDADES / RESPONSIBILITIES
+══════════════════════════════════════════════════════════════════════════════
+
+ES:
+8.1 La Empresa se compromete a prestar los servicios descritos de manera profesional.
+8.2 La Empresa coordinará con funerarias aliadas en Venezuela para la ejecución de los servicios.
+8.3 El Cliente se compromete a mantener sus datos de pago actualizados.
+8.4 El Cliente debe notificar cualquier cambio en sus familiares designados.
+
+EN:
+8.1 The Company commits to providing the described services professionally.
+8.2 The Company will coordinate with partner funeral homes in Venezuela for service execution.
+8.3 The Customer commits to keeping their payment information up to date.
+8.4 The Customer must notify any changes in their designated family members.
+
+══════════════════════════════════════════════════════════════════════════════
+
+9. PROTECCIÓN DE DATOS / DATA PROTECTION
+══════════════════════════════════════════════════════════════════════════════
+
+ES: Los datos personales del Cliente y familiares serán tratados de acuerdo con las leyes de privacidad aplicables. No compartiremos información con terceros sin consentimiento.
+
+EN: Customer and family member personal data will be treated according to applicable privacy laws. We will not share information with third parties without consent.
+
+══════════════════════════════════════════════════════════════════════════════
+
+10. CAMBIOS EN LOS TÉRMINOS / CHANGES TO TERMS
+══════════════════════════════════════════════════════════════════════════════
+
+ES: La Empresa se reserva el derecho de modificar estos términos. Los cambios serán comunicados al Cliente con 30 días de anticipación.
+
+EN: The Company reserves the right to modify these terms. Changes will be communicated to the Customer with 30 days advance notice.
+
+══════════════════════════════════════════════════════════════════════════════
+
+11. LEY APLICABLE / APPLICABLE LAW
+══════════════════════════════════════════════════════════════════════════════
+
+ES: Este contrato se regirá por las leyes del Estado de Florida, USA.
+
+EN: This contract will be governed by the laws of the State of Florida, USA.
+
+══════════════════════════════════════════════════════════════════════════════
+
+ACEPTACIÓN / ACCEPTANCE
+══════════════════════════════════════════════════════════════════════════════
+
+Al hacer clic en "Aceptar términos y condiciones", el Cliente confirma haber leído, comprendido y aceptado los términos y condiciones establecidos en este documento.
+
+By clicking "Accept terms and conditions", the Customer confirms having read, understood, and accepted the terms and conditions established in this document.
+
+══════════════════════════════════════════════════════════════════════════════
+
+EMPRESA / COMPANY: LEGADO HOLDING
+CONTACTO / CONTACT: soporte@legadoholding.com
+FECHA / DATE: [Fecha de aceptación / Date of acceptance]

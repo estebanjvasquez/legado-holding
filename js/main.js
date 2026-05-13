@@ -24,13 +24,18 @@
    INIT           — DOMContentLoaded
    ─────────────────────────────────────────────────────────── */
 
-
 /* =============================================================================
    CONFIG
    ▶ CAMBIA ESTA URL por la de tu webhook de n8n
    ============================================================================= */
 const CHAT_WEBHOOK_URL = "https://TU-N8N-WEBHOOK-URL/webhook/chat"; // ← CAMBIAR
 
+const WIZARD_WEBHOOK_URL =
+  (typeof window !== "undefined" && window.LEGADO_CONFIG?.WIZARD_WEBHOOK_URL) ||
+  "https://vmi2945958.contaboserver.net/webhook/legado-payment";
+
+/* Catálogo de planes — proxy n8n (evita CORS; la autenticación con Invoice Ninja queda en el servidor) */
+const PLANS_API_URL = "https://vmi2945958.contaboserver.net/webhook/List_Products";
 
 /* =============================================================================
    i18n / LANG — Diccionario bilingüe ES / EN
@@ -44,200 +49,303 @@ const CHAT_WEBHOOK_URL = "https://TU-N8N-WEBHOOK-URL/webhook/chat"; // ← CAMBI
    ▶ Para cambiar un texto existente: edita directamente el string en el array
    ============================================================================= */
 const LANG = {
-
   /* ── Navegación ────────────────────────────────────────────────────────── */
-  nav_inicio:   ["Inicio",            "Home"],
-  nav_planes:   ["Planes",            "Plans"],
-  nav_como:     ["Cómo funciona",     "How it works"],
-  nav_contacto: ["Contacto",          "Contact"],
-  nav_cta:      ["PROTEGE TU LEGADO", "PROTECT YOUR LEGACY"],
+  nav_inicio: ["Inicio", "Home"],
+  nav_planes: ["Planes", "Plans"],
+  nav_como: ["Cómo funciona", "How it works"],
+  nav_contacto: ["Contacto", "Contact"],
+  nav_cta: ["PROTEGE TU LEGADO", "PROTECT YOUR LEGACY"],
 
   /* ── Hero (sobre fondo de foto de los abuelos) ─────────────────────────── */
-  hero_eyebrow: ["Previsión funeraria para venezolanos en USA",
-                 "Funeral pre-planning for Venezuelans in the USA"],
-  hero_title1:  ["Sabemos lo que significa",  "We know what it means"],
-  hero_title2:  ["no poder estar presente",   "not being able to be there"],
-  hero_sub1:    ["Si eres venezolano y dejaste familia en tu país, este espacio es para ti. Contrata hoy tu plan de previsión funeraria directamente, sin intermediarios, sin tasas confusas, sin variaciones en el precio. Domicilia tu pago en USA en tu tarjeta de crédito.",
-                 "If you're Venezuelan and left family behind, this space is for you. Enroll today in your funeral pre-planning plan directly, no middlemen, no confusing fees, no price changes. Charge to your US credit card."],
-  hero_tagline: ['"Uniendo familias, honrando vidas, preservando memorias"',
-                 '"Uniting families, honoring lives, preserving memories"'],
-  hero_cta:     ["PROTEGE TU LEGADO AQUÍ", "PROTECT YOUR LEGACY HERE"],
-  badge1:       ["Sin intermediarios",        "No middlemen"],
-  badge2:       ["Pago en USA con tarjeta",   "Pay in USA by card"],
-  badge3:       ["Sin variaciones de precio", "No price changes"],
+  hero_eyebrow: [
+    "Previsión funeraria para venezolanos en USA",
+    "Funeral pre-planning for Venezuelans in the USA",
+  ],
+  hero_title1: ["Sabemos lo que significa", "We know what it means"],
+  hero_title2: ["no poder estar presente", "not being able to be there"],
+  hero_sub1: [
+    "Si eres venezolano y dejaste familia en tu país, este espacio es para ti. Contrata hoy tu plan de previsión funeraria directamente, sin intermediarios, sin tasas confusas, sin variaciones en el precio. Domicilia tu pago en USA en tu tarjeta de crédito.",
+    "If you're Venezuelan and left family behind, this space is for you. Enroll today in your funeral pre-planning plan directly, no middlemen, no confusing fees, no price changes. Charge to your US credit card.",
+  ],
+  hero_tagline: [
+    '"Uniendo familias, honrando vidas, preservando memorias"',
+    '"Uniting families, honoring lives, preserving memories"',
+  ],
+  hero_cta: ["PROTEGE TU LEGADO AQUÍ", "PROTECT YOUR LEGACY HERE"],
+  badge1: ["Sin intermediarios", "No middlemen"],
+  badge2: ["Pago en USA con tarjeta", "Pay in USA by card"],
+  badge3: ["Sin variaciones de precio", "No price changes"],
 
   /* ── Trust bar ─────────────────────────────────────────────────────────── */
   trust1: ["Respaldo de Funeraria del Zulia", "Backed by Funeraria del Zulia"],
-  trust2: ["80+ años de trayectoria",          "80+ years of experience"],
-  trust3: ["Pago en USA con tarjeta de crédito",           "Pay in USA with credit card"],
-  trust4: ["Precio fijo, sin variaciones",                 "Fixed price, no variations"],
+  trust2: ["80+ años de trayectoria", "80+ years of experience"],
+  trust3: ["Pago en USA con tarjeta de crédito", "Pay in USA with credit card"],
+  trust4: ["Precio fijo, sin variaciones", "Fixed price, no variations"],
 
   /* ── Sección "Protege a tu familia" (versión raíz) ─────────────────────── */
-  protege_h2:   ["Protege a tu familia en Venezuela aunque estés lejos",
-                 "Protect your family in Venezuela even from far away"],
-  protege_p1:   ["Sabemos lo que significa no poder estar presente en los momentos más difíciles para la familia que dejaste en Venezuela: DUELE DOBLE, porque duele la pérdida y duele la distancia.",
-                 "We know what it means not to be present in the most difficult moments for the family you left in Venezuela: IT HURTS DOUBLE, because you feel the loss and the distance."],
-  protege_p2:   ["Legado Holding es un grupo de empresas con trayectoria comprobada en servicios funerarios en Venezuela, más de 80 años de experiencia, que nace para atender a la comunidad venezolana en Estados Unidos.",
-                 "Legado Holding is a group of companies with proven experience in funeral services in Venezuela — over 80 years of experience — created to serve the Venezuelan community in the United States."],
-  protege_p3:   ["Nos ocupamos de la atención personalizada a familiares que quedaron en nuestro territorio nacional. Contrata desde tu teléfono móvil, directamente, con la tranquilidad que tú necesitas.",
-                 "We take care of personalized attention for family members who remained in our country. Enroll from your mobile phone, directly, with the peace of mind you need."],
-  protege_link: ["Ver nuestros planes",
-                 "See our plans"],
+  protege_h2: [
+    "Protege a tu familia en Venezuela aunque estés lejos",
+    "Protect your family in Venezuela even from far away",
+  ],
+  protege_p1: [
+    "Sabemos lo que significa no poder estar presente en los momentos más difíciles para la familia que dejaste en Venezuela: DUELE DOBLE, porque duele la pérdida y duele la distancia.",
+    "We know what it means not to be present in the most difficult moments for the family you left in Venezuela: IT HURTS DOUBLE, because you feel the loss and the distance.",
+  ],
+  protege_p2: [
+    "Legado Holding es un grupo de empresas con trayectoria comprobada en servicios funerarios en Venezuela, más de 80 años de experiencia, que nace para atender a la comunidad venezolana en Estados Unidos.",
+    "Legado Holding is a group of companies with proven experience in funeral services in Venezuela — over 80 years of experience — created to serve the Venezuelan community in the United States.",
+  ],
+  protege_p3: [
+    "Nos ocupamos de la atención personalizada a familiares que quedaron en nuestro territorio nacional. Contrata desde tu teléfono móvil, directamente, con la tranquilidad que tú necesitas.",
+    "We take care of personalized attention for family members who remained in our country. Enroll from your mobile phone, directly, with the peace of mind you need.",
+  ],
+  protege_link: ["Ver nuestros planes", "See our plans"],
 
   /* ── Planes ────────────────────────────────────────────────────────────── */
-  plans_title1:     ["Con LEGADO, la tranquilidad en los momentos",  "With LEGADO, peace of mind in the most"],
-  plans_title2:     ["más difíciles toma otra dimensión",           "difficult moments takes on a new dimension"],
-  plans_sub:        ["Total, confiable y al alcance de todos. Titular y hasta 6 familiares, edad máxima 65 años.",
-                     "Total, reliable, and within everyone's reach. Policyholder and up to 6 family members, max age 65."],
-  region_zulia:     ["Región Zulia",                   "Zulia Region"],
-  region_selecto:   ["Toda Venezuela — Grupo Selecto",  "All Venezuela — Select Group"],
-  plan_recommended: ["RECOMENDADO",                    "RECOMMENDED"],
-  plan_mo:          ["/mes",                            "/mo"],
-  plan_yr:          ["/año",                            "/yr"],
-  plan_or:          ["o",                               "or"],
-  plan_buy:         ["Comprar",                         "Buy Now"],
-  plan_details:     ["Ver componentes",                 "View components"],
+  plans_title1: [
+    "Con LEGADO, la tranquilidad en los momentos",
+    "With LEGADO, peace of mind in the most",
+  ],
+  plans_title2: [
+    "más difíciles toma otra dimensión",
+    "difficult moments takes on a new dimension",
+  ],
+  plans_sub: [
+    "Total, confiable y al alcance de todos. Titular y hasta 6 familiares, edad máxima 65 años.",
+    "Total, reliable, and within everyone's reach. Policyholder and up to 6 family members, max age 65.",
+  ],
+  region_zulia:   ["Región Zulia", "Zulia Region"],
+  region_ven:     ["Toda Venezuela", "All Venezuela"],
+  region_selecto: ["Toda Venezuela — Grupo Selecto", "All Venezuela — Select Group"],
+  plan_recommended: ["RECOMENDADO", "RECOMMENDED"],
+  plan_mo: ["/mes", "/mo"],
+  plan_yr: ["/año", "/yr"],
+  plan_or: ["o", "or"],
+  plan_buy: ["Comprar", "Buy Now"],
+  plan_details: ["Saber más", "Learn more"],
+  plan_details_title: ["Detalles del plan", "Plan details"],
+  plan_details_empty: [
+    "No hay información adicional disponible para este plan.",
+    "No additional information available for this plan.",
+  ],
 
   /* Nombres de planes */
-  "plan_esencial-zulia_name":     ["Plan Esencial Zulia",          "Essential Zulia Plan"],
-  "plan_vanguardia-zulia_name":   ["Plan Vanguardia Zulia",        "Vanguard Zulia Plan"],
-  "plan_esencial-selecto_name":   ["Plan Esencial Grupo Selecto",  "Essential Select Group Plan"],
-  "plan_vanguardia-selecto_name": ["Plan Vanguardia Grupo Selecto","Vanguard Select Group Plan"],
+  "plan_esencial-zulia_name": ["Plan Esencial Zulia", "Essential Zulia Plan"],
+  "plan_vanguardia-zulia_name": [
+    "Plan Vanguardia Zulia",
+    "Vanguard Zulia Plan",
+  ],
+  "plan_esencial-selecto_name": [
+    "Plan Esencial Grupo Selecto",
+    "Essential Select Group Plan",
+  ],
+  "plan_vanguardia-selecto_name": [
+    "Plan Vanguardia Grupo Selecto",
+    "Vanguard Select Group Plan",
+  ],
 
   /* ── Cómo funciona ─────────────────────────────────────────────────────── */
-  how_title:   ["Cómo funciona",                        "How it works"],
-  how_sub:     ["Contratación 100% digital en solo 4 pasos",
-                "100% digital enrollment in just 4 steps"],
-  step_word:   ["PASO",  "STEP"],
-  step1_title: ["Elige tu plan",     "Choose your plan"],
-  step1_desc:  ["Selecciona la cobertura que mejor se adapte a tu familia.",
-                "Select the coverage that best fits your family."],
-  step2_title: ["Completa tus datos","Complete your info"],
-  step2_desc:  ["Ingresa los datos del comprador y de las personas a cubrir.",
-                "Enter buyer and covered persons information."],
-  step3_title: ["Acepta y paga",     "Accept & pay"],
-  step3_desc:  ["Revisa el contrato, acepta términos y realiza tu pago seguro.",
-                "Review the contract, accept terms, and make a secure payment."],
-  step4_title: ["Tu familia protegida","Your family protected"],
-  step4_desc:  ["Recibe confirmación y accede a tu portal de cliente.",
-                "Receive confirmation and access your client portal."],
+  how_title: ["Cómo funciona", "How it works"],
+  how_sub: [
+    "Contratación 100% digital en solo 4 pasos",
+    "100% digital enrollment in just 4 steps",
+  ],
+  step_word: ["PASO", "STEP"],
+  step1_title: ["Elige tu plan", "Choose your plan"],
+  step1_desc: [
+    "Selecciona la cobertura que mejor se adapte a tu familia.",
+    "Select the coverage that best fits your family.",
+  ],
+  step2_title: ["Completa tus datos", "Complete your info"],
+  step2_desc: [
+    "Ingresa los datos del comprador y de las personas a cubrir.",
+    "Enter buyer and covered persons information.",
+  ],
+  step3_title: ["Acepta y paga", "Accept & pay"],
+  step3_desc: [
+    "Revisa el contrato, acepta términos y realiza tu pago seguro.",
+    "Review the contract, accept terms, and make a secure payment.",
+  ],
+  step4_title: ["Tu familia protegida", "Your family protected"],
+  step4_desc: [
+    "Recibe confirmación y accede a tu portal de cliente.",
+    "Receive confirmation and access your client portal.",
+  ],
 
   /* ── Storytelling ──────────────────────────────────────────────────────── */
-  story_eyebrow: ["Nuestra historia",  "Our story"],
-  story_title:   ["La distancia no debería impedir cuidar a quienes más amas",
-                  "Distance shouldn't prevent you from caring for those you love most"],
-  story_p1:      ["En nuestras empresas, nuestra misión es escuchar cada planteamiento de los clientes. Cada paso que damos viene de propuestas de familias que hemos atendido durante casi 85 años y que hoy viven en USA, al igual que tú.",
-                  "In our companies, our mission is to listen to every concern our clients raise. Every step we take comes from proposals by families we've served for nearly 85 years who now live in the USA, just like you."],
-  story_p2:      ["Es por eso que hemos creado el GRUPO SELECTO: para dar respuesta a los cambios en la prestación de servicios funerarios que nuestros clientes han pedido. Ahora puedes optar por una bóveda en parcelas en cementerio privado — una innovación en toda Venezuela, disponible primero para nuestros clientes en USA.",
-                  "That's why we created the SELECT GROUP: to respond to changes in funeral service delivery that our clients have requested. You can now choose a vault in private cemetery parcels — an innovation across all of Venezuela, available first to our US clients."],
-  story_quote:   ['"Uniendo familias, honrando vidas, preservando memorias"',
-                  '"Uniting families, honoring lives, preserving memories"'],
+  story_eyebrow: ["Nuestra historia", "Our story"],
+  story_title: [
+    "La distancia no debería impedir cuidar a quienes más amas",
+    "Distance shouldn't prevent you from caring for those you love most",
+  ],
+  story_p1: [
+    "En nuestras empresas, nuestra misión es escuchar cada planteamiento de los clientes. Cada paso que damos viene de propuestas de familias que hemos atendido durante casi 85 años y que hoy viven en USA, al igual que tú.",
+    "In our companies, our mission is to listen to every concern our clients raise. Every step we take comes from proposals by families we've served for nearly 85 years who now live in the USA, just like you.",
+  ],
+  story_p2: [
+    "Es por eso que hemos creado el GRUPO SELECTO: para dar respuesta a los cambios en la prestación de servicios funerarios que nuestros clientes han pedido. Ahora puedes optar por una bóveda en parcelas en cementerio privado — una innovación en toda Venezuela, disponible primero para nuestros clientes en USA.",
+    "That's why we created the SELECT GROUP: to respond to changes in funeral service delivery that our clients have requested. You can now choose a vault in private cemetery parcels — an innovation across all of Venezuela, available first to our US clients.",
+  ],
+  story_quote: [
+    '"Uniendo familias, honrando vidas, preservando memorias"',
+    '"Uniting families, honoring lives, preserving memories"',
+  ],
 
   /* ── Testimonios ───────────────────────────────────────────────────────── */
-  test_title1: ["Familias que ya",    "Families who already"],
+  test_title1: ["Familias que ya", "Families who already"],
   test_title2: ["protegen su legado", "protect their legacy"],
-  test1_text:  ["Desde que contraté Legado, duermo tranquila. Sé que si algo pasa con mi mamá en Maracaibo, todo estará cubierto.",
-                "Since I hired Legado, I sleep peacefully. I know if something happens to my mom in Maracaibo, everything will be covered."],
-  test2_text:  ["Cuando mi padre falleció, Legado se encargó de todo. Yo estaba aquí sin poder viajar, pero sabía que mi familia estaba acompañada.",
-                "When my father passed, Legado took care of everything. I was here unable to travel, but I knew my family was supported."],
-  test3_text:  ["El proceso fue súper fácil. En minutos tenía todo configurado desde mi teléfono. Ahora mis abuelos están protegidos.",
-                "The process was super easy. In minutes I had everything set up from my phone. Now my grandparents are protected."],
+  test1_text: [
+    "Desde que contraté Legado, duermo tranquila. Sé que si algo pasa con mi mamá en Maracaibo, todo estará cubierto.",
+    "Since I hired Legado, I sleep peacefully. I know if something happens to my mom in Maracaibo, everything will be covered.",
+  ],
+  test2_text: [
+    "Cuando mi padre falleció, Legado se encargó de todo. Yo estaba aquí sin poder viajar, pero sabía que mi familia estaba acompañada.",
+    "When my father passed, Legado took care of everything. I was here unable to travel, but I knew my family was supported.",
+  ],
+  test3_text: [
+    "El proceso fue súper fácil. En minutos tenía todo configurado desde mi teléfono. Ahora mis abuelos están protegidos.",
+    "The process was super easy. In minutes I had everything set up from my phone. Now my grandparents are protected.",
+  ],
 
   /* ── Contacto ──────────────────────────────────────────────────────────── */
-  contact_title1:   ["¿Tienes preguntas?", "Have questions?"],
-  contact_title2:   ["Estamos aquí",       "We're here"],
-  contact_sub:      ["Nuestro equipo te acompaña en cada paso.",
-                     "Our team walks with you every step."],
-  contact_phone:    ["Teléfono",   "Phone"],
-  contact_coverage: ["Cobertura",  "Coverage"],
+  contact_title1: ["¿Tienes preguntas?", "Have questions?"],
+  contact_title2: ["Estamos aquí", "We're here"],
+  contact_sub: [
+    "Nuestro equipo te acompaña en cada paso.",
+    "Our team walks with you every step.",
+  ],
+  contact_phone: ["Teléfono", "Phone"],
+  contact_coverage: ["Cobertura", "Coverage"],
   contact_all_vzla: ["Toda Venezuela", "All Venezuela"],
 
   /* ── CTA final ─────────────────────────────────────────────────────────── */
-  cta_title:   ["Esta innovación es simple: tú decides cómo despedirte",
-                "This innovation is simple: you decide how to say goodbye"],
-  cta_sub:     ["Sin cambios en tu cuota mensual. Solo haz click en el plan que más te convenga, realiza el pago de la inicial anual, y amplía tus servicios siendo tú quien decide. Titular + 6 familiares hasta 65 años.",
-                "No changes to your monthly fee. Just click on the plan that suits you best, make the annual initial payment, and expand your services — you decide. Policyholder + 6 family members up to age 65."],
-  cta_call:    ["Llámanos", "Call us"],
+  cta_title: [
+    "Esta innovación es simple: tú decides cómo despedirte",
+    "This innovation is simple: you decide how to say goodbye",
+  ],
+  cta_sub: [
+    "Sin cambios en tu cuota mensual. Solo haz click en el plan que más te convenga, realiza el pago de la inicial anual, y amplía tus servicios siendo tú quien decide. Titular + 6 familiares hasta 65 años.",
+    "No changes to your monthly fee. Just click on the plan that suits you best, make the annual initial payment, and expand your services — you decide. Policyholder + 6 family members up to age 65.",
+  ],
+  cta_call: ["Llámanos", "Call us"],
 
   /* ── Footer ────────────────────────────────────────────────────────────── */
-  footer_tagline: ["Uniendo familias, honrando vidas, preservando memorias.",
-                   "Uniting families, honoring lives, preserving memories."],
-  footer_follow:  ["Síguenos",               "Follow us"],
-  footer_terms:   ["Términos y condiciones", "Terms & conditions"],
+  footer_tagline: [
+    "Uniendo familias, honrando vidas, preservando memorias.",
+    "Uniting families, honoring lives, preserving memories.",
+  ],
+  footer_follow: ["Síguenos", "Follow us"],
+  footer_terms: ["Términos y condiciones", "Terms & conditions"],
   footer_privacy: ["Política de privacidad", "Privacy policy"],
-  footer_support: ["Soporte",                "Support"],
-  footer_rights:  ["Todos los derechos reservados.", "All rights reserved."],
+  footer_support: ["Soporte", "Support"],
+  footer_rights: ["Todos los derechos reservados.", "All rights reserved."],
 
   /* ── Emergencia ────────────────────────────────────────────────────────── */
   emergency: ["EMERGENCIA", "EMERGENCY"],
 
   /* ── Chatbot ───────────────────────────────────────────────────────────── */
-  chat_title:     ["Asistente LEGADO",         "LEGADO Assistant"],
+  chat_title: ["Asistente LEGADO", "LEGADO Assistant"],
   chat_emergency: ["Asistencia de Emergencia", "Emergency Assistance"],
-  chat_greeting:  ["¡Hola! Soy el asistente de LEGADO. ¿En qué puedo ayudarte con tu plan?",
-                   "Hi! I'm the LEGADO assistant. How can I help you with your plan?"],
-  chat_greeting_emergency: ["Lamento mucho que estés pasando por este momento. Estoy aquí para ayudarte. ¿Puedes contarme qué sucedió?",
-                             "I'm so sorry you're going through this. I'm here to help. Can you tell me what happened?"],
-  chat_placeholder:    ["Escribe tu pregunta...",       "Type your question..."],
-  chat_ph_emergency:   ["Escribe aquí tu situación...", "Describe your situation..."],
-  chat_error:          ["Lo siento, no pude conectarme. Por favor intenta de nuevo.",
-                        "Sorry, I couldn't connect. Please try again."],
-  chat_error_emergency:["Lo siento, hubo un error de conexión. Por favor intenta de nuevo o llámanos directamente.",
-                        "Sorry, there was a connection error. Please try again or call us directly."],
+  chat_greeting: [
+    "¡Hola! Soy el asistente de LEGADO. ¿En qué puedo ayudarte con tu plan?",
+    "Hi! I'm the LEGADO assistant. How can I help you with your plan?",
+  ],
+  chat_greeting_emergency: [
+    "Lamento mucho que estés pasando por este momento. Estoy aquí para ayudarte. ¿Puedes contarme qué sucedió?",
+    "I'm so sorry you're going through this. I'm here to help. Can you tell me what happened?",
+  ],
+  chat_placeholder: ["Escribe tu pregunta...", "Type your question..."],
+  chat_ph_emergency: [
+    "Escribe aquí tu situación...",
+    "Describe your situation...",
+  ],
+  chat_error: [
+    "Lo siento, no pude conectarme. Por favor intenta de nuevo.",
+    "Sorry, I couldn't connect. Please try again.",
+  ],
+  chat_error_emergency: [
+    "Lo siento, hubo un error de conexión. Por favor intenta de nuevo o llámanos directamente.",
+    "Sorry, there was a connection error. Please try again or call us directly.",
+  ],
 
   /* ── Wizard ────────────────────────────────────────────────────────────── */
-  wiz_title:         ["Compra tu plan",     "Buy your plan"],
-  wiz_step_data:     ["Datos",              "Info"],
-  wiz_step_family:   ["Familia",            "Family"],
-  wiz_step_plan:     ["Plan",               "Plan"],
-  wiz_step_payment:  ["Pago",              "Payment"],
-  wiz_step_summary:  ["Resumen",           "Summary"],
-  wiz_back:          ["Atrás",             "Back"],
-  wiz_next:          ["Siguiente",         "Next"],
-  wiz_confirm:       ["Confirmar y Pagar", "Confirm & Pay"],
-  wiz_fname:         ["Nombre",            "First name"],
-  wiz_lname:         ["Apellido",          "Last name"],
-  wiz_cedula:        ["Cédula",            "ID Number"],
-  wiz_phone:         ["Teléfono",          "Phone"],
-  wiz_birth:         ["Fecha de nacimiento","Date of birth"],
-  wiz_age_err:       ["La edad máxima permitida para este plan es 65 años (padres hasta 80 años en Plan Vanguardia Zulia)",
-                      "Maximum allowed age for this plan is 65 years (parents up to 80 in Vanguard Zulia Plan)"],
-  wiz_family_hint:   ["Agrega los familiares que deseas cubrir (máximo 6)",
-                      "Add family members to cover (max 6)"],
-  wiz_member:        ["Familiar",          "Family member"],
-  wiz_relation:      ["Parentesco",        "Relationship"],
-  wiz_relation_ph:   ["Ej: Madre",         "E.g.: Mother"],
-  wiz_age_err_short: ["Máximo 65 años",    "Max 65 years"],
-  wiz_add_family:    ["Agregar familiar",  "Add family member"],
-  wiz_select_payment:["Selecciona tu forma de pago","Select your payment method"],
-  wiz_monthly_title: ["Suscripción mensual","Monthly subscription"],
-  wiz_monthly_sub:   ["Tarjeta de crédito","Credit card"],
-  wiz_annual_title:  ["Pago anual",        "Annual payment"],
-  wiz_annual_sub:    ["¡Ahorra 2 meses!",  "Save 2 months!"],
+  wiz_title: ["Compra tu plan", "Buy your plan"],
+  wiz_step_data: ["Datos", "Info"],
+  wiz_step_family: ["Familia", "Family"],
+  wiz_step_plan: ["Plan", "Plan"],
+  wiz_step_payment: ["Pago", "Payment"],
+  wiz_step_summary: ["Resumen", "Summary"],
+  wiz_back: ["Atrás", "Back"],
+  wiz_next: ["Siguiente", "Next"],
+  wiz_confirm: ["Confirmar y Pagar", "Confirm & Pay"],
+  wiz_fname: ["Nombre", "First name"],
+  wiz_lname: ["Apellido", "Last name"],
+  wiz_cedula: ["Cédula", "ID Number"],
+  wiz_phone: ["Teléfono", "Phone"],
+  wiz_birth: ["Fecha de nacimiento", "Date of birth"],
+  wiz_age_err: [
+    "La edad máxima permitida para este plan es 65 años (padres hasta 80 años en Plan Vanguardia Zulia)",
+    "Maximum allowed age for this plan is 65 years (parents up to 80 in Vanguard Zulia Plan)",
+  ],
+  wiz_family_hint: [
+    "Agrega los familiares que deseas cubrir (máximo 6)",
+    "Add family members to cover (max 6)",
+  ],
+  wiz_member: ["Familiar", "Family member"],
+  wiz_relation: ["Parentesco", "Relationship"],
+  wiz_relation_ph: ["Ej: Madre", "E.g.: Mother"],
+  wiz_age_err_short: ["Máximo 65 años", "Max 65 years"],
+  wiz_add_family: ["Agregar familiar", "Add family member"],
+  wiz_select_payment: [
+    "Selecciona tu forma de pago",
+    "Select your payment method",
+  ],
+  wiz_select_billing: ["Selecciona tu modalidad de pago", "Select your billing mode"],
+  wiz_monthly_title: ["Suscripción mensual", "Monthly subscription"],
+  wiz_monthly_sub: ["Suscripción mensual", "Monthly subscription"],
+  wiz_annual_title: ["Pago anual", "Annual payment"],
+  wiz_annual_sub: ["¡Ahorra 2 meses!", "Save 2 months!"],
+  wiz_yr: ["/año", "/yr"],
   wiz_summary_title: ["Resumen de compra", "Purchase summary"],
-  wiz_sum_plan:      ["Plan",              "Plan"],
-  wiz_sum_payment:   ["Pago",             "Payment"],
-  wiz_sum_buyer:     ["Comprador",         "Buyer"],
-  wiz_sum_members:   ["Familiares",        "Family members"],
-  wiz_contract_title:["Contrato de servicio","Service contract"],
-  wiz_contract_chk:  ["Acepto los términos y condiciones del servicio",
-                      "I accept the service terms and conditions"],
-  wiz_contract_p0:   ["TÉRMINOS Y CONDICIONES DEL SERVICIO DE PREVISIÓN FUNERARIA LEGADO",
-                      "LEGADO FUNERAL PRE-PLANNING SERVICE TERMS AND CONDITIONS"],
-  wiz_contract_p1:   ["El presente contrato establece los términos y condiciones bajo los cuales Legado provee servicios de previsión funeraria para familias venezolanas. Al aceptar estos términos, el contratante acepta las condiciones de servicio, cobertura y pago aquí descritas.",
-                      "This contract establishes the terms and conditions under which Legado provides funeral pre-planning services for Venezuelan families."],
-  wiz_contract_p2:   ["1. COBERTURA: El servicio incluye los beneficios especificados en el plan seleccionado. La cobertura aplica exclusivamente en el territorio de Venezuela según el plan contratado.",
-                      "1. COVERAGE: The service includes the benefits specified in the selected plan. Coverage applies exclusively within Venezuelan territory."],
-  wiz_contract_p3:   ["2. PAGOS: Los pagos deben realizarse de forma puntual según la modalidad seleccionada (mensual o anual). El incumplimiento de pago por más de 30 días resultará en la suspensión del servicio.",
-                      "2. PAYMENTS: Payments must be made promptly. Payment default for more than 30 days will result in service suspension."],
-  wiz_contract_p4:   ["3. CANCELACIÓN: El contratante puede cancelar el servicio en cualquier momento con 30 días de anticipación.",
-                      "3. CANCELLATION: The contractor may cancel the service at any time with 30 days notice."],
+  wiz_sum_billing: ["Modalidad", "Billing mode"],
+  wiz_sum_method: ["Método de pago", "Payment method"],
+  wiz_sum_plan: ["Plan", "Plan"],
+  wiz_sum_payment: ["Pago", "Payment"],
+  wiz_sum_buyer: ["Comprador", "Buyer"],
+  wiz_sum_members: ["Familiares", "Family members"],
+  wiz_contract_title: ["Contrato de servicio", "Service contract"],
+  wiz_contract_chk: [
+    "Acepto los términos y condiciones del servicio",
+    "I accept the service terms and conditions",
+  ],
+  wiz_contract_p0: [
+    "TÉRMINOS Y CONDICIONES DEL SERVICIO DE PREVISIÓN FUNERARIA LEGADO",
+    "LEGADO FUNERAL PRE-PLANNING SERVICE TERMS AND CONDITIONS",
+  ],
+  wiz_contract_p1: [
+    "El presente contrato establece los términos y condiciones bajo los cuales Legado provee servicios de previsión funeraria para familias venezolanas. Al aceptar estos términos, el contratante acepta las condiciones de servicio, cobertura y pago aquí descritas.",
+    "This contract establishes the terms and conditions under which Legado provides funeral pre-planning services for Venezuelan families.",
+  ],
+  wiz_contract_p2: [
+    "1. COBERTURA: El servicio incluye los beneficios especificados en el plan seleccionado. La cobertura aplica exclusivamente en el territorio de Venezuela según el plan contratado.",
+    "1. COVERAGE: The service includes the benefits specified in the selected plan. Coverage applies exclusively within Venezuelan territory.",
+  ],
+  wiz_contract_p3: [
+    "2. PAGOS: Los pagos deben realizarse de forma puntual según la modalidad seleccionada (mensual o anual). El incumplimiento de pago por más de 30 días resultará en la suspensión del servicio.",
+    "2. PAYMENTS: Payments must be made promptly. Payment default for more than 30 days will result in service suspension.",
+  ],
+  wiz_contract_p4: [
+    "3. CANCELACIÓN: El contratante puede cancelar el servicio en cualquier momento con 30 días de anticipación.",
+    "3. CANCELLATION: The contractor may cancel the service at any time with 30 days notice.",
+  ],
 
   /* ── Toast ─────────────────────────────────────────────────────────────── */
-  toast_confirm: ["¡Solicitud enviada! Nos pondremos en contacto pronto.",
-                  "Request submitted! We'll get in touch soon."],
-};
+  toast_confirm: [
+    "¡Solicitud enviada! Nos pondremos en contacto pronto.",
+    "Request submitted! We'll get in touch soon.",
+  ],
 
+};
 
 /* =============================================================================
    PLANS — precios y características
@@ -247,12 +355,34 @@ const LANG = {
    ▶ Para añadir un plan: agrega una entrada en PLANS, PLAN_FEATURES,
      LANG (el nombre), y PLAN_GROUPS
    ============================================================================= */
-const PLANS = {
-  /* Precios reales según el documento del cliente */
-  "esencial-zulia":    { monthly:"$9,47", annual:"$94,7",  mo_save:"$19",  maxAge: 65 },
-  "vanguardia-zulia":  { monthly:"$14,7", annual:"$147",   mo_save:"$29,4",maxAge: 80 },
-  "esencial-selecto":  { monthly:"$9,47", annual:"$202",   mo_save:"$",    initial:"$35", maxAge: 65 },
-  "vanguardia-selecto":{ monthly:"$14,7", annual:"$129,7", mo_save:"$",    initial:"$55", maxAge: 65 },
+let PLANS = {
+  /* Precios de respaldo — se sobreescriben con datos de la API al cargar */
+  "esencial-zulia": {
+    monthly: "$9,47",
+    annual: "$94,7",
+    mo_save: "$19",
+    maxAge: 65,
+  },
+  "vanguardia-zulia": {
+    monthly: "$14,7",
+    annual: "$147",
+    mo_save: "$29,4",
+    maxAge: 80,
+  },
+  "esencial-selecto": {
+    monthly: "$9,47",
+    annual: "$202",
+    mo_save: "$",
+    initial: "$35",
+    maxAge: 65,
+  },
+  "vanguardia-selecto": {
+    monthly: "$14,7",
+    annual: "$129,7",
+    mo_save: "$",
+    initial: "$55",
+    maxAge: 65,
+  },
 };
 
 /* Nota Planes Selecto: pagan una cuota inicial + mensualidad igual al plan base */
@@ -352,43 +482,218 @@ const PLAN_FEATURES = {
   },
 };
 
-const PLAN_GROUPS = [
-  { region_key: "region_zulia",   plans: ["esencial-zulia",   "vanguardia-zulia"]   },
-  { region_key: "region_selecto", plans: ["esencial-selecto", "vanguardia-selecto"] },
+let PLAN_GROUPS = [
+  { region_key: "region_zulia", plans: ["esencial-zulia", "vanguardia-zulia"] },
+  {
+    region_key: "region_selecto",
+    plans: ["esencial-selecto", "vanguardia-selecto"],
+  },
 ];
 
-const HIGHLIGHTED = new Set(["vanguardia-zulia","vanguardia-selecto"]);
+let HIGHLIGHTED = new Set(["vanguardia-zulia", "vanguardia-selecto"]);
 
 /* Descripción corta debajo del nombre del plan (aparece en tarjeta) */
 const PLAN_SUBTITLE = {
-  "esencial-zulia":    { es: "Funeral + cremación · Funeraria del Zulia · Regional Zulia",
-                         en: "Funeral + cremation · Funeraria del Zulia · Zulia Region" },
-  "vanguardia-zulia":  { es: "Lo mejor de nuestros planes · Padres hasta 80 años · Funeraria del Zulia",
-                         en: "Best of our plans · Parents up to 80 years · Funeraria del Zulia" },
-  "esencial-selecto":  { es: "Todo Venezuela · Tú eliges los componentes · Cremación incluida",
-                         en: "All Venezuela · You choose the components · Cremation included" },
-  "vanguardia-selecto":{ es: "El más completo · Exclusivo Venezuela · Tú eliges: cremación o bóveda privada",
-                         en: "Most comprehensive · Exclusive Venezuela · You choose: cremation or private vault" },
+  "esencial-zulia": {
+    es: "Funeral + cremación · Funeraria del Zulia · Regional Zulia",
+    en: "Funeral + cremation · Funeraria del Zulia · Zulia Region",
+  },
+  "vanguardia-zulia": {
+    es: "Lo mejor de nuestros planes · Padres hasta 80 años · Funeraria del Zulia",
+    en: "Best of our plans · Parents up to 80 years · Funeraria del Zulia",
+  },
+  "esencial-selecto": {
+    es: "Todo Venezuela · Tú eliges los componentes · Cremación incluida",
+    en: "All Venezuela · You choose the components · Cremation included",
+  },
+  "vanguardia-selecto": {
+    es: "El más completo · Exclusivo Venezuela · Tú eliges: cremación o bóveda privada",
+    en: "Most comprehensive · Exclusive Venezuela · You choose: cremation or private vault",
+  },
 };
 
+/* =============================================================================
+   PLANES — carga dinámica desde Invoice Ninja
+   Filtra custom_value1 === "legadoweb", agrupa por familia (mensual + anual),
+   y actualiza PLANS / PLAN_GROUPS / HIGHLIGHTED antes de re-renderizar.
+   ============================================================================= */
+
+function formatPrice(num) {
+  const n = Math.round(num * 100) / 100;
+  const s = n.toFixed(2).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+  return "$" + s.replace(".", ",");
+}
+
+function extractMaxAge(notes) {
+  if (/max\s*80|80\s*a[ñn]os?/i.test(notes)) return 80;
+  const m = /edad\s*m[aá]x[a-z]*\s*(?:de\s*contrat[a-z]*)?\s*(\d+)/i.exec(notes);
+  if (m) return parseInt(m[1], 10);
+  return 65;
+}
+
+function getPlanFamily(productKey) {
+  const upper = productKey.toUpperCase();
+  if (upper.includes("ESENCIAL") && (upper.includes("SELECTO") || upper.includes("SELEC"))) return "esencial-selecto";
+  if (upper.includes("VANGUARDIA") && (upper.includes("SELECTO") || upper.includes("SELEC"))) return "vanguardia-selecto";
+  if (upper.includes("ESENCIAL"))   return "esencial-zulia";
+  if (upper.includes("VANGUARDIA")) return "vanguardia-zulia";
+  return productKey.toLowerCase()
+    .replace(/^plan\s+/i, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+async function loadPlansFromAPI() {
+  try {
+    const resp = await fetch(PLANS_API_URL);
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const raw = await resp.json();
+
+    /* n8n puede devolver un array directo o { data: [...] } — normalizar ambos */
+    const list = Array.isArray(raw) ? raw : (raw.data || []);
+    const products = list.filter(
+      (p) => !p.is_deleted && p.custom_value1 === "legadoweb",
+    );
+    if (products.length === 0) return;
+
+    /* Agrupar productos por familia de plan.
+       Prioridad: custom_value3 (slug explícito) > inferir del product_key.
+       isMonthly: acepta "mensual" (legacy) y "monthly" (nuevo). */
+    /* Tabla de alias: normaliza slugs alternativos que pueden venir de Invoice Ninja
+       hacia el slug canónico que usa el renderizador.
+       Ejemplo: "esencial-ven" (mal configurado) → "esencial-selecto" */
+    const SLUG_ALIASES = {
+      "esencial-ven":    "esencial-selecto",
+      "vanguardia-ven":  "vanguardia-selecto",
+    };
+
+    const grouped = {};
+    products.forEach((p) => {
+      const rawFamily = (p.custom_value3 && p.custom_value3.trim()) || getPlanFamily(p.product_key);
+      const family = SLUG_ALIASES[rawFamily] || rawFamily;
+      if (!grouped[family]) grouped[family] = {};
+      const cv2 = (p.custom_value2 || "").toLowerCase();
+      const isMonthly = cv2 === "mensual" || cv2 === "monthly";
+      /* "Unico" = cuota inicial obligatoria (se paga siempre, independiente
+         de si la suscripción es mensual o anual) */
+      const isUnico   = cv2 === "unico";
+      if (isMonthly) {
+        grouped[family].monthly = p;
+      } else if (isUnico) {
+        grouped[family].initial = p;   // ← cuota inicial, NO anual
+      } else {
+        grouped[family].annual = p;
+      }
+    });
+
+    /* Construir el objeto PLANS desde los grupos */
+    const newPlans = {};
+    Object.entries(grouped).forEach(([slug, { monthly, annual, initial }]) => {
+      if (!monthly && !annual && !initial) return;
+      const anchor        = monthly || annual || initial;
+      const monthlyPrice  = monthly ? monthly.price : null;
+      const annualPrice   = annual  ? annual.price  : null;
+      /* initialPrice: cuota única obligatoria (custom_value2 = 'Unico') */
+      const initialPrice  = initial ? initial.price : null;
+
+      newPlans[slug] = {
+        monthly:     monthlyPrice  !== null ? formatPrice(monthlyPrice)  : null,
+        annual:      annualPrice   !== null ? formatPrice(annualPrice)   : null,
+        mo_save:     monthlyPrice  !== null ? formatPrice(monthlyPrice * 2) : null,
+        /* 'initial' solo se define si existe — renderPlans usa (plan.initial !== undefined)
+           para activar el bloque de precios Selecto */
+        ...(initialPrice !== null && { initial: formatPrice(initialPrice) }),
+        maxAge:      extractMaxAge(anchor.notes),
+        notes:       (anchor.notes || "").trim(),
+        id_monthly:  monthly ? monthly.id : null,
+        id_annual:   annual  ? annual.id  : null,
+        id_initial:  initial ? initial.id : null,
+      };
+    });
+
+    if (Object.keys(newPlans).length === 0) return;
+
+    /* ── Merge con fallback ─────────────────────────────────────────────────
+       Si la API no devuelve algún plan que está en PLAN_GROUPS original
+       (ej.: vanguardia-selecto faltante), conservamos el precio de respaldo
+       para que la tarjeta siga visible. Así la API solo ACTUALIZA precios,
+       nunca ELIMINA tarjetas. */
+    const ORIGINAL_SLUGS = PLAN_GROUPS.flatMap((g) => g.plans);
+    const FALLBACK_PLANS_SNAPSHOT = { ...PLANS }; // copia de los datos de respaldo
+    ORIGINAL_SLUGS.forEach((slug) => {
+      if (!newPlans[slug] && FALLBACK_PLANS_SNAPSHOT[slug]) {
+        newPlans[slug] = FALLBACK_PLANS_SNAPSHOT[slug];
+        console.warn(`Plan "${slug}" no devuelto por la API — usando datos de respaldo.`);
+      }
+    });
+
+    PLANS = newPlans;
+
+    /* Reconstruir PLAN_GROUPS: usamos la estructura original como referencia
+       canónica de grupos/planes, solo reemplazando precios desde la API.
+       Esto garantiza siempre 4 tarjetas aunque la API devuelva datos parciales. */
+    const FAMILY_REGION = {
+      "esencial-zulia":    "region_zulia",
+      "vanguardia-zulia":  "region_zulia",
+      /* "esencial-ven" y "vanguardia-ven" ya se normalizan a "-selecto" antes de llegar aquí */
+      "esencial-selecto":  "region_selecto",
+      "vanguardia-selecto":"region_selecto",
+    };
+    /* region_ven eliminado: era un alias de region_selecto que causaba
+       el grupo huérfano con una sola tarjeta */
+    const REGION_ORDER = ["region_zulia", "region_selecto"];
+    const SLUG_ORDER   = [
+      "esencial-zulia", "vanguardia-zulia",
+      "esencial-selecto", "vanguardia-selecto",
+    ];
+    const regionMap = {};
+    Object.keys(newPlans).forEach((slug) => {
+      const r = FAMILY_REGION[slug] || "region_otros";
+      if (!regionMap[r]) regionMap[r] = [];
+      regionMap[r].push(slug);
+    });
+    PLAN_GROUPS = REGION_ORDER
+      .filter((r) => regionMap[r])
+      .map((r) => ({
+        region_key: r,
+        plans: regionMap[r].sort((a, b) => SLUG_ORDER.indexOf(a) - SLUG_ORDER.indexOf(b)),
+      }));
+
+    /* Los planes "vanguardia-*" siempre se muestran resaltados */
+    HIGHLIGHTED = new Set(Object.keys(newPlans).filter((id) => id.startsWith("vanguardia")));
+
+    renderPlans();
+    console.log("Planes actualizados desde API ✓", Object.keys(newPlans));
+  } catch (e) {
+    console.warn("Plan API no disponible, usando datos de respaldo:", e.message);
+  }
+}
 
 /* =============================================================================
    STATE — variables de estado global
    ============================================================================= */
-let currentLang        = "es";
-let chatMode           = "wizard"; // "wizard" | "emergency"
-let chatMessages       = [];
-let chatLoading        = false;
-let chatSessionId      = null;
-let wizardOpen         = false;
-let wizardStep         = 0;
+let currentLang = "es";
+let chatMode = "wizard"; // "wizard" | "emergency"
+let chatMessages = [];
+let chatLoading = false;
+let chatSessionId = null;
+let wizardOpen = false;
+let wizardSubmitted = false;
+let wizardStep = 0;
 let wizardSelectedPlan = null;
-let wizardPaymentType  = "monthly";
+let wizardPaymentType = "monthly";
 let wizardAcceptedTerms = false;
-let wizardBuyer        = { name:"", lastName:"", cedula:"", phone:"", email:"", birthDate:"" };
-let wizardFamily       = [];
-let revealObserver     = null;
-
+let wizardBuyer = {
+  name: "",
+  lastName: "",
+  cedula: "",
+  phone: "",
+  email: "",
+  birthDate: "",
+  zip: "",
+};
+let wizardFamily = [];
+let revealObserver = null;
 
 /* =============================================================================
    HELPERS
@@ -397,21 +702,25 @@ const $ = (sel, ctx = document) => ctx.querySelector(sel);
 const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
 
 function generateSessionId() {
-  return "sess_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  return (
+    "sess_" + Math.random().toString(36).slice(2) + Date.now().toString(36)
+  );
 }
 
 function escapeHTML(str) {
   return String(str)
-    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function simpleMarkdown(text) {
   return escapeHTML(text)
-    .replace(/\*\*(.*?)\*\*/g,"<strong>$1</strong>")
-    .replace(/\*(.*?)\*/g,"<em>$1</em>")
-    .replace(/`(.*?)`/g,"<code>$1</code>")
-    .replace(/\n/g,"<br>");
+    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.*?)\*/g, "<em>$1</em>")
+    .replace(/`(.*?)`/g, "<code>$1</code>")
+    .replace(/\n/g, "<br>");
 }
 
 function checkIcon() {
@@ -421,17 +730,19 @@ function checkIcon() {
 /* Traduce una clave al idioma actual */
 function t(key) {
   const pair = LANG[key];
-  if (!pair) { console.warn("i18n missing key:", key); return key; }
+  if (!pair) {
+    console.warn("i18n missing key:", key);
+    return key;
+  }
   return currentLang === "es" ? pair[0] : pair[1];
 }
-
 
 /* =============================================================================
    LANGUAGE — cambio de idioma y aplicación de traducciones
    ============================================================================= */
 function applyLanguage() {
   /* Traduce todos los elementos con data-i18n */
-  $$("[data-i18n]").forEach(el => {
+  $$("[data-i18n]").forEach((el) => {
     const key = el.getAttribute("data-i18n");
     const txt = t(key);
     if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") {
@@ -442,7 +753,7 @@ function applyLanguage() {
   });
 
   /* Actualiza el botón de idioma */
-  $$("[data-i18n-lang]").forEach(el => {
+  $$("[data-i18n-lang]").forEach((el) => {
     el.textContent = currentLang === "es" ? "EN" : "ES";
   });
 
@@ -465,19 +776,20 @@ function toggleLang() {
     const greetBubble = $("#chat-messages .chat-greeting .chat-bubble");
     if (greetBubble && chatMessages.length === 0) {
       greetBubble.textContent =
-        chatMode === "emergency" ? t("chat_greeting_emergency") : t("chat_greeting");
+        chatMode === "emergency"
+          ? t("chat_greeting_emergency")
+          : t("chat_greeting");
     }
   }
 }
-
 
 /* =============================================================================
    NAVIGATION
    ============================================================================= */
 function initNav() {
-  const toggle     = $("#nav-mobile-toggle");
+  const toggle = $("#nav-mobile-toggle");
   const mobileMenu = $("#nav-mobile-menu");
-  const nav        = $("#main-nav");
+  const nav = $("#main-nav");
 
   toggle?.addEventListener("click", () => {
     mobileMenu.classList.toggle("open");
@@ -489,37 +801,42 @@ function initNav() {
     }
   });
 
-  $$(".mobile-nav-link").forEach(a =>
-    a.addEventListener("click", () => mobileMenu.classList.remove("open"))
+  $$(".mobile-nav-link").forEach((a) =>
+    a.addEventListener("click", () => mobileMenu.classList.remove("open")),
   );
 
-  window.addEventListener("scroll", () => {
-    nav.classList.toggle("scrolled", window.scrollY > 20);
-  }, { passive: true });
+  window.addEventListener(
+    "scroll",
+    () => {
+      nav.classList.toggle("scrolled", window.scrollY > 20);
+    },
+    { passive: true },
+  );
 }
-
 
 /* =============================================================================
    REVEAL — animaciones por scroll
    ============================================================================= */
 function initReveal() {
-  revealObserver = new IntersectionObserver((entries) => {
-    entries.forEach(e => {
-      if (e.isIntersecting) {
-        e.target.classList.add("visible");
-        revealObserver.unobserve(e.target);
-      }
-    });
-  }, { threshold: 0.12 });
+  revealObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting) {
+          e.target.classList.add("visible");
+          revealObserver.unobserve(e.target);
+        }
+      });
+    },
+    { threshold: 0.12 },
+  );
 
-  $$(".reveal").forEach(el => revealObserver.observe(el));
+  $$(".reveal").forEach((el) => revealObserver.observe(el));
 }
 
 /* Re-observa elementos .reveal añadidos dinámicamente */
 function reObserveReveals() {
-  $$(".reveal:not(.visible)").forEach(el => revealObserver?.observe(el));
+  $$(".reveal:not(.visible)").forEach((el) => revealObserver?.observe(el));
 }
-
 
 /* =============================================================================
    PLANS RENDER
@@ -529,7 +846,7 @@ function renderPlans() {
   if (!container) return;
   container.innerHTML = "";
 
-  PLAN_GROUPS.forEach(group => {
+  PLAN_GROUPS.forEach((group) => {
     const groupDiv = document.createElement("div");
     groupDiv.className = "plans-group";
 
@@ -542,45 +859,60 @@ function renderPlans() {
     grid.className = "plans-grid";
 
     group.plans.forEach((planId, i) => {
-      const plan       = PLANS[planId];
-      const features   = PLAN_FEATURES[planId][currentLang];
-      const name       = t(`plan_${planId}_name`);
-      const subtitle   = PLAN_SUBTITLE[planId][currentLang];
+      const plan = PLANS[planId];
+      const featuresEntry = PLAN_FEATURES[planId] || { es: [], en: [] };
+      const features = featuresEntry[currentLang] || [];
+      const name = t(`plan_${planId}_name`);
+      const subtitle = (PLAN_SUBTITLE[planId] || {})[currentLang] || "";
       const highlighted = HIGHLIGHTED.has(planId);
-      const isSelecto  = plan.initial !== undefined;
+      const isSelecto = plan.initial !== undefined;
 
-      /* Pricing display: Selecto has initial + monthly, base plans have monthly + annual */
+      /* Pricing display */
       let priceHTML = "";
       let subPriceHTML = "";
       if (isSelecto) {
-        priceHTML    = `<div class="plan-price-monthly">${plan.monthly}<span>${t("plan_mo")}</span></div>`;
+        /* Suscripción disponible: mensual tiene prioridad; si no hay, usar anual */
+        const recurringAmt   = plan.monthly ?? plan.annual;
+        const recurringLabel = plan.monthly ? t("plan_mo") : t("plan_yr");
+
+        priceHTML = recurringAmt
+          ? `<div class="plan-price-monthly">${recurringAmt}<span>${recurringLabel}</span></div>`
+          : "";
+
+        /* Cuota inicial: obligatoria, independiente del tipo de suscripción */
         subPriceHTML = `<p class="plan-price-annual plan-price-initial">
-          ${currentLang==="es"?"Cuota inicial":"Initial fee"}: <strong>${plan.initial}</strong> +
-          ${currentLang==="es"?"pago contado":"lump sum"}: ${plan.annual}${t("plan_yr")}
+          ${currentLang === "es" ? "Cuota inicial obligatoria" : "Mandatory initial fee"}:
+          <strong>${plan.initial}</strong>
         </p>`;
       } else {
-        priceHTML    = `<div class="plan-price-monthly">${plan.monthly}<span>${t("plan_mo")}</span></div>`;
-        subPriceHTML = `<p class="plan-price-annual">
-          ${currentLang==="es"?"Oferta lanzamiento":"Launch offer"}: <strong>${plan.annual}${t("plan_yr")}</strong>
-        </p>`;
+        priceHTML    = plan.monthly
+          ? `<div class="plan-price-monthly">${plan.monthly}<span>${t("plan_mo")}</span></div>`
+          : (plan.annual ? `<div class="plan-price-monthly">${plan.annual}<span>${t("plan_yr")}</span></div>` : "");
+        subPriceHTML = plan.monthly && plan.annual
+          ? `<p class="plan-price-annual">${currentLang === "es" ? "Oferta lanzamiento" : "Launch offer"}: <strong>${plan.annual}${t("plan_yr")}</strong></p>`
+          : "";
       }
 
       const card = document.createElement("div");
-      card.className = `plan-card${highlighted ? " highlighted" : ""} reveal reveal-delay-${i+1}`;
+      card.className = `plan-card${highlighted ? " highlighted" : ""} reveal reveal-delay-${i + 1}`;
       card.innerHTML = `
-        ${highlighted ? `<div class="plan-badge">
+        ${
+          highlighted
+            ? `<div class="plan-badge">
           <svg fill="currentColor" viewBox="0 0 20 20" width="12" height="12">
             <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
-          </svg>${t("plan_recommended")}</div>` : ""}
+          </svg>${t("plan_recommended")}</div>`
+            : ""
+        }
         <h4 class="plan-name">${name}</h4>
         <p class="plan-subtitle">${subtitle}</p>
         ${priceHTML}
         ${subPriceHTML}
         <ul class="plan-features">
-          ${features.map(f => `<li>${checkIcon()}${f}</li>`).join("")}
+          ${features.map((f) => `<li>${checkIcon()}${f}</li>`).join("")}
         </ul>
         <button class="btn-gold plan-btn-primary" data-plan="${planId}">${t("plan_buy")}</button>
-        <button class="plan-btn-secondary">${t("plan_details")}</button>
+        <button class="plan-btn-secondary" data-plan-details="${planId}">${t("plan_details")}</button>
       `;
       grid.appendChild(card);
     });
@@ -591,7 +923,6 @@ function renderPlans() {
 
   reObserveReveals();
 }
-
 
 /* =============================================================================
    STEPS RENDER
@@ -607,19 +938,18 @@ function renderSteps() {
   const container = $("#steps-container");
   if (!container) return;
   container.innerHTML = "";
-  ["step1","step2","step3","step4"].forEach((s, i) => {
+  ["step1", "step2", "step3", "step4"].forEach((s, i) => {
     const div = document.createElement("div");
-    div.className = `step-item reveal reveal-delay-${i+1}`;
+    div.className = `step-item reveal reveal-delay-${i + 1}`;
     div.innerHTML = `
       <div class="step-icon">${STEP_ICONS[i]}</div>
-      <div class="step-number">${t("step_word")} ${i+1}</div>
+      <div class="step-number">${t("step_word")} ${i + 1}</div>
       <h4 class="step-title">${t(`${s}_title`)}</h4>
       <p class="step-desc">${t(`${s}_desc`)}</p>
     `;
     container.appendChild(div);
   });
 }
-
 
 /* =============================================================================
    TESTIMONIALS RENDER
@@ -631,12 +961,14 @@ function renderTestimonials() {
   const container = $("#testimonials-container");
   if (!container) return;
   const tests = [
-    { key:"test1_text", name:"María G.",  loc:"Miami, FL"    },
-    { key:"test2_text", name:"Carlos R.", loc:"Houston, TX"  },
-    { key:"test3_text", name:"Ana P.",    loc:"New York, NY" },
+    { key: "test1_text", name: "María G.", loc: "Miami, FL" },
+    { key: "test2_text", name: "Carlos R.", loc: "Houston, TX" },
+    { key: "test3_text", name: "Ana P.", loc: "New York, NY" },
   ];
-  container.innerHTML = tests.map((td, i) => `
-    <div class="testimonial-card reveal reveal-delay-${i+1}">
+  container.innerHTML = tests
+    .map(
+      (td, i) => `
+    <div class="testimonial-card reveal reveal-delay-${i + 1}">
       <div class="testimonial-quote-icon">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/></svg>
       </div>
@@ -644,9 +976,10 @@ function renderTestimonials() {
       <p class="testimonial-name">${td.name}</p>
       <p class="testimonial-location">${td.loc}</p>
     </div>
-  `).join("");
+  `,
+    )
+    .join("");
 }
-
 
 /* =============================================================================
    CHATBOT
@@ -658,11 +991,16 @@ function openChat(mode) {
 
   const overlay = $("#chatbot-overlay");
   overlay.classList.remove("hidden");
-  $("#chat-header").className = `chat-header ${mode === "emergency" ? "emergency" : "normal"}`;
-  $("#chat-title").textContent = mode === "emergency" ? t("chat_emergency") : t("chat_title");
-  $("#chat-header-icon").innerHTML = mode === "emergency" ? alertIcon() : chatIcon();
-  $("#chat-input").placeholder = mode === "emergency" ? t("chat_ph_emergency") : t("chat_placeholder");
-  $("#chat-send-btn").className = `chat-send-btn ${mode === "emergency" ? "emergency" : "normal"}`;
+  $("#chat-header").className =
+    `chat-header ${mode === "emergency" ? "emergency" : "normal"}`;
+  $("#chat-title").textContent =
+    mode === "emergency" ? t("chat_emergency") : t("chat_title");
+  $("#chat-header-icon").innerHTML =
+    mode === "emergency" ? alertIcon() : chatIcon();
+  $("#chat-input").placeholder =
+    mode === "emergency" ? t("chat_ph_emergency") : t("chat_placeholder");
+  $("#chat-send-btn").className =
+    `chat-send-btn ${mode === "emergency" ? "emergency" : "normal"}`;
 
   $("#chat-messages").innerHTML = `
     <div class="chat-bubble-wrap bot chat-greeting">
@@ -674,15 +1012,18 @@ function openChat(mode) {
   setTimeout(() => $("#chat-input").focus(), 300);
 }
 
-function closeChat() { $("#chatbot-overlay").classList.add("hidden"); }
+function closeChat() {
+  $("#chatbot-overlay").classList.add("hidden");
+}
 
 function appendChatBubble(role, content) {
-  const msgs  = $("#chat-messages");
-  const wrap  = document.createElement("div");
+  const msgs = $("#chat-messages");
+  const wrap = document.createElement("div");
   wrap.className = `chat-bubble-wrap ${role === "user" ? "user" : "bot"}`;
   const bubble = document.createElement("div");
   bubble.className = `chat-bubble ${role === "user" ? "user" : "bot"}${chatMode === "emergency" && role === "assistant" ? " emergency" : ""}`;
-  bubble.innerHTML = role === "assistant" ? simpleMarkdown(content) : escapeHTML(content);
+  bubble.innerHTML =
+    role === "assistant" ? simpleMarkdown(content) : escapeHTML(content);
   wrap.appendChild(bubble);
   msgs.appendChild(wrap);
   msgs.scrollTop = msgs.scrollHeight;
@@ -698,17 +1039,19 @@ function showTypingIndicator() {
   msgs.scrollTop = msgs.scrollHeight;
 }
 
-function removeTypingIndicator() { $("#typing-indicator")?.remove(); }
+function removeTypingIndicator() {
+  $("#typing-indicator")?.remove();
+}
 
 async function sendChatMessage() {
   const input = $("#chat-input");
-  const text  = input.value.trim();
+  const text = input.value.trim();
   if (!text || chatLoading) return;
 
   input.value = "";
   chatLoading = true;
   updateChatUI();
-  chatMessages.push({ role:"user", content:text });
+  chatMessages.push({ role: "user", content: text });
   appendChatBubble("user", text);
   showTypingIndicator();
 
@@ -716,21 +1059,33 @@ async function sendChatMessage() {
     const resp = await fetch(CHAT_WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message:text, messages:chatMessages, mode:chatMode, sessionId:chatSessionId, lang:currentLang }),
+      body: JSON.stringify({
+        message: text,
+        messages: chatMessages,
+        mode: chatMode,
+        sessionId: chatSessionId,
+        lang: currentLang,
+      }),
     });
     removeTypingIndicator();
     if (!resp.ok) throw new Error("HTTP " + resp.status);
     const data = await resp.json();
-    const reply = data?.response || data?.message || data?.content || data?.text
-                  || (Array.isArray(data) ? data[0]?.response || data[0]?.message : null)
-                  || t(chatMode === "emergency" ? "chat_error_emergency" : "chat_error");
-    chatMessages.push({ role:"assistant", content:reply });
+    const reply =
+      data?.response ||
+      data?.message ||
+      data?.content ||
+      data?.text ||
+      (Array.isArray(data) ? data[0]?.response || data[0]?.message : null) ||
+      t(chatMode === "emergency" ? "chat_error_emergency" : "chat_error");
+    chatMessages.push({ role: "assistant", content: reply });
     appendChatBubble("assistant", reply);
   } catch (e) {
     console.error("Chat error:", e);
     removeTypingIndicator();
-    const err = t(chatMode === "emergency" ? "chat_error_emergency" : "chat_error");
-    chatMessages.push({ role:"assistant", content:err });
+    const err = t(
+      chatMode === "emergency" ? "chat_error_emergency" : "chat_error",
+    );
+    chatMessages.push({ role: "assistant", content: err });
     appendChatBubble("assistant", err);
   } finally {
     chatLoading = false;
@@ -740,18 +1095,21 @@ async function sendChatMessage() {
 }
 
 function updateChatUI() {
-  const input   = $("#chat-input");
+  const input = $("#chat-input");
   const sendBtn = $("#chat-send-btn");
-  if (input)   input.disabled   = chatLoading;
+  if (input) input.disabled = chatLoading;
   if (sendBtn) sendBtn.disabled = chatLoading || !input?.value.trim();
 }
 
 function initChat() {
-  const input   = $("#chat-input");
+  const input = $("#chat-input");
   const sendBtn = $("#chat-send-btn");
   sendBtn?.addEventListener("click", sendChatMessage);
-  input?.addEventListener("keydown", e => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
+  input?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendChatMessage();
+    }
   });
   input?.addEventListener("input", () => {
     if (sendBtn) sendBtn.disabled = !input.value.trim() || chatLoading;
@@ -759,9 +1117,6 @@ function initChat() {
   $("#chat-close-btn")?.addEventListener("click", closeChat);
   $("#emergency-btn")?.addEventListener("click", () => openChat("emergency"));
 }
-
-
-
 
 /* =============================================================================
    WIZARD — modal de compra — 4 PASOS
@@ -774,20 +1129,120 @@ function initChat() {
    ============================================================================= */
 
 function openWizard(planId) {
-  wizardOpen          = true;
-  wizardStep          = 0;
-  wizardSelectedPlan  = planId;
-  wizardPaymentType   = "monthly";
+  wizardOpen = true;
+  wizardSubmitted = false;
+  wizardStep = 0;
+  wizardSelectedPlan = planId;
+  const _plan = PLANS[planId] || {};
+  wizardPaymentType = _plan.monthly ? "monthly" : (_plan.annual ? "annual" : "monthly");
   wizardAcceptedTerms = false;
-  wizardBuyer  = { name:"", lastName:"", cedula:"", phone:"", email:"", birthDate:"" };
+  wizardBuyer = {
+    name: "",
+    lastName: "",
+    cedula: "",
+    phone: "",
+    email: "",
+    birthDate: "",
+    zip: "",
+  };
   wizardFamily = [];
   $("#wizard-overlay").classList.remove("hidden");
   renderWizardContent();
 }
 
 function closeWizard() {
+  if (!wizardSubmitted && wizardBuyer.name) {
+    const payload = {
+      intent:      "lead_abandoned",
+      plan:        wizardSelectedPlan,
+      paymentType: wizardPaymentType,
+      buyer:       wizardBuyer,
+      family:      wizardFamily,
+      step:        wizardStep,
+      timestamp:   new Date().toISOString(),
+    };
+    try {
+      fetch(WIZARD_WEBHOOK_URL, {
+        method:    "POST",
+        headers:   { "Content-Type": "application/json" },
+        body:      JSON.stringify(payload),
+        keepalive: true,
+      }).catch(() => {});
+    } catch (_) {}
+  }
   wizardOpen = false;
   $("#wizard-overlay").classList.add("hidden");
+}
+
+/* =============================================================================
+   PLAN DETAILS MODAL — emergente con el campo `notes` del producto
+   ============================================================================= */
+function openPlanDetails(planId) {
+  const plan = PLANS[planId];
+  if (!plan) return;
+  const name = t(`plan_${planId}_name`);
+  const rawNotes = (plan.notes || "").trim();
+  const bodyHTML = rawNotes
+    ? rawNotes
+        .split(/\n+/)
+        .map((line) => `<p>${escapeHTML(line.trim())}</p>`)
+        .join("")
+    : `<p>${t("plan_details_empty")}</p>`;
+  let overlay = document.getElementById("plan-details-overlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "plan-details-overlay";
+    overlay.className = "plan-details-overlay";
+    document.body.appendChild(overlay);
+  }
+  overlay.innerHTML = `
+    <div class="plan-details-modal" role="dialog" aria-modal="true" aria-labelledby="plan-details-title">
+      <div class="plan-details-header">
+        <div>
+          <p class="plan-details-eyebrow">${t("plan_details_title")}</p>
+          <h3 id="plan-details-title" class="plan-details-name">${name}</h3>
+        </div>
+        <button id="plan-details-close" class="plan-details-close" aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="plan-details-body">${bodyHTML}</div>
+    </div>`;
+  overlay.classList.remove("hidden");
+  document.body.style.overflow = "hidden";
+}
+
+function closePlanDetails() {
+  const overlay = document.getElementById("plan-details-overlay");
+  if (overlay) overlay.classList.add("hidden");
+  document.body.style.overflow = "";
+}
+
+function showWizardSuccessScreen(email) {
+  wizardSubmitted = true;
+  const isEs = currentLang === "es";
+  const msg = isEs
+    ? `Tu solicitud fue recibida correctamente. Recibirás un correo en <strong>${escapeHTML(email)}</strong> con el enlace para completar tu pago.`
+    : `Your request was received successfully. You will receive an email at <strong>${escapeHTML(email)}</strong> with the link to complete your payment.`;
+  const closeLabel = isEs ? "Cerrar" : "Close";
+
+  const body = $("#wizard-body");
+  if (body) {
+    body.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;gap:1.5rem;padding:2rem 1rem;text-align:center;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/></svg>
+        <p style="font-size:1rem;color:#374151;line-height:1.6;">${msg}</p>
+        <button class="btn-back" id="wizard-success-close-btn">${closeLabel}</button>
+      </div>`;
+    $("#wizard-success-close-btn")?.addEventListener("click", closeWizard);
+  }
+
+  const footer = $(".wizard-footer");
+  if (footer) footer.style.display = "none";
+  const steps = $("#wizard-steps");
+  if (steps) steps.style.display = "none";
 }
 
 function renderWizardContent() {
@@ -808,21 +1263,31 @@ function renderWizardContent() {
 function renderWizardSteps() {
   const el = $("#wizard-steps");
   if (!el) return;
-  const labels = [t("wiz_step_data"), t("wiz_step_family"), t("wiz_step_payment"), t("wiz_step_summary")];
-  el.innerHTML = labels.map((label, i) => {
-    const dotClass   = i < wizardStep ? "done" : (i === wizardStep ? "active" : "inactive");
-    const labelClass = i <= wizardStep ? "active" : "inactive";
-    return `
+  const labels = [
+    t("wiz_step_data"),
+    t("wiz_step_family"),
+    t("wiz_step_payment"),
+    t("wiz_step_summary"),
+  ];
+  el.innerHTML = labels
+    .map((label, i) => {
+      const dotClass =
+        i < wizardStep ? "done" : i === wizardStep ? "active" : "inactive";
+      const labelClass = i <= wizardStep ? "active" : "inactive";
+      return `
       <div class="step-dot-wrap">
         <div class="step-dot ${dotClass}">
-          ${i < wizardStep
-            ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`
-            : i + 1}
+          ${
+            i < wizardStep
+              ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`
+              : i + 1
+          }
         </div>
         <span class="step-label ${labelClass}">${label}</span>
         ${i < labels.length - 1 ? `<div class="step-line ${i < wizardStep ? "done" : ""}"></div>` : ""}
       </div>`;
-  }).join("");
+    })
+    .join("");
 }
 
 function renderWizardStep() {
@@ -831,7 +1296,7 @@ function renderWizardStep() {
   body.innerHTML = "";
   const div = document.createElement("div");
   div.className = "wizard-step active";
-  if      (wizardStep === 0) div.innerHTML = renderStep0();
+  if (wizardStep === 0) div.innerHTML = renderStep0();
   else if (wizardStep === 1) div.innerHTML = renderStep1();
   else if (wizardStep === 2) div.innerHTML = renderStep2();
   else if (wizardStep === 3) div.innerHTML = renderStep3();
@@ -842,8 +1307,16 @@ function renderWizardStep() {
 function renderStep0() {
   const b = wizardBuyer;
   const maxAge = PLANS[wizardSelectedPlan]?.maxAge || 65;
-  const minDate = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - maxAge); return d.toISOString().split("T")[0]; })();
-  const maxDate = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 18);    return d.toISOString().split("T")[0]; })();
+  const minDate = (() => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - maxAge);
+    return d.toISOString().split("T")[0];
+  })();
+  const maxDate = (() => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - 18);
+    return d.toISOString().split("T")[0];
+  })();
   return `
     <div class="form-row cols-2">
       <div class="form-group"><label class="form-label">${t("wiz_fname")}</label>
@@ -861,23 +1334,38 @@ function renderStep0() {
       <div class="form-group"><label class="form-label">Email</label>
         <input class="form-input" id="wf-email" type="email" value="${escapeHTML(b.email)}" placeholder="correo@email.com"></div>
     </div>
-    <div class="form-row">
+    <div class="form-row cols-2">
       <div class="form-group"><label class="form-label">${t("wiz_birth")}</label>
         <input class="form-input" id="wf-birthDate" type="date" value="${b.birthDate}" min="${minDate}" max="${maxDate}">
         <div id="age-error" class="form-error" style="display:none">
           ${currentLang === "es" ? "Edad máxima permitida: " + maxAge + " años" : "Maximum allowed age: " + maxAge + " years"}
         </div>
       </div>
+      <div class="form-group"><label class="form-label">${currentLang === "es" ? "Código Postal (ZIP)" : "ZIP Code"}</label>
+        <input class="form-input" id="wf-zip" type="text" value="${escapeHTML(b.zip)}" placeholder="33101" maxlength="10"></div>
     </div>`;
 }
 
 function renderStep1() {
   const maxAge = PLANS[wizardSelectedPlan]?.maxAge || 65;
-  const minDate = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - maxAge); return d.toISOString().split("T")[0]; })();
-  const maxDate = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 18);    return d.toISOString().split("T")[0]; })();
-  const ageErrMsg = currentLang === "es" ? "Máximo " + maxAge + " años" : "Max " + maxAge + " years";
+  const minDate = (() => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - maxAge);
+    return d.toISOString().split("T")[0];
+  })();
+  const maxDate = (() => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - 18);
+    return d.toISOString().split("T")[0];
+  })();
+  const ageErrMsg =
+    currentLang === "es"
+      ? "Máximo " + maxAge + " años"
+      : "Max " + maxAge + " years";
 
-  const cards = wizardFamily.map((m, i) => `
+  const cards = wizardFamily
+    .map(
+      (m, i) => `
     <div class="family-card">
       <div class="family-card-header">
         <span class="family-card-title">${t("wiz_member")} ${i + 1}</span>
@@ -901,53 +1389,99 @@ function renderStep1() {
           ${m.birthDate && !validateAge(m.birthDate, maxAge) ? `<div class="form-error">${ageErrMsg}</div>` : ""}
         </div>
       </div>
-    </div>`).join("");
+    </div>`,
+    )
+    .join("");
 
   return `
     <p style="color:var(--muted-foreground);font-size:0.875rem;margin-bottom:1.25rem">${t("wiz_family_hint")}</p>
     <div id="family-cards">${cards}</div>
-    ${wizardFamily.length < 6 ? `
+    ${
+      wizardFamily.length < 6
+        ? `
       <button class="btn-add-family" id="btn-add-family">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         ${t("wiz_add_family")}
-      </button>` : ""}`;
+      </button>`
+        : ""
+    }`;
 }
 
 function renderStep2() {
-  const plan      = PLANS[wizardSelectedPlan];
+  const plan = PLANS[wizardSelectedPlan];
   const isSelecto = plan.initial !== undefined;
-  const monthlyLabel = currentLang === "es" ? "Domiciliar a tarjeta de crédito" : "Charge to credit card";
-  const annualSub    = currentLang === "es" ? "¡Oferta de lanzamiento!" : "Launch offer!";
-  return `
-    <p style="color:var(--muted-foreground);font-size:0.875rem;margin-bottom:1rem">${t("wiz_select_payment")}</p>
-    <button class="payment-option${wizardPaymentType === "monthly" ? " selected" : ""}" data-type="monthly">
+  const monthlyLabel =
+    currentLang === "es"
+      ? "Domiciliar a tarjeta de crédito"
+      : "Charge to credit card";
+  const annualSub =
+    currentLang === "es" ? "¡Oferta de lanzamiento!" : "Launch offer!";
+
+  // Get method display name
+  const getMethodName = (method) => {
+    switch (method) {
+      case "card":
+        return t("wiz_method_card");
+      case "zelle":
+        return t("wiz_method_zelle");
+      case "bank":
+        return t("wiz_method_bank");
+      default:
+        return method;
+    }
+  };
+
+  const prefix = isSelecto ? plan.initial + " + " : "";
+  const monthlyBtn = plan.monthly
+    ? `<button class="payment-option${wizardPaymentType === "monthly" ? " selected" : ""}" data-type="monthly">
       <div>
         <p class="payment-option-title">${t("wiz_monthly_title")}</p>
         <p class="payment-option-sub">${monthlyLabel}</p>
       </div>
-      <div class="payment-option-price">${isSelecto ? plan.initial + " + " : ""}${plan.monthly}<span>${t("plan_mo")}</span></div>
-    </button>
-    <button class="payment-option${wizardPaymentType === "annual" ? " selected" : ""}" data-type="annual">
+      <div class="payment-option-price">${prefix}${plan.monthly}<span>${t("plan_mo")}</span></div>
+    </button>`
+    : "";
+  const annualBtn = plan.annual
+    ? `<button class="payment-option${wizardPaymentType === "annual" ? " selected" : ""}" data-type="annual">
       <div>
         <p class="payment-option-title">${t("wiz_annual_title")}</p>
         <p class="payment-option-sub highlight">${annualSub}</p>
       </div>
-      <div class="payment-option-price">${isSelecto ? plan.initial + " + " : ""}${plan.annual}<span>${t("plan_yr")}</span></div>
-    </button>`;
+      <div class="payment-option-price">${prefix}${plan.annual}<span>${t("wiz_yr")}</span></div>
+    </button>`
+    : "";
+
+  return `
+    <p style="color:var(--muted-foreground);font-size:0.875rem;margin-bottom:0.5rem">${t("wiz_select_billing")}</p>
+    ${monthlyBtn}
+    ${annualBtn}
+    `;
 }
 
 function renderStep3() {
-  const plan      = PLANS[wizardSelectedPlan];
-  const planName  = t(`plan_${wizardSelectedPlan}_name`);
+  const plan = PLANS[wizardSelectedPlan];
+  const planName = t(`plan_${wizardSelectedPlan}_name`);
   const isSelecto = plan.initial !== undefined;
-  const prefix    = isSelecto ? plan.initial + " + " : "";
-  const priceDisplay = wizardPaymentType === "monthly"
-    ? prefix + plan.monthly + t("plan_mo")
-    : prefix + plan.annual + t("plan_yr") + (currentLang === "es" ? " (oferta lanzamiento)" : " (launch offer)");
+  const prefix = isSelecto ? plan.initial + " + " : "";
+  const priceDisplay =
+    wizardPaymentType === "monthly"
+      ? prefix + plan.monthly + t("plan_mo")
+      : prefix +
+        plan.annual +
+        t("wiz_yr") +
+        (currentLang === "es" ? " (oferta lanzamiento)" : " (launch offer)");
+
+  // Get billing mode display
+  const billingMode =
+    wizardPaymentType === "monthly"
+      ? t("wiz_monthly_title")
+      : t("wiz_annual_title");
+
   return `
     <div class="summary-box">
       <h4>${t("wiz_summary_title")}</h4>
       <div class="summary-row"><span class="label">${t("wiz_sum_plan")}</span><span class="value">${planName}</span></div>
+      <div class="summary-row"><span class="label">${t("wiz_sum_billing")}</span><span class="value">${billingMode}</span></div>
       <div class="summary-row"><span class="label">${t("wiz_sum_payment")}</span><span class="value highlight">${priceDisplay}</span></div>
       <div class="summary-row"><span class="label">${t("wiz_sum_buyer")}</span><span class="value">${escapeHTML(wizardBuyer.name)} ${escapeHTML(wizardBuyer.lastName)}</span></div>
       <div class="summary-row"><span class="label">${t("wiz_sum_members")}</span><span class="value">${wizardFamily.length}</span></div>
@@ -966,6 +1500,9 @@ function renderStep3() {
     </div>`;
 }
 
+/* =============================================================================
+   CARD CONFIRM STEP — flujo de confirmación de datos para pago con tarjeta
+   ============================================================================= */
 function validateAge(dateStr, maxAge) {
   if (!dateStr) return true;
   const birth = new Date(dateStr);
@@ -979,52 +1516,66 @@ function validateAge(dateStr, maxAge) {
 function bindWizardStepEvents() {
   if (wizardStep === 0) {
     const maxAge = PLANS[wizardSelectedPlan]?.maxAge || 65;
-    ["name","lastName","cedula","phone","email","birthDate"].forEach(field => {
-      const el = $(`#wf-${field}`);
-      if (!el) return;
-      el.addEventListener("input", () => {
-        wizardBuyer[field] = el.value;
-        if (field === "birthDate") {
-          const err = $("#age-error");
-          if (err) err.style.display = !validateAge(el.value, maxAge) ? "" : "none";
-        }
-        updateWizardFooter();
-      });
-    });
+    ["name", "lastName", "cedula", "phone", "email", "birthDate", "zip"].forEach(
+      (field) => {
+        const el = $(`#wf-${field}`);
+        if (!el) return;
+        el.addEventListener("input", () => {
+          wizardBuyer[field] = el.value;
+          if (field === "birthDate") {
+            const err = $("#age-error");
+            if (err)
+              err.style.display = !validateAge(el.value, maxAge) ? "" : "none";
+          }
+          updateWizardFooter();
+        });
+      },
+    );
   }
   if (wizardStep === 1) {
     const maxAge = PLANS[wizardSelectedPlan]?.maxAge || 65;
-    $$(".family-remove-btn").forEach(btn => {
+    $$(".family-remove-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
         wizardFamily.splice(parseInt(btn.dataset.remove), 1);
-        renderWizardStep(); updateWizardFooter();
+        renderWizardStep();
+        updateWizardFooter();
       });
     });
-    $$(".fm-input").forEach(input => {
+    $$(".fm-input").forEach((input) => {
       input.addEventListener("input", () => {
-        wizardFamily[parseInt(input.dataset.idx)][input.dataset.field] = input.value;
+        wizardFamily[parseInt(input.dataset.idx)][input.dataset.field] =
+          input.value;
         updateWizardFooter();
       });
     });
     $("#btn-add-family")?.addEventListener("click", () => {
       if (wizardFamily.length < 6) {
-        wizardFamily.push({ name:"", lastName:"", cedula:"", phone:"", birthDate:"", relationship:"" });
-        renderWizardStep(); updateWizardFooter();
+        wizardFamily.push({
+          name: "",
+          lastName: "",
+          cedula: "",
+          phone: "",
+          birthDate: "",
+          relationship: "",
+        });
+        renderWizardStep();
+        updateWizardFooter();
       }
     });
   }
   if (wizardStep === 2) {
-    $$(".payment-option").forEach(btn => {
+    // Billing mode (monthly/annual) selection
+    $$(".payment-option").forEach((btn) => {
       btn.addEventListener("click", () => {
         wizardPaymentType = btn.dataset.type;
-        $$(".payment-option").forEach(b => b.classList.remove("selected"));
+        $$(".payment-option").forEach((b) => b.classList.remove("selected"));
         btn.classList.add("selected");
         updateWizardFooter();
       });
     });
   }
   if (wizardStep === 3) {
-    $("#terms-check")?.addEventListener("change", e => {
+    $("#terms-check")?.addEventListener("change", (e) => {
       wizardAcceptedTerms = e.target.checked;
       updateWizardFooter();
     });
@@ -1039,15 +1590,27 @@ function canWizardNext() {
   if (wizardStep === 0) {
     const b = wizardBuyer;
     const maxAge = PLANS[wizardSelectedPlan]?.maxAge || 65;
-    return !!(b.name && b.lastName && b.cedula && b.phone && b.email && b.birthDate && validateAge(b.birthDate, maxAge));
+    return !!(
+      b.name &&
+      b.lastName &&
+      b.cedula &&
+      b.phone &&
+      b.email &&
+      b.birthDate &&
+      b.zip &&
+      validateAge(b.birthDate, maxAge)
+    );
   }
   if (wizardStep === 1) return true;
-  if (wizardStep === 2) return !!wizardSelectedPlan && !!wizardPaymentType;
+  if (wizardStep === 2) return !!(wizardSelectedPlan && wizardPaymentType);
   if (wizardStep === 3) return wizardAcceptedTerms;
   return true;
 }
 
 function updateWizardFooter() {
+  const footer = $(".wizard-footer");
+  if (footer) footer.style.display = "";
+
   const backBtn = $("#wizard-back-btn");
   const nextBtn = $("#wizard-next-btn");
   if (backBtn) backBtn.classList.toggle("hidden", wizardStep === 0);
@@ -1056,46 +1619,153 @@ function updateWizardFooter() {
     if (wizardStep === 3) {
       nextBtn.textContent = t("wiz_confirm");
     } else {
-      nextBtn.innerHTML = t("wiz_next") + ` <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>`;
+      nextBtn.innerHTML =
+        t("wiz_next") +
+        ` <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>`;
     }
   }
 }
 
 function wizardNext() {
   if (!canWizardNext()) return;
-  if (wizardStep < 3) { wizardStep++; renderWizardContent(); }
-  else { submitWizard(); }
+  if (wizardStep < 3) {
+    wizardStep++;
+    renderWizardContent();
+  } else {
+    submitWizard();
+  }
 }
 
 function wizardBack() {
-  if (wizardStep > 0) { wizardStep--; renderWizardContent(); }
+  if (wizardStep > 0) {
+    wizardStep--;
+    renderWizardContent();
+  }
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   INCLUSION DEL WEBHOOK AL FLUJO
+   ══════════════════════════════════════════════════════════════════════════ */
 async function submitWizard() {
-  showToast(t("toast_confirm"), "success");
-  closeWizard();
+  const payload = {
+    intent:      "create_payment_intent",
+    plan:        wizardSelectedPlan,
+    paymentType: wizardPaymentType,
+    buyer:       wizardBuyer,
+    family:      wizardFamily,
+    timestamp:   new Date().toISOString(),
+  };
+
+  setWizardProcessing(true);
+
+  try {
+    const resp = await fetch(WIZARD_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    await resp.json().catch(() => null);
+
+    setWizardProcessing(false);
+    showWizardSuccessScreen(wizardBuyer.email);
+  } catch (e) {
+    console.error("Webhook error:", e);
+    setWizardProcessing(false);
+    showWizardError(
+      currentLang === "es"
+        ? "Error de conexión. Por favor intenta de nuevo."
+        : "Connection error. Please try again.",
+    );
+  }
 }
+
+/* Helper para controlar estado de processing dentro del wizard */
+function setWizardProcessing(on) {
+  const overlay = $("#wizard-overlay");
+  const nextBtn = $("#wizard-next-btn");
+  const backBtn = $("#wizard-back-btn");
+  if (nextBtn) nextBtn.disabled = on;
+  if (backBtn) backBtn.disabled = on;
+  if (overlay) overlay.classList.toggle("wizard-processing", !!on);
+}
+
+/* Muestra un mensaje informativo dentro del wizard */
+function showWizardInfo(title, link, text) {
+  const body = $("#wizard-body");
+  if (!body) {
+    showToast(text || title, "info");
+    return;
+  }
+  const htmlParts = [];
+  if (title)
+    htmlParts.push(`<div class="wizard-info-title">${escapeHTML(title)}</div>`);
+  if (text)
+    htmlParts.push(`<div class="wizard-info-text">${escapeHTML(text)}</div>`);
+  if (link)
+    htmlParts.push(
+      `<div class="wizard-info-link"><a href="${escapeHTML(link)}" target="_blank" rel="noopener">${link}</a></div>`,
+    );
+  htmlParts.push(
+    '<div style="margin-top:1rem"><button id="wizard-retry-btn" class="btn-outline">Volver a intentar</button></div>',
+  );
+  body.innerHTML = htmlParts.join("");
+  $("#wizard-retry-btn")?.addEventListener("click", () => {
+    renderWizardContent();
+  });
+}
+
+/* Muestra un error dentro del wizard con botón reintentar */
+function showWizardError(msg) {
+  const body = $("#wizard-body");
+  if (!body) {
+    showToast(msg, "error");
+    return;
+  }
+  body.innerHTML = `<div class="wizard-error">${escapeHTML(msg)}</div><div style="margin-top:1rem"><button id="wizard-retry-btn" class="btn-outline">Reintentar</button></div>`;
+  $("#wizard-retry-btn")?.addEventListener("click", () => {
+    renderWizardContent();
+  });
+}
+
 
 function initWizard() {
   /* Botones de planes — creados dinámicamente por renderPlans().
      Delegación para capturar clicks en .plan-btn-primary con data-plan */
-  document.addEventListener("click", e => {
-    const btn = e.target.closest(".plan-btn-primary[data-plan]");
-    if (btn && btn.dataset.plan) openWizard(btn.dataset.plan);
+  document.addEventListener("click", (e) => {
+    const buyBtn = e.target.closest(".plan-btn-primary[data-plan]");
+    if (buyBtn && buyBtn.dataset.plan) {
+      openWizard(buyBtn.dataset.plan);
+      return;
+    }
+    const detailsBtn = e.target.closest("[data-plan-details]");
+    if (detailsBtn && detailsBtn.dataset.planDetails) {
+      openPlanDetails(detailsBtn.dataset.planDetails);
+      return;
+    }
+    const detailsClose = e.target.closest("#plan-details-close");
+    if (detailsClose) {
+      closePlanDetails();
+      return;
+    }
+    if (e.target.id === "plan-details-overlay") closePlanDetails();
   });
 
-  $("#wizard-overlay")?.addEventListener("click", e => {
+  $("#wizard-overlay")?.addEventListener("click", (e) => {
     if (e.target === $("#wizard-overlay")) closeWizard();
   });
   $("#wizard-close-btn")?.addEventListener("click", closeWizard);
   $("#wizard-next-btn")?.addEventListener("click", wizardNext);
   $("#wizard-back-btn")?.addEventListener("click", wizardBack);
-  document.addEventListener("keydown", e => {
+  document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && wizardOpen) closeWizard();
+    if (e.key === "Escape") {
+      const overlay = document.getElementById("plan-details-overlay");
+      if (overlay && !overlay.classList.contains("hidden")) closePlanDetails();
+    }
   });
 }
-
-
 
 /* =============================================================================
    TOAST
@@ -1110,7 +1780,6 @@ function showToast(msg, type = "info") {
   setTimeout(() => toast.remove(), 4500);
 }
 
-
 /* =============================================================================
    ICONS (SVG inline reutilizables)
    ============================================================================= */
@@ -1121,31 +1790,36 @@ function alertIcon() {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
 }
 
-
 /* =============================================================================
    INIT — punto de entrada
    ============================================================================= */
 document.addEventListener("DOMContentLoaded", () => {
   /* Botones de cambio de idioma */
-  $$("[data-toggle-lang]").forEach(btn => btn.addEventListener("click", toggleLang));
+  $$("[data-toggle-lang]").forEach((btn) =>
+    btn.addEventListener("click", toggleLang),
+  );
 
-  /* Render inicial de secciones dinámicas */
+  /* Render inicial con datos de respaldo, luego actualizar desde la API */
   renderPlans();
   renderSteps();
   renderTestimonials();
   applyLanguage();
+  loadPlansFromAPI();
 
   /* Configurar IntersectionObserver para animaciones reveal */
-  revealObserver = new IntersectionObserver((entries) => {
-    entries.forEach(e => {
-      if (e.isIntersecting) {
-        e.target.classList.add("visible");
-        revealObserver.unobserve(e.target);
-      }
-    });
-  }, { threshold: 0.12 });
+  revealObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting) {
+          e.target.classList.add("visible");
+          revealObserver.unobserve(e.target);
+        }
+      });
+    },
+    { threshold: 0.12 },
+  );
 
-  $$(".reveal").forEach(el => revealObserver.observe(el));
+  $$(".reveal").forEach((el) => revealObserver.observe(el));
 
   initNav();
   initChat();
