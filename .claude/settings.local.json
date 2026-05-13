@@ -8,7 +8,13 @@
       "mcp__claude_ai_n8n__search_workflows",
       "mcp__claude_ai_n8n__get_workflow_details",
       "mcp__claude_ai_n8n__execute_workflow",
-      "mcp__claude_ai_n8n__get_execution"
+      "mcp__claude_ai_n8n__get_execution",
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('c:/Users/EstebanVasquez/OneDrive - MSFT/Documents/GitHub/legado-holding/n8n/LEGADO_PostPayment_v7.json','utf8'\\)\\); console.log\\('OK: JSON valid'\\)\")",
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('c:/Users/EstebanVasquez/OneDrive - MSFT/Documents/GitHub/legado-holding/n8n/LEGADO_PostPayment_v7.json','utf8'\\)\\); console.log\\('OK'\\)\")",
+      "Bash(node -e \"const w=JSON.parse\\(require\\('fs'\\).readFileSync\\('c:/Users/EstebanVasquez/OneDrive - MSFT/Documents/GitHub/legado-holding/n8n/LEGADO_PostPayment_v7.json','utf8'\\)\\); const ci=w.nodes.find\\(n=>n.name==='Create Invoices'\\); console.log\\('OK · jsCode lines:', ci.parameters.jsCode.split\\('\\\\n'\\).length\\);\")",
+      "WebFetch(domain:api-docs.invoicing.co)",
+      "WebFetch(domain:invoiceninja.github.io)",
+      "WebFetch(domain:github.com)"
     ]
   }
 }
