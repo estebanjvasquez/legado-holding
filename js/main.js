@@ -122,7 +122,12 @@ const LANG = {
   plan_yr: ["/año", "/yr"],
   plan_or: ["o", "or"],
   plan_buy: ["Comprar", "Buy Now"],
-  plan_details: ["Ver componentes", "View components"],
+  plan_details: ["Saber más", "Learn more"],
+  plan_details_title: ["Detalles del plan", "Plan details"],
+  plan_details_empty: [
+    "No hay información adicional disponible para este plan.",
+    "No additional information available for this plan.",
+  ],
 
   /* Nombres de planes */
   "plan_esencial-zulia_name": ["Plan Esencial Zulia", "Essential Zulia Plan"],
@@ -599,6 +604,7 @@ async function loadPlansFromAPI() {
            para activar el bloque de precios Selecto */
         ...(initialPrice !== null && { initial: formatPrice(initialPrice) }),
         maxAge:      extractMaxAge(anchor.notes),
+        notes:       (anchor.notes || "").trim(),
         id_monthly:  monthly ? monthly.id : null,
         id_annual:   annual  ? annual.id  : null,
         id_initial:  initial ? initial.id : null,
@@ -906,7 +912,7 @@ function renderPlans() {
           ${features.map((f) => `<li>${checkIcon()}${f}</li>`).join("")}
         </ul>
         <button class="btn-gold plan-btn-primary" data-plan="${planId}">${t("plan_buy")}</button>
-        <button class="plan-btn-secondary">${t("plan_details")}</button>
+        <button class="plan-btn-secondary" data-plan-details="${planId}">${t("plan_details")}</button>
       `;
       grid.appendChild(card);
     });
@@ -1166,6 +1172,52 @@ function closeWizard() {
   }
   wizardOpen = false;
   $("#wizard-overlay").classList.add("hidden");
+}
+
+/* =============================================================================
+   PLAN DETAILS MODAL — emergente con el campo `notes` del producto
+   ============================================================================= */
+function openPlanDetails(planId) {
+  const plan = PLANS[planId];
+  if (!plan) return;
+  const name = t(`plan_${planId}_name`);
+  const rawNotes = (plan.notes || "").trim();
+  const bodyHTML = rawNotes
+    ? rawNotes
+        .split(/\n+/)
+        .map((line) => `<p>${escapeHTML(line.trim())}</p>`)
+        .join("")
+    : `<p>${t("plan_details_empty")}</p>`;
+  let overlay = document.getElementById("plan-details-overlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "plan-details-overlay";
+    overlay.className = "plan-details-overlay";
+    document.body.appendChild(overlay);
+  }
+  overlay.innerHTML = `
+    <div class="plan-details-modal" role="dialog" aria-modal="true" aria-labelledby="plan-details-title">
+      <div class="plan-details-header">
+        <div>
+          <p class="plan-details-eyebrow">${t("plan_details_title")}</p>
+          <h3 id="plan-details-title" class="plan-details-name">${name}</h3>
+        </div>
+        <button id="plan-details-close" class="plan-details-close" aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="plan-details-body">${bodyHTML}</div>
+    </div>`;
+  overlay.classList.remove("hidden");
+  document.body.style.overflow = "hidden";
+}
+
+function closePlanDetails() {
+  const overlay = document.getElementById("plan-details-overlay");
+  if (overlay) overlay.classList.add("hidden");
+  document.body.style.overflow = "";
 }
 
 function showWizardSuccessScreen(email) {
@@ -1682,8 +1734,22 @@ function initWizard() {
   /* Botones de planes — creados dinámicamente por renderPlans().
      Delegación para capturar clicks en .plan-btn-primary con data-plan */
   document.addEventListener("click", (e) => {
-    const btn = e.target.closest(".plan-btn-primary[data-plan]");
-    if (btn && btn.dataset.plan) openWizard(btn.dataset.plan);
+    const buyBtn = e.target.closest(".plan-btn-primary[data-plan]");
+    if (buyBtn && buyBtn.dataset.plan) {
+      openWizard(buyBtn.dataset.plan);
+      return;
+    }
+    const detailsBtn = e.target.closest("[data-plan-details]");
+    if (detailsBtn && detailsBtn.dataset.planDetails) {
+      openPlanDetails(detailsBtn.dataset.planDetails);
+      return;
+    }
+    const detailsClose = e.target.closest("#plan-details-close");
+    if (detailsClose) {
+      closePlanDetails();
+      return;
+    }
+    if (e.target.id === "plan-details-overlay") closePlanDetails();
   });
 
   $("#wizard-overlay")?.addEventListener("click", (e) => {
@@ -1694,6 +1760,10 @@ function initWizard() {
   $("#wizard-back-btn")?.addEventListener("click", wizardBack);
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && wizardOpen) closeWizard();
+    if (e.key === "Escape") {
+      const overlay = document.getElementById("plan-details-overlay");
+      if (overlay && !overlay.classList.contains("hidden")) closePlanDetails();
+    }
   });
 }
 

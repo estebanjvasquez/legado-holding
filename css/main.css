@@ -2494,3 +2494,82 @@ footer {
         text-align: left;
     }
 }
+
+/* =============================================================================
+   PLAN DETAILS MODAL — emergente "Saber más"
+   ============================================================================= */
+.plan-details-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    background: rgba(15, 22, 35, 0.55);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    animation: fadeIn 0.2s ease;
+}
+.plan-details-overlay.hidden {
+    display: none;
+}
+.plan-details-modal {
+    background: var(--card);
+    border-radius: 1.5rem;
+    box-shadow: var(--shadow-elevated);
+    width: 100%;
+    max-width: 620px;
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: fadeInUp 0.3s ease;
+}
+.plan-details-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border);
+}
+.plan-details-eyebrow {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted-foreground);
+    margin-bottom: 0.25rem;
+}
+.plan-details-name {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--foreground);
+    margin: 0;
+}
+.plan-details-close {
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    color: var(--muted-foreground);
+    transition: color 0.2s;
+    padding: 0.25rem;
+    line-height: 0;
+}
+.plan-details-close:hover {
+    color: var(--foreground);
+}
+.plan-details-body {
+    padding: 1.25rem 1.5rem 1.75rem;
+    overflow-y: auto;
+    color: var(--foreground);
+    font-size: 0.95rem;
+    line-height: 1.55;
+}
+.plan-details-body p {
+    margin: 0 0 0.75rem;
+    white-space: pre-wrap;
+}
+.plan-details-body p:last-child {
+    margin-bottom: 0;
+}
