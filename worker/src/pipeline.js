@@ -46,7 +46,11 @@ function normalize(body) {
   const planName   = PLAN_NAMES[planFamily] || plan;
 
   const frequencyLabel = paymentType === "annual" ? "Annualy" : "Monthly";
-  const frequencyId    = paymentType === "annual" ? 9 : 4;
+  /* Invoice Ninja v5 frequency_id:
+       5  = Monthly (1 mes calendario)
+       10 = Annually (1 año)
+     NO usar 4 (= 4 semanas) ni 9 (= 6 meses). */
+  const frequencyId    = paymentType === "annual" ? 10 : 5;
 
   const familyRaw = Array.isArray(body.family) ? body.family : [];
   const family = familyRaw
@@ -183,7 +187,7 @@ async function buildInvoiceContext(IN, ctx) {
     lineItems2 = [
       { product_key: monthlyProd.product_key, notes: monthlyProd.notes || "Mensualidad del plan", cost: monthlyProd.price, qty: 1 },
     ];
-    frequencyId2       = 4;
+    frequencyId2       = 5;   // Monthly (1 mes calendario) — ver nota arriba
     recurringProductId = monthlyProd.id;
     oneTimeProductId   = unicoProd.id;
   } else {
