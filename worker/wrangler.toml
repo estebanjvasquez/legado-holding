@@ -1,0 +1,31 @@
+name = "legado-checkout-dev"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+# Habilita la URL pública https://legado-checkout-dev.<subdominio>.workers.dev
+# Útil para staging/pruebas desde el celular o desde el sitio real.
+workers_dev = true
+
+routes = [
+  { pattern = "api.legadoholding.com/*", zone_name = "legadoholding.com" }
+]
+
+
+# Variables públicas (no son secretos). Editar aquí cualquier valor que NO
+# requiera estar cifrado. El IN_TOKEN se inyecta con `wrangler secret put`.
+[vars]
+IN_BASE = "https://invoicing.legadoholding.com/api/v1"
+ENVIRONMENT = "dev"
+# EMAIL_MODE controla el envío del correo al cliente:
+#   "explicit" → Worker llama POST /invoices/bulk action:email (default)
+#   "auto"     → Worker NO llama; confía en "Email invoices automatically" de IN
+#   "none"     → No se envía email (útil para pruebas sin spamear)
+EMAIL_MODE = "explicit"
+
+# Lista CSV de orígenes (esquema + host + puerto) autorizados a hacer
+# requests con CORS. El Worker hace eco del Origin entrante solo si está
+# en esta lista; cualquier otro origen recibe respuesta sin Access-Control-
+# Allow-Origin y el navegador bloquea la lectura. Usa "*" para abrir todo
+# (NO recomendado en prod). Requests sin Origin (curl/PowerShell) pasan
+# siempre porque no son sujetas a CORS.
+ALLOWED_ORIGINS = "https://legadoholding.com,https://www.legadoholding.com,http://localhost:5500,http://127.0.0.1:5500,http://localhost:8000,http://127.0.0.1:8000"

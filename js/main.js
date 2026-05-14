@@ -34,8 +34,12 @@ const WIZARD_WEBHOOK_URL =
   (typeof window !== "undefined" && window.LEGADO_CONFIG?.WIZARD_WEBHOOK_URL) ||
   "https://vmi2945958.contaboserver.net/webhook/legado-payment";
 
-/* Catálogo de planes — proxy n8n (evita CORS; la autenticación con Invoice Ninja queda en el servidor) */
-const PLANS_API_URL = "https://vmi2945958.contaboserver.net/webhook/List_Products";
+/* Catálogo de planes — proxy server-side (token de Invoice Ninja queda oculto).
+   En dev apunta al Worker (GET /products); en prod, al webhook de n8n hasta
+   que se despliegue el Worker en producción. */
+const PLANS_API_URL =
+  (typeof window !== "undefined" && window.LEGADO_CONFIG?.PLANS_API_URL) ||
+  "https://vmi2945958.contaboserver.net/webhook/List_Products";
 
 /* =============================================================================
    i18n / LANG — Diccionario bilingüe ES / EN

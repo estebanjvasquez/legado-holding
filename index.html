@@ -38,9 +38,19 @@
 
         <!-- ═══ CONFIGURACIÓN GLOBAL — Webhooks y API Keys ═══ -->
         <script>
+            // Conmutador dev/prod por hostname.
+            //  • localhost / 127.0.0.1 / file:// → Worker local (wrangler dev en :8787)
+            //  • cualquier otro host → Worker desplegado en api.legadoholding.com
+            const __isDev = ["localhost", "127.0.0.1", ""].includes(
+                location.hostname,
+            );
             window.LEGADO_CONFIG = {
-                WIZARD_WEBHOOK_URL:
-                    "https://vmi2945958.contaboserver.net/webhook/legado-payment",
+                WIZARD_WEBHOOK_URL: __isDev
+                    ? "http://localhost:8787"
+                    : "https://api.legadoholding.com",
+                PLANS_API_URL: __isDev
+                    ? "http://localhost:8787/products"
+                    : "https://api.legadoholding.com/products",
             };
         </script>
     </head>
