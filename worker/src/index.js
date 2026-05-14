@@ -11,7 +11,7 @@ import { createIN } from "./invoiceninja.js";
 import { processCheckout } from "./pipeline.js";
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, executionCtx) {
     const url  = new URL(request.url);
     const cors = corsFor(request, env);
     const json = (obj, status = 200) =>
@@ -51,7 +51,7 @@ export default {
     }
 
     try {
-      const result = await processCheckout(body, env);
+      const result = await processCheckout(body, env, executionCtx);
       return json(result, result.success ? 200 : 400);
     } catch (e) {
       console.error("Pipeline error:", e.message);

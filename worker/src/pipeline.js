@@ -143,7 +143,15 @@ async function resolveClient(IN, ctx) {
 
 /* ── 4. Build invoice context ──────────────────────────────────────────── */
 async function buildInvoiceContext(IN, ctx) {
-  const prodResp = await IN.listProducts();
+  /* Paralelizar lecturas: products y subscriptions son independientes. */
+  const [prodResp, subsResp] = await Promise.all([
+    IN.listProducts(),
+    IN.listSubscriptions().catch((e) => {
+      console.warn(`listSubscriptions falló: ${e.message}`);
+      return { data: [] };
+    }),
+  ]);
+
   const allProducts = (prodResp.data || []).filter(
     (p) => !p.is_deleted && p.custom_value1 === "legadoweb",
   );
@@ -197,60 +205,17 @@ async function buildInvoiceContext(IN, ctx) {
     recurringProductId = targetProd.id;
   }
 
-  /* Subscription template — opcional. Si falla la creación, seguimos sin link. */
-  const recurringFreqId  = ctx.isVen ? frequencyId2 : ctx.frequencyId;
+  /* Subscription template — opcional. Solo se consulta; ya no se intenta
+     auto-crear porque IN devuelve 500 consistentemente. El subscription_id
+     solo afecta el link visual del portal del cliente, no el cobro. Si
+     alguien lo crea manualmente en IN con el nombre esperado, se enlaza. */
   const freqNameForName  = ctx.isVen ? "monthly" : ctx.paymentType;
   const subscriptionName = `legadoweb-${ctx.planFamily}-${freqNameForName}`;
-  let subscriptionId = null;
-
-  try {
-    const subsResp = await IN.listSubscriptions();
-    const allSubs  = subsResp.data || [];
-    let subscription = allSubs.find((s) => s.name === subscriptionName && !s.is_deleted);
-
-    if (!subscription) {
-      try {
-        const created = await IN.createSubscription({
-          name: subscriptionName,
-          recurring_product_ids: recurringProductId,
-          product_ids: oneTimeProductId || "",
-          optional_product_ids: "",
-          optional_recurring_product_ids: "",
-          frequency_id: recurringFreqId,
-          auto_bill: "off",
-          promo_code: "",
-          promo_discount: 0,
-          is_amount_discount: false,
-          allow_cancellation: true,
-          per_seat_enabled: false,
-          max_seats_limit: 0,
-          trial_enabled: false,
-          trial_duration: 0,
-          allow_query_overrides: false,
-          allow_plan_changes: false,
-          refund_period: 0,
-          use_inventory_management: false,
-          registration_required: false,
-          plan_map: "",
-          steps: "cart,checkout",
-          webhook_configuration: {
-            post_purchase_url: "",
-            post_purchase_rest_method: "",
-            post_purchase_headers: [],
-            post_purchase_body: "",
-            return_url: "",
-          },
-        });
-        subscription = created.data || created;
-      } catch (e) {
-        console.warn(`Auto-creación Subscription '${subscriptionName}' falló: ${e.message}`);
-        subscription = null;
-      }
-    }
-    subscriptionId = subscription && subscription.id ? subscription.id : null;
-  } catch (e) {
-    console.warn(`Listing subscriptions falló: ${e.message}`);
-  }
+  const allSubs = subsResp.data || [];
+  const subscription = allSubs.find(
+    (s) => s.name === subscriptionName && !s.is_deleted,
+  );
+  const subscriptionId = subscription?.id || null;
 
   return {
     strategy, strategyLabel,
@@ -269,7 +234,7 @@ function toLineItems(items) {
   }));
 }
 
-async function createInvoices(IN, ctx, invCtx) {
+async function createInvoices(IN, ctx, invCtx, executionCtx) {
   const invoiceTotal = invCtx.lineItems1
     .reduce((sum, li) => sum + li.cost * (li.qty || 1), 0)
     .toFixed(2);
@@ -305,15 +270,17 @@ async function createInvoices(IN, ctx, invCtx) {
   await IN.bulkRecurring("send_now", [recurringId]);
   console.log(`send_now triggered for ${recurringId}`);
 
-  /* Polling — el cron de IN genera la primera factura asíncronamente. */
+  /* Polling — el cron de IN genera la primera factura asíncronamente.
+     Patrón: chequear primero (suele estar listo), dormir entre intentos
+     con intervalos cortos (400ms). Hasta 12 intentos = ~4.4s worst case. */
   let firstInvoice = null;
-  for (let attempt = 0; attempt < 10 && !firstInvoice; attempt++) {
-    await sleep(800);
+  for (let attempt = 0; attempt < 12 && !firstInvoice; attempt++) {
+    if (attempt > 0) await sleep(400);
     const listResp = await IN.listInvoicesByClient(ctx.clientId);
     const list = (listResp.data || []).filter(
       (inv) => inv.recurring_id === recurringId,
     );
-    console.log(`Poll ${attempt + 1}/10: ${list.length} matches`);
+    console.log(`Poll ${attempt + 1}/12: ${list.length} matches`);
     if (list.length > 0) firstInvoice = list[0];
   }
 
@@ -323,12 +290,20 @@ async function createInvoices(IN, ctx, invCtx) {
     );
   }
 
-  /* Selecto: quitar 'Unico' para ciclos siguientes. */
+  /* Selecto: quitar 'Unico' para ciclos siguientes. Se hace en background
+     porque no afecta la respuesta al usuario — debe completarse antes
+     del siguiente ciclo (un mes), no del próximo response. */
   if (ctx.isVen && invCtx.lineItems2) {
-    await IN.updateRecurringInvoice(recurringId, {
+    const removeUnicoPromise = IN.updateRecurringInvoice(recurringId, {
       line_items: toLineItems(invCtx.lineItems2),
-    });
-    console.log("Selecto: Unico removido para ciclos siguientes");
+    })
+      .then(() => console.log("Selecto: Unico removido (background)"))
+      .catch((e) => console.error(`Selecto PUT falló: ${e.message}`));
+    if (executionCtx?.waitUntil) {
+      executionCtx.waitUntil(removeUnicoPromise);
+    } else {
+      await removeUnicoPromise;
+    }
   }
 
   const invFull = await IN.getInvoiceWithInvitations(firstInvoice.id);
@@ -347,8 +322,11 @@ async function createInvoices(IN, ctx, invCtx) {
   };
 }
 
-/* ── 7. Orquestador público ────────────────────────────────────────────── */
-export async function processCheckout(body, env) {
+/* ── 7. Orquestador público ──────────────────────────────────────────────
+   executionCtx es el `ctx` del fetch handler del Worker; se usa para
+   `waitUntil` y permitir que email + Selecto PUT corran en background
+   sin bloquear la respuesta al usuario. */
+export async function processCheckout(body, env, executionCtx) {
   const ctx = normalize(body);
 
   /* Route by Intent: solo create_payment_intent dispara el pipeline. */
@@ -367,21 +345,26 @@ export async function processCheckout(body, env) {
   const invCtx = await buildInvoiceContext(IN, ctx);
   console.log(`Context built: strategy=${invCtx.strategy} sub=${invCtx.subscriptionId}`);
 
-  const result = await createInvoices(IN, ctx, invCtx);
+  const result = await createInvoices(IN, ctx, invCtx, executionCtx);
   console.log(`Invoice ${result.invoiceNumber} generated, link=${result.invitationLink ? "ok" : "missing"}`);
 
   /* 6. Email — reemplazo del nodo Gmail.
      EMAIL_MODE:
        'explicit' (default) → Worker llama POST /invoices/bulk action:email
        'auto'              → No llama; confía en "Email invoices automatically" de IN
-       'none'              → Salta el email (útil para dev sin spamear) */
+       'none'              → Salta el email (útil para dev sin spamear)
+     El email corre en background con waitUntil cuando hay executionCtx
+     disponible: la respuesta llega al usuario antes; IN procesa el envío
+     después. Si falla, queda en logs pero no rompe la UX. */
   const emailMode = (env.EMAIL_MODE || "explicit").toLowerCase();
   if (emailMode === "explicit") {
-    try {
-      await IN.emailInvoice(result.invoiceId);
-      console.log(`Email disparado vía IN para invoice ${result.invoiceId}`);
-    } catch (e) {
-      console.warn(`Email IN falló (la factura sí se creó): ${e.message}`);
+    const emailPromise = IN.emailInvoice(result.invoiceId)
+      .then(() => console.log(`Email disparado vía IN para invoice ${result.invoiceId}`))
+      .catch((e) => console.warn(`Email IN falló (la factura sí se creó): ${e.message}`));
+    if (executionCtx?.waitUntil) {
+      executionCtx.waitUntil(emailPromise);
+    } else {
+      await emailPromise;
     }
   } else {
     console.log(`Email saltado (EMAIL_MODE=${emailMode})`);
