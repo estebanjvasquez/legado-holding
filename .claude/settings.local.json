@@ -5,7 +5,12 @@
       "WebFetch(domain:api-docs.invoicing.co)",
       "WebFetch(domain:invoiceninja.github.io)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:developers.cloudflare.com)"
+      "WebFetch(domain:developers.cloudflare.com)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git checkout *)",
+      "Bash(git merge *)",
+      "Bash(git push *)"
     ]
   }
 }
