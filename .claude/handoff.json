@@ -1,0 +1,276 @@
+{
+  "schema_version": "1.0",
+  "generated_for": "Conversación nueva que retoma el proyecto Legado Holding",
+  "project": {
+    "name": "legado-holding",
+    "description": "Sitio bilingüe (ES/EN) de previsión funeraria para venezolanos en USA. Stack estático + Cloudflare Worker + Invoice Ninja v5.",
+    "repo": "https://github.com/estebanjvasquez/legado-holding",
+    "primary_lang": "es",
+    "site_lang": "es+en",
+    "domains": {
+      "public": "legadoholding.com",
+      "deploy_path": "legadoholding.com/prueba",
+      "api": "api.legadoholding.com",
+      "workers_dev_backup": "legado-checkout-dev.<subdomain>.workers.dev",
+      "invoice_ninja": "invoicing.legadoholding.com"
+    },
+    "git": {
+      "default_branch": "main",
+      "working_branch": "Sin_n8n",
+      "last_commit_sha": "4ee4cbf",
+      "last_commit_msg": "fix: corregir frequency_id de recurring invoices a valores reales de IN v5"
+    }
+  },
+  "architecture": {
+    "frontend": {
+      "stack": "HTML5 + CSS3 + vanilla JS ES2017+",
+      "no_bundler": true,
+      "no_node_runtime": true,
+      "served_by": "Apache via cPanel",
+      "deploy_mechanism": ".cpanel.yml on git push to cPanel-tracked branch"
+    },
+    "worker": {
+      "name": "legado-checkout-dev",
+      "runtime": "Cloudflare Workers (V8 isolate)",
+      "language": "JS ES modules",
+      "deploy_cmd": "wrangler deploy",
+      "tail_cmd": "wrangler tail"
+    },
+    "billing": {
+      "system": "Invoice Ninja v5 self-hosted",
+      "host": "Contabo VPS",
+      "api_base": "https://invoicing.legadoholding.com/api/v1",
+      "auth_header": "X-API-TOKEN"
+    }
+  },
+  "file_tree": {
+    "frontend": [
+      { "path": "index.html", "role": "single page; LEGADO_CONFIG dev/prod switch at lines ~41-55" },
+      { "path": "css/main.css", "role": "all styles" },
+      { "path": "js/main.js", "role": "i18n LANG, plans, wizard 4 steps, chat placeholder" },
+      { "path": "js/wizard-generic.js", "role": "wizard helpers" },
+      { "path": "images/", "role": "logos, photos" },
+      { "path": "terminos-condiciones.txt", "role": "legal text" }
+    ],
+    "worker": [
+      { "path": "worker/wrangler.toml", "role": "config: name, routes, [vars]" },
+      { "path": "worker/package.json", "role": "scripts: dev, deploy, tail" },
+      { "path": "worker/src/index.js", "role": "router: GET/health, GET/products, POST/checkout, OPTIONS" },
+      { "path": "worker/src/invoiceninja.js", "role": "IN HTTP client factory createIN(env)" },
+      { "path": "worker/src/pipeline.js", "role": "processCheckout(body, env, executionCtx)" },
+      { "path": "worker/.dev.vars.example", "role": "template for local IN_TOKEN" }
+    ],
+    "infra": [
+      { "path": ".cpanel.yml", "role": "cPanel deploy: copies static assets to /home/legadoholding/public_html/prueba" },
+      { "path": ".gitignore", "role": "ignores worker/.dev.vars, .wrangler/, node_modules/" },
+      { "path": "README.md", "role": "849-line documentation" }
+    ]
+  },
+  "worker_config": {
+    "vars": {
+      "IN_BASE": "https://invoicing.legadoholding.com/api/v1",
+      "ENVIRONMENT": "dev",
+      "EMAIL_MODE": "explicit",
+      "ALLOWED_ORIGINS": [
+        "https://legadoholding.com",
+        "https://www.legadoholding.com",
+        "http://localhost:5500",
+        "http://127.0.0.1:5500",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://localhost:8080",
+        "http://127.0.0.1:8080"
+      ]
+    },
+    "secrets": [
+      {
+        "name": "IN_TOKEN",
+        "type": "secret_text",
+        "set_cmd": "wrangler secret put IN_TOKEN",
+        "note": "Ha desaparecido varias veces; re-subir si Health Check muestra tokenLoaded:false"
+      }
+    ],
+    "routes": [
+      { "pattern": "api.legadoholding.com/*", "zone": "legadoholding.com" }
+    ],
+    "email_modes": {
+      "explicit": "Worker llama POST /invoices/bulk action:email (recomendado)",
+      "auto": "Worker no llama; depende de 'Email invoices automatically' en IN",
+      "none": "no envía email (para pruebas)"
+    }
+  },
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/",
+      "response": {
+        "ok": true,
+        "service": "legado-checkout",
+        "env": "dev",
+        "tokenLoaded": "bool",
+        "inBase": "url",
+        "emailMode": "explicit",
+        "allowedOrigins": "array"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/products",
+      "response": { "data": "[productos legadoweb filtrados]" }
+    },
+    {
+      "method": "POST",
+      "path": "/",
+      "request": {
+        "intent": "create_payment_intent",
+        "plan": "esencial-zulia | vanguardia-zulia | esencial-selecto | vanguardia-selecto",
+        "paymentType": "monthly | annual",
+        "buyer": {
+          "name": "",
+          "lastName": "",
+          "email": "",
+          "cedula": "",
+          "phone": "",
+          "birthDate": "YYYY-MM-DD",
+          "zip": ""
+        },
+        "family": "[{ name, lastName, cedula, birthDate, relation }]",
+        "timestamp": "ISO8601"
+      },
+      "response_success": {
+        "success": true,
+        "message": "",
+        "plan": "",
+        "modalidad": "",
+        "invoiceNumber": "",
+        "invitationLink": "",
+        "total": ""
+      },
+      "response_error": { "success": false, "message": "" }
+    }
+  ],
+  "invoice_ninja_conventions": {
+    "product_filtering": "GET /products?per_page=100 then filter where is_deleted=false AND custom_value1='legadoweb'",
+    "custom_value_1": "legadoweb (marca productos del sitio)",
+    "custom_value_2": "Monthly | Annualy | Unico",
+    "custom_value_3": "plan family slug",
+    "slug_mapping_frontend_to_in": {
+      "esencial-selecto": "esencial-ven",
+      "vanguardia-selecto": "vanguardia-ven"
+    },
+    "frequency_id_correct_values": {
+      "5": "Monthly (1 mes calendario)",
+      "10": "Annually (1 año)"
+    },
+    "frequency_id_wrong_values_avoid": {
+      "4": "Four weeks (28 días, no es mensual)",
+      "9": "Six months (no es anual)"
+    },
+    "selecto_plan_strategy": "Primer ciclo: Unico + Monthly. Luego PUT /recurring_invoices/{id} con line_items solo Monthly."
+  },
+  "frontend_config": {
+    "legado_config_location": "index.html lines ~41-55",
+    "dev_detection": "__isDev = ['localhost','127.0.0.1',''].includes(location.hostname)",
+    "ga4_property": "G-6NQKC8DHDV (inlined en index.html)"
+  },
+  "completed_work": [
+    "Migración n8n LEGADO_PostPayment_v7 → Worker en JS",
+    "Eliminación carpeta n8n/ + 17 docs obsoletas + 3 scripts de testing",
+    "CORS endurecido (echo condicional según ALLOWED_ORIGINS)",
+    "Deploy Worker en api.legadoholding.com vía routes binding",
+    "Deploy frontend vía .cpanel.yml a /home/legadoholding/public_html/prueba",
+    "Optimización pipeline: 20s → 11.8s (-41%)",
+    "Fix frequency_id (bug heredado de n8n): monthly 4→5, annual 9→10",
+    "Inline GA4 snippet (eliminado js/gtag.js)",
+    "README.md completo de 849 líneas con TOC y 12 secciones"
+  ],
+  "incidents_log": [
+    {
+      "issue": "Token IN expuesto en .claude/settings.local.json y en wrangler secret",
+      "root_cause": "wrangler secret put se invocó con el token como NOMBRE en vez de valor",
+      "fix": "Rotar token en IN admin; borrar secret malo; re-subir IN_TOKEN correctamente; limpiar settings.local.json"
+    },
+    {
+      "issue": "IN_TOKEN desaparece del Worker ocasionalmente",
+      "root_cause_hypothesis": "wrangler delete | switch de cuenta CF | rename del Worker | proceso externo",
+      "fix": "wrangler secret put IN_TOKEN cada vez; verificar wrangler secret list"
+    },
+    {
+      "issue": "HTTP 522 desde IN",
+      "root_cause": "VPS Contabo o servicios apache/mysql/php caídos",
+      "fix": "SSH al VPS, systemctl restart de servicios caídos"
+    },
+    {
+      "issue": "CORS bloqueando origin http://127.0.0.1:8080",
+      "root_cause": "Puerto 8080 no estaba en ALLOWED_ORIGINS",
+      "fix": "Agregar http://localhost:8080 y http://127.0.0.1:8080 a wrangler.toml + wrangler deploy"
+    }
+  ],
+  "known_limitations": [
+    "Sin idempotencia: doble-click puede crear 2 clientes/facturas",
+    "Polling fijo 12×400ms; si IN cron es lento puede fallar",
+    "Subscription template no se auto-crea (IN devuelve 500); subscription_id es null salvo creación manual",
+    "Chat webhook actual es placeholder no funcional",
+    "lead_abandoned POST se envía pero Worker responde 400 sin loguear (no hay CRM)",
+    "Sin tests automatizados"
+  ],
+  "commands_cheatsheet": {
+    "dev_local": "cd worker && wrangler dev",
+    "deploy": "cd worker && wrangler deploy",
+    "tail_logs": "cd worker && wrangler tail",
+    "set_secret": "cd worker && wrangler secret put IN_TOKEN",
+    "list_secrets": "cd worker && wrangler secret list",
+    "health_check": "Invoke-RestMethod -Uri 'https://api.legadoholding.com' -Method GET",
+    "products_check": "Invoke-RestMethod -Uri 'https://api.legadoholding.com/products' -Method GET",
+    "static_server_local": "python -m http.server 8080  |  npx serve -p 8000  |  Live Server VS Code (5500)"
+  },
+  "user_preferences": {
+    "language": "Spanish",
+    "tone": "Terse, action-oriented",
+    "decision_style": "Confirms with 'si' or 'ok'; expects explicit options before destructive actions",
+    "platform": "Windows 11, PowerShell 5.1 (sin -SkipHttpErrorCheck), bash disponible vía Claude Code",
+    "git_workflow": "commit + ff-merge to main + push origin main Sin_n8n",
+    "git_user": "ESTEBAN VASQUEZ <estebanjvasquez@gmail.com>"
+  },
+  "open_tasks": [
+    {
+      "id": "chatbot-emergency",
+      "name": "Chatbot de emergencia",
+      "status": "alignment_phase",
+      "description": "Bot conversacional con IA para clientes con emergencia funeraria activa. Determina servicios necesarios, muestra resumen, permite confirmación, crea cliente si nuevo, emite factura única.",
+      "constraints": [
+        "Productos a contratar son DISTINTOS a legadoweb (catálogo aparte)",
+        "Si cliente nuevo: crear como en wizard. Si existe: emitir factura directo",
+        "Conectar con flow n8n llamado 'Alma 2'"
+      ],
+      "blocking_questions": {
+        "A_alma2": "¿Qué es Alma 2? Existe? Qué hace?",
+        "B_agent_location": "Worker (B1, recomendado) | n8n (B2) | Híbrido (B3)?",
+        "C_ai_model": "Claude Haiku 4.5 (recomendado) | GPT-4o-mini | otro?",
+        "D_emergency_services": "Catálogo en IN con qué custom_value*?",
+        "E_min_client_fields": "Qué datos pedir en emergencia (vs wizard que pide 7)?",
+        "F_acceptance": "Mecanismo: botón en chat | email confirmación | otro?"
+      },
+      "proposed_phases": [
+        "Fase 1: POST /chat en Worker con IA integrada",
+        "Fase 2: agente con tools (searchServices, summarizeQuote, confirmAndInvoice)",
+        "Fase 3: integración con widget chat del frontend",
+        "Fase 4: integración con Alma 2 (rol TBD)"
+      ],
+      "first_recommended_step": "Responder preguntas A-F para destrabar el diseño"
+    },
+    {
+      "id": "migrate-old-subscriptions",
+      "name": "Migrar suscripciones con frequency_id viejo",
+      "status": "deferred",
+      "description": "Suscripciones creadas antes del fix tienen frequency_id 4 (4-weeks) o 9 (6-months). Actualizar manualmente en IN admin o con script PUT /recurring_invoices/{id}."
+    },
+    {
+      "id": "decommission-old-n8n",
+      "name": "Desactivar n8n viejo en Contabo",
+      "status": "deferred",
+      "description": "Workflow LEGADO_PostPayment_v7 sigue activo en VPS Contabo pero sin tráfico. Apagar desde la UI de n8n cuando convenga."
+    }
+  ],
+  "rehydration_prompt_template": "Soy Esteban Vasquez. Estoy retomando el proyecto legado-holding. Mi último checkpoint quedó en el JSON adjunto. Hay un task abierto: 'Chatbot de emergencia' bloqueado por preguntas A-F. Por favor confirma que entiendes el estado y procede."
+}
