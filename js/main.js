@@ -26,9 +26,14 @@
 
 /* =============================================================================
    CONFIG
-   ▶ CAMBIA ESTA URL por la de tu webhook de n8n
+   ─────────────────────────────────────────────────────────────────────────────
+   El chat de emergencia habla con el Worker (api.legadoholding.com/chat), que
+   a su vez proxea al agente Alma 2 en n8n y al final emite la factura en
+   Invoice Ninja. En dev apunta al wrangler local; en prod al subdominio api.
    ============================================================================= */
-const CHAT_WEBHOOK_URL = "https://TU-N8N-WEBHOOK-URL/webhook/chat"; // ← CAMBIAR
+const CHAT_WEBHOOK_URL =
+  (typeof window !== "undefined" && window.LEGADO_CONFIG?.CHAT_API_URL) ||
+  "https://api.legadoholding.com/chat";
 
 const WIZARD_WEBHOOK_URL =
   (typeof window !== "undefined" && window.LEGADO_CONFIG?.WIZARD_WEBHOOK_URL) ||
@@ -1020,15 +1025,50 @@ function closeChat() {
   $("#chatbot-overlay").classList.add("hidden");
 }
 
+/* Alma 2 (modo emergencia) emite HTML con cards. Para los mensajes normales
+   se mantiene el render markdown. Sanitiza tags peligrosos en cualquier caso
+   ya que el contenido del agente incluye fragmentos del prompt del usuario. */
+function sanitizeAgentHTML(html) {
+  return String(html)
+    .replace(
+      /<\s*(script|iframe|object|embed|style|link|meta)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi,
+      "",
+    )
+    .replace(/<\s*(script|iframe|object|embed|style|link|meta)\b[^>]*>/gi, "")
+    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/(href|src)\s*=\s*(["'])\s*javascript:[^"']*\2/gi, "");
+}
+
 function appendChatBubble(role, content) {
   const msgs = $("#chat-messages");
   const wrap = document.createElement("div");
   wrap.className = `chat-bubble-wrap ${role === "user" ? "user" : "bot"}`;
   const bubble = document.createElement("div");
   bubble.className = `chat-bubble ${role === "user" ? "user" : "bot"}${chatMode === "emergency" && role === "assistant" ? " emergency" : ""}`;
-  bubble.innerHTML =
-    role === "assistant" ? simpleMarkdown(content) : escapeHTML(content);
+  if (role === "user") {
+    bubble.innerHTML = escapeHTML(content);
+  } else if (chatMode === "emergency") {
+    bubble.innerHTML = sanitizeAgentHTML(content);
+  } else {
+    bubble.innerHTML = simpleMarkdown(content);
+  }
   wrap.appendChild(bubble);
+  msgs.appendChild(wrap);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+/* Botón "Pagar ahora" que aparece tras finalize → factura en Invoice Ninja.
+   El invitation_link abre el portal de pago de IN en pestaña nueva. */
+function appendPayButton(invitationLink, invoiceNumber, total) {
+  const msgs = $("#chat-messages");
+  const wrap = document.createElement("div");
+  wrap.className = "chat-bubble-wrap bot";
+  const safe = String(invitationLink).replace(/"/g, "&quot;");
+  wrap.innerHTML = `
+    <a class="chat-pay-btn" href="${safe}" target="_blank" rel="noopener">
+      <span>Pagar ahora${total ? " · $" + escapeHTML(String(total)) + " USD" : ""}</span>
+      <small>${invoiceNumber ? "Factura " + escapeHTML(String(invoiceNumber)) : ""}</small>
+    </a>`;
   msgs.appendChild(wrap);
   msgs.scrollTop = msgs.scrollHeight;
 }
@@ -1064,25 +1104,33 @@ async function sendChatMessage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        message: text,
-        messages: chatMessages,
-        mode: chatMode,
         sessionId: chatSessionId,
-        lang: currentLang,
+        message:   text,
+        mode:      chatMode,
+        lang:      currentLang,
       }),
     });
     removeTypingIndicator();
-    if (!resp.ok) throw new Error("HTTP " + resp.status);
-    const data = await resp.json();
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok && !data.output) {
+      throw new Error(data.error || "HTTP " + resp.status);
+    }
     const reply =
+      data?.output ||
       data?.response ||
       data?.message ||
-      data?.content ||
-      data?.text ||
-      (Array.isArray(data) ? data[0]?.response || data[0]?.message : null) ||
       t(chatMode === "emergency" ? "chat_error_emergency" : "chat_error");
     chatMessages.push({ role: "assistant", content: reply });
     appendChatBubble("assistant", reply);
+
+    /* Si Alma 2 cerró el flujo y el Worker emitió la factura, mostramos
+       botón de pago. Si la facturación falló (error en data.error), pasamos
+       el mensaje del Worker como burbuja de error sin tumbar la conversación. */
+    if (data.finalize && data.invitationLink) {
+      appendPayButton(data.invitationLink, data.invoiceNumber, data.total);
+    } else if (data.finalize && data.error) {
+      appendChatBubble("assistant", data.error);
+    }
   } catch (e) {
     console.error("Chat error:", e);
     removeTypingIndicator();

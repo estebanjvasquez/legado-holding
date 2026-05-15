@@ -29,3 +29,8 @@ EMAIL_MODE = "explicit"
 # (NO recomendado en prod). Requests sin Origin (curl/PowerShell) pasan
 # siempre porque no son sujetas a CORS.
 ALLOWED_ORIGINS = "https://legadoholding.com,https://www.legadoholding.com,http://localhost:5500,http://127.0.0.1:5500,http://localhost:8000,http://127.0.0.1:8000,http://localhost:8080,http://127.0.0.1:8080"
+
+# Webhook del agente Alma 2 en n8n (Contabo). El Worker hace POST aquí
+# desde /chat con { sessionId, chatInput }. Si Alma 2 está inactivo o
+# el host cambia, ajustar este valor y `wrangler deploy`.
+ALMA_WEBHOOK_URL = "https://vmi2945958.contaboserver.net/webhook/alma"

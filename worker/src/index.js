@@ -1,14 +1,17 @@
 /* =============================================================================
    LEGADO — Checkout Worker
    Reemplazo de n8n LEGADO_PostPayment_v7 y del proxy List_Products.
-     GET  /          → health check (verifica secret y vars cargados)
-     GET  /products  → lista de productos 'legadoweb' (proxy a IN /products)
-     POST /          → ejecuta el pipeline de checkout
-     OPTIONS         → CORS preflight
+     GET  /                    → health check (verifica secret y vars cargados)
+     GET  /products            → lista de productos 'legadoweb' (proxy a IN)
+     GET  /emergency-products  → lista de productos 'urgencias' para Alma 2
+     POST /                    → ejecuta el pipeline de checkout legadoweb
+     POST /chat                → proxy al agente Alma 2 + handoff a IN
+     OPTIONS                   → CORS preflight
    ============================================================================= */
 
 import { createIN } from "./invoiceninja.js";
 import { processCheckout } from "./pipeline.js";
+import { handleChat } from "./chat.js";
 
 export default {
   async fetch(request, env, executionCtx) {
@@ -26,7 +29,10 @@ export default {
 
     if (request.method === "GET") {
       if (url.pathname === "/products") {
-        return await handleProducts(env, json);
+        return await handleProducts(env, json, "legadoweb");
+      }
+      if (url.pathname === "/emergency-products") {
+        return await handleProducts(env, json, "urgencias");
       }
       return json({
         ok: true,
@@ -35,6 +41,7 @@ export default {
         tokenLoaded:    !!env.IN_TOKEN,
         inBase:         env.IN_BASE,
         emailMode:      env.EMAIL_MODE || "explicit",
+        almaConfigured: !!env.ALMA_WEBHOOK_URL,
         allowedOrigins: getAllowedOrigins(env),
       });
     }
@@ -50,6 +57,17 @@ export default {
       return json({ success: false, message: "JSON inválido: " + e.message }, 400);
     }
 
+    if (url.pathname === "/chat") {
+      try {
+        const result = await handleChat(body, env, executionCtx);
+        return json(result, 200);
+      } catch (e) {
+        console.error("Chat error:", e.message);
+        if (e.stack) console.error(e.stack);
+        return json({ output: "", error: e.message }, 500);
+      }
+    }
+
     try {
       const result = await processCheckout(body, env, executionCtx);
       return json(result, result.success ? 200 : 400);
@@ -61,14 +79,14 @@ export default {
   },
 };
 
-async function handleProducts(env, json) {
+async function handleProducts(env, json, brand) {
   try {
     const IN = createIN(env);
     const resp = await IN.listProducts();
     const products = (resp.data || []).filter(
-      (p) => !p.is_deleted && p.custom_value1 === "legadoweb",
+      (p) => !p.is_deleted && p.custom_value1 === brand,
     );
-    console.log(`Products served: ${products.length} legadoweb items`);
+    console.log(`Products served: ${products.length} ${brand} items`);
     return json({ data: products });
   } catch (e) {
     console.error("Products error:", e.message);

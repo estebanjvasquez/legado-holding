@@ -65,6 +65,7 @@ export function createIN(env) {
       ),
     getInvoiceWithInvitations: (id) =>
       req("GET", `/invoices/${id}?include=invitations`),
+    createInvoice: (data) => req("POST", "/invoices?include=invitations", data),
 
     /* ── Email (reemplazo del nodo Gmail de n8n) ──────────────────────── */
     /* POST /invoices/bulk action:email dispara la plantilla configurada en
