@@ -63,7 +63,7 @@ const LANG = {
   nav_planes: ["Planes", "Plans"],
   nav_como: ["Cómo funciona", "How it works"],
   nav_contacto: ["Contacto", "Contact"],
-  nav_portal: ["Portal del cliente", "Client Portal"],
+  nav_portal: ["Portal Clientes", "Client Portal"],
   nav_cta: ["PROTEGE TU LEGADO", "PROTECT YOUR LEGACY"],
 
   /* ── Hero (sobre fondo de foto de los abuelos) ─────────────────────────── */
