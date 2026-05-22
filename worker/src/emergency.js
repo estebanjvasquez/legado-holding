@@ -72,8 +72,21 @@ async function resolveUrgencyProducts(IN, productKeys) {
        - id            (id numérico interno)
        - notes         (descripción, último recurso)
      Probamos en orden de especificidad. Sólo se busca dentro del catálogo
-     urgencias para evitar contaminación cruzada. */
-  const norm = (s) => String(s || "").trim().toLowerCase();
+     urgencias para evitar contaminación cruzada.
+
+     `norm` también quita acentos (NFD + strip de diacríticos). Cuando
+     Gemini propone "Cremación básica" pero el product_key real es
+     "Cremacion Basica" sin tildes, sin esto el match falla. */
+  /* RegExp con string ASCII puro para evitar problemas de encoding al
+     editar el archivo: ̀-ͯ es el rango de combining diacritical
+     marks de Unicode. Strippearlos tras normalize("NFD") quita tildes/acentos. */
+  const DIACRITICS = new RegExp("[\\u0300-\\u036f]", "g");
+  const norm = (s) =>
+    String(s || "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(DIACRITICS, "");
   const wanted = productKeys.map((k) => String(k).trim()).filter(Boolean);
 
   const found = wanted.map((key) => {

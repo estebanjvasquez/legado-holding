@@ -108,6 +108,35 @@ export function createSupabase(env) {
       });
       return (data && data[0]) || null;
     },
+
+    /* ── locations_venezuela + funeral_partners ───────────────────────────
+       Búsqueda fuzzy por nombre de ciudad: el agente puede pasar la ciudad
+       tal como la dice el usuario ("caracas", "Maracaibo", "Pto Ordaz").
+       Usamos ilike sobre lower(city) para tolerar mayúsculas y acentos.  */
+    async findLocationByCity(city) {
+      const q = (city || "").trim();
+      if (!q) return null;
+      const path =
+        `/locations_venezuela?city=ilike.${encodeURIComponent(q)}` +
+        `&select=*&limit=1`;
+      const data = await req("GET", path);
+      if (Array.isArray(data) && data[0]) return data[0];
+      /* Segundo intento: substring match — más flexible. */
+      const path2 =
+        `/locations_venezuela?city=ilike.${encodeURIComponent("%" + q + "%")}` +
+        `&select=*&limit=1`;
+      const data2 = await req("GET", path2);
+      return (Array.isArray(data2) && data2[0]) || null;
+    },
+
+    async listPartnersByLocation(locationId, activeOnly = true) {
+      let path =
+        `/funeral_partners?location_id=eq.${encodeURIComponent(locationId)}` +
+        `&select=id,name,brand,services,phone,email,notes`;
+      if (activeOnly) path += `&is_active=eq.true`;
+      const data = await req("GET", path);
+      return Array.isArray(data) ? data : [];
+    },
   };
 }
 
@@ -115,10 +144,12 @@ export function createSupabase(env) {
    no romper el chat. Los logs se pierden pero la conversación funciona.       */
 function makeNoopClient() {
   return {
-    upsertSession: async () => null,
-    getSession:    async () => null,
-    updateSession: async () => null,
-    listTurns:     async () => [],
-    insertTurn:    async () => null,
+    upsertSession:         async () => null,
+    getSession:            async () => null,
+    updateSession:         async () => null,
+    listTurns:             async () => [],
+    insertTurn:            async () => null,
+    findLocationByCity:    async () => null,
+    listPartnersByLocation: async () => [],
   };
 }

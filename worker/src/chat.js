@@ -97,9 +97,10 @@ export async function handleChat(body, env, executionCtx) {
     .catch((e) => console.warn(`[chat] insertTurn(user) failed: ${e.message}`));
   if (executionCtx?.waitUntil) executionCtx.waitUntil(userTurnPromise);
 
-  /* 3. Llamar al agente. */
+  /* 3. Llamar al agente. Le pasamos el cliente db para que pueda ejecutar
+        la tool lookup_coverage contra Supabase.                              */
   const result = await runAlma(
-    { sessionId, message, history, lang },
+    { sessionId, message, history, lang, db },
     env,
     executionCtx,
   );
@@ -110,6 +111,7 @@ export async function handleChat(body, env, executionCtx) {
     await persistEvents(db, sessionId, result.events, result.model);
     if (result.finalize) {
       const c = result.customer || {};
+      const d = result.deceased || {};
       await db
         .updateSession(sessionId, {
           finalized:          true,
@@ -124,8 +126,22 @@ export async function handleChat(body, env, executionCtx) {
           customer_address:   c.address   || null,
           product_keys:       result.productKeys || null,
           notes:              result.notes        || null,
+          deceased_name:      d.name      || null,
+          deceased_relation:  d.relation  || null,
+          deceased_religion:  d.religion  || null,
+          deceased_age:       d.age       || null,
+          deceased_birth:     d.birth     || null,
         })
         .catch((e) => console.warn(`[chat] updateSession failed: ${e.message}`));
+    } else if (result.coverage) {
+      /* Aunque no haya finalize, persistimos la cobertura confirmada como
+         metadata de la sesión — útil para analytics y para evitar repreguntas. */
+      const meta = result.coverage.covered
+        ? { coverage: "covered", coverage_city: result.coverage.city, coverage_state: result.coverage.state }
+        : { coverage: "not_covered", coverage_reason: result.coverage.reason };
+      await db
+        .updateSession(sessionId, { metadata: meta })
+        .catch((e) => console.warn(`[chat] updateSession(coverage) failed: ${e.message}`));
     }
   })();
   if (executionCtx?.waitUntil) {
