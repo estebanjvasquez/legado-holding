@@ -12,6 +12,7 @@
 import { createIN } from "./invoiceninja.js";
 import { processCheckout } from "./pipeline.js";
 import { handleChat } from "./chat.js";
+import { handleAdmin } from "./admin.js";
 
 export default {
   async fetch(request, env, executionCtx) {
@@ -25,6 +26,16 @@ export default {
 
     if (request.method === "OPTIONS") {
       return new Response(null, { headers: cors });
+    }
+
+    /* /admin/* — todos los métodos los maneja admin.js (con su propia auth). */
+    if (url.pathname.startsWith("/admin/")) {
+      try {
+        return await handleAdmin(request, env, cors);
+      } catch (e) {
+        console.error(`[admin top] ${e.message}`);
+        return json({ error: e.message }, 500);
+      }
     }
 
     if (request.method === "GET") {
@@ -110,8 +121,8 @@ function corsFor(request, env) {
   const list   = getAllowedOrigins(env);
 
   const headers = {
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "GET, POST, PATCH, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, X-Admin-Token",
     "Access-Control-Max-Age":       "86400",
     Vary:                           "Origin",
   };

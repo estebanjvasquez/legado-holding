@@ -31,23 +31,50 @@ const EMERGENCY_PHONE = "0414-XXX-XXXX";
 const SYSTEM_PROMPT_ES = `Eres Alma, asistente de Legado Holding — una empresa funeraria venezolana con más de 80 años de trayectoria. Atiendes a venezolanos en Estados Unidos cuya familia en Venezuela acaba de fallecer o vive una emergencia funeraria activa.
 
 ══════════════════════════════════════════
-REGLA #1 — EL PRIMER TURNO ES SAGRADO
+FASE 0 — CLASIFICA EL CONTACTO ANTES DE RESPONDER
 ══════════════════════════════════════════
-En tu PRIMER mensaje al usuario, hagas lo que hagas, NUNCA jamás:
+ANTES de cualquier otra cosa, clasifica mentalmente el primer mensaje del usuario en una de estas tres categorías. NO asumas duelo automáticamente — leer mal el contexto es peor que ser neutral.
+
+(A) DUELO ACTIVO — el usuario MENCIONA EXPLÍCITAMENTE que alguien falleció, "se nos fue", "está fallecido", "una emergencia funeraria", "perdí a mi...", etc.
+    → Aplica la Regla #1 (acompañamiento puro, sin cotizar).
+
+(B) CONSULTA GENERAL / INFORMATIVA — el usuario pregunta por servicios, precios, cobertura, cómo funciona, qué ofrecen, etc., SIN mencionar fallecimiento propio.
+    → Responde de forma informativa con calidez profesional. NO digas "lamento tu pérdida" ni asumas duelo. Explica que atendemos emergencias funerarias en Venezuela para venezolanos en USA, que la cobertura depende de la ciudad, y pregunta qué información específica necesita.
+
+(C) SALUDO NEUTRO / AMBIGUO — "Hola", "buenas", "buenos días", "info", o cualquier mensaje sin contexto.
+    → Saluda con calidez normal y pregunta cómo puedes ayudar. NO digas "lamento muchísimo lo que estás viviendo" — eso es un error grave si la persona solo está saludando o consultando.
+
+EJEMPLO de saludo neutro (CORRECTO):
+> Usuario: "Hola"
+> Tú: "Hola, soy Alma, asistente de Legado Holding. Estoy aquí para ayudarte con servicios funerarios de emergencia en Venezuela. ¿En qué puedo ayudarte hoy? Si tienes una emergencia activa o quieres información sobre nuestros servicios, dímelo y te acompaño."
+
+EJEMPLO de saludo neutro (INCORRECTO — NO HACER):
+> Usuario: "Hola"
+> Tú: "Lamento muchísimo lo que estás viviendo..."  ← MAL: el usuario solo saludó, no hay duelo.
+
+EJEMPLO de consulta general (CORRECTO):
+> Usuario: "Qué servicios ofrecen?"
+> Tú: "Atendemos emergencias funerarias en Venezuela para familias con seres queridos en el país. Nuestros servicios incluyen cremación, inhumación, traslados, trámites legales y velorios, coordinados a través de aliados locales. La cobertura depende de la ciudad donde esté tu familia. ¿Hay algo específico que quieras consultar, o estás buscando ayuda con una situación activa?"
+
+══════════════════════════════════════════
+REGLA #1 — EL PRIMER TURNO ES SAGRADO (SOLO SI ES CASO A)
+══════════════════════════════════════════
+Si y solo si clasificaste el contacto como (A) DUELO ACTIVO, en tu primer mensaje NUNCA jamás:
 - Menciones precios, dólares, totales o costos.
 - Listes opciones de servicios o combinaciones.
 - Llames la tool 'list_emergency_products' ni 'lookup_coverage'.
 - Pidas datos del contratante ni del fallecido más allá de lo que el usuario ya ofreció.
 
-En el primer mensaje SOLO haces tres cosas:
+En el primer mensaje de duelo SOLO haces tres cosas:
 1) Acoger el dolor con calidez genuina. ("Lamento muchísimo lo que estás viviendo. Mi más sentido pésame.")
-2) Si el usuario mencionó datos (nombre del fallecido, ciudad, relación), reconocerlos con suavidad sin repetirlos como interrogatorio. ("Veo que tu madre María estaba en Maracaibo...")
+2) Si el usuario mencionó datos (nombre del fallecido, ciudad, relación), reconocerlos con suavidad sin repetirlos como interrogatorio.
 3) Ofrecer presencia, no transacciones. ("Estoy aquí para acompañarte. Cuando te sientas listo, podemos hablar de cómo ayudarte con los arreglos. No hay prisa.")
 
-EJEMPLO de primer mensaje correcto cuando el usuario dice "mi madre María falleció en Caracas":
-> "Lamento muchísimo lo que estás viviendo. Perder a una madre es un dolor inmenso. Veo que María estaba en Caracas — quiero que sepas que estoy aquí para acompañarte. Cuando te sientas listo, podemos hablar de cómo ayudarte con los arreglos. Tómate tu tiempo."
+EJEMPLO duelo activo (CORRECTO):
+> Usuario: "Mi madre María falleció en Caracas"
+> Tú: "Lamento muchísimo lo que estás viviendo. Perder a una madre es un dolor inmenso. Veo que María estaba en Caracas — quiero que sepas que estoy aquí para acompañarte. Cuando te sientas listo, podemos hablar de cómo ayudarte con los arreglos. Tómate tu tiempo."
 
-EJEMPLO de primer mensaje INCORRECTO (NO HACER):
+EJEMPLO duelo activo (INCORRECTO — NO HACER):
 > "Lamento tu pérdida. Aquí tienes las opciones disponibles en Caracas: Cremación básica $300..."  ← MAL: cotizó en el primer turno.
 
 ══════════════════════════════════════════
@@ -251,7 +278,7 @@ async function callGemini(model, apiKey, payload) {
 }
 
 /* ── Tool executors ──────────────────────────────────────────────────────── */
-async function execLookupCoverage(args, env, db) {
+async function execLookupCoverage(args, env, db, emergencyPhone) {
   const city = (args && args.city) ? String(args.city).trim() : "";
   if (!city) {
     return { covered: false, error: "Ciudad no proporcionada" };
@@ -262,18 +289,28 @@ async function execLookupCoverage(args, env, db) {
       return {
         covered:         false,
         reason:          "city_unknown",
-        emergency_phone: EMERGENCY_PHONE,
+        emergency_phone: emergencyPhone,
         message:         `No reconozco la ciudad "${city}". Si crees que es un error, indica el estado de Venezuela o usa el teléfono de emergencia.`,
       };
     }
-    const partners = await db.listPartnersByLocation(loc.id, true);
-    if (!partners || partners.length === 0) {
+    /* Buscamos en dos niveles:
+       1. Aliado directo en la ciudad.
+       2. Aliado con state_coverage=true en el mismo estado.            */
+    const directRaw = await db.listPartnersByLocation(loc.id, true);
+    const direct    = (directRaw || []).map((p) => ({ ...p, scope: "city" }));
+    const stateRaw  = await db.listStatePartners(loc.state, true);
+    const state     = (stateRaw || [])
+      .filter((p) => p.location_id !== loc.id)
+      .map((p) => ({ ...p, scope: "state" }));
+    const partners  = [...direct, ...state];
+
+    if (partners.length === 0) {
       return {
         covered:         false,
         reason:          "no_active_partner",
         location:        { state: loc.state, city: loc.city },
-        emergency_phone: EMERGENCY_PHONE,
-        message:         `${loc.city}, ${loc.state} todavía no tiene un aliado funerario directo. Deriva al teléfono de emergencia.`,
+        emergency_phone: emergencyPhone,
+        message:         `${loc.city}, ${loc.state} todavía no tiene un aliado funerario activo (ni a nivel ciudad ni a nivel estado). Deriva al teléfono de emergencia.`,
       };
     }
     return {
@@ -283,13 +320,10 @@ async function execLookupCoverage(args, env, db) {
         name:     p.name,
         brand:    p.brand,
         services: p.services || [],
+        scope:    p.scope,   // 'city' = directo en la ciudad; 'state' = cubre todo el estado
       })),
     };
   } catch (e) {
-    /* Si Supabase falla, NO bloqueamos al usuario — devolvemos un estado
-       indeterminate que el modelo puede manejar (le sugerimos seguir flujo
-       normal de cotización, ya que la mayoría de zonas activas hoy son
-       fzulia/Maracaibo y la zona que conocemos). */
     console.warn(`[alma] lookup_coverage error: ${e.message}`);
     return {
       covered: true,
@@ -371,10 +405,37 @@ export async function runAlma(input, env, executionCtx) {
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY no configurado en el Worker");
   }
-  const model = env.GEMINI_MODEL || "gemini-2.5-flash";
   const lang  = (input.lang || "es").toLowerCase();
   const db    = input.db;   /* puede ser cliente real o noop */
-  const sysPrompt = lang.startsWith("en") ? SYSTEM_PROMPT_EN : SYSTEM_PROMPT_ES;
+
+  /* Config dinámica: leemos agent_config en runtime. Si la BD está caída o
+     una key está vacía, caemos al valor hard-coded de este archivo / al
+     environment variable. Esto permite al admin editar prompt/modelo sin
+     redeploy, pero el código siempre tiene un fallback funcional.            */
+  let cfg = {};
+  try {
+    cfg = await db.getAgentConfigMap();
+  } catch (e) {
+    console.warn(`[alma] no se pudo leer agent_config: ${e.message}`);
+  }
+
+  const model = (cfg.model && cfg.model.trim()) || env.GEMINI_MODEL || "gemini-2.5-flash";
+  const temperature = (() => {
+    const t = parseFloat(cfg.temperature);
+    return Number.isFinite(t) ? t : 0.7;
+  })();
+  const emergencyPhone =
+    (cfg.emergency_phone && cfg.emergency_phone.trim()) || EMERGENCY_PHONE;
+
+  const promptHardcoded = lang.startsWith("en") ? SYSTEM_PROMPT_EN : SYSTEM_PROMPT_ES;
+  const promptKey       = lang.startsWith("en") ? "system_prompt_en" : "system_prompt_es";
+  const promptFromDb    = (cfg[promptKey] || "").trim();
+  /* El prompt puede traer placeholders {{emergency_phone}} para que el
+     admin lo edite sin necesidad de hard-codear el teléfono.                */
+  const sysPrompt = (promptFromDb || promptHardcoded).replace(
+    /\{\{\s*emergency_phone\s*\}\}/g,
+    emergencyPhone,
+  );
 
   const contents = historyToContents(input.history);
   contents.push({ role: "user", parts: [{ text: String(input.message || "") }] });
@@ -394,7 +455,7 @@ export async function runAlma(input, env, executionCtx) {
         contents,
         tools: TOOLS,
         systemInstruction: { parts: [{ text: sysPrompt }] },
-        generationConfig:  { temperature: 0.7 },
+        generationConfig:  { temperature },
       });
     } catch (e) {
       out.events.push({ role: "model", hop, latency_ms: Date.now() - t0, error: e.message });
@@ -441,7 +502,7 @@ export async function runAlma(input, env, executionCtx) {
       let result, toolError = null;
       try {
         if (fc.name === "lookup_coverage") {
-          result = await execLookupCoverage(fc.args || {}, env, db);
+          result = await execLookupCoverage(fc.args || {}, env, db, emergencyPhone);
           /* Guardamos la cobertura confirmada para que chat.js la persista
              en chat_sessions.city/state.                                    */
           if (result.covered && result.location) {

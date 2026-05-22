@@ -132,8 +132,113 @@ export function createSupabase(env) {
     async listPartnersByLocation(locationId, activeOnly = true) {
       let path =
         `/funeral_partners?location_id=eq.${encodeURIComponent(locationId)}` +
-        `&select=id,name,brand,services,phone,email,notes`;
+        `&select=id,name,brand,services,phone,email,notes,state_coverage,is_active`;
       if (activeOnly) path += `&is_active=eq.true`;
+      const data = await req("GET", path);
+      return Array.isArray(data) ? data : [];
+    },
+
+    /* Aliados con state_coverage=true en el estado dado, sin importar qué
+       ciudad específica tengan asignada. Se usa cuando una ciudad no tiene
+       aliado directo: si el estado tiene un aliado estatal, lo aplicamos. */
+    async listStatePartners(stateName, activeOnly = true) {
+      const path =
+        `/funeral_partners?state_coverage=eq.true` +
+        `&select=id,name,brand,services,phone,email,notes,state_coverage,is_active,` +
+        `location:locations_venezuela!inner(state,city)` +
+        `&location.state=eq.${encodeURIComponent(stateName)}` +
+        (activeOnly ? `&is_active=eq.true` : "");
+      const data = await req("GET", path);
+      return Array.isArray(data) ? data : [];
+    },
+
+    /* ── Admin: CRUD de locations ─────────────────────────────────────── */
+    async listAllLocations(stateFilter) {
+      let path = `/locations_venezuela?select=*&order=state.asc,city.asc`;
+      if (stateFilter) path += `&state=eq.${encodeURIComponent(stateFilter)}`;
+      const data = await req("GET", path);
+      return Array.isArray(data) ? data : [];
+    },
+    async createLocation(row) {
+      const data = await req("POST", "/locations_venezuela", [row], {
+        Prefer: "return=representation",
+      });
+      return (data && data[0]) || null;
+    },
+    async updateLocation(id, patch) {
+      const data = await req(
+        "PATCH",
+        `/locations_venezuela?id=eq.${encodeURIComponent(id)}`,
+        patch,
+        { Prefer: "return=representation" },
+      );
+      return (data && data[0]) || null;
+    },
+    async deleteLocation(id) {
+      return req("DELETE", `/locations_venezuela?id=eq.${encodeURIComponent(id)}`);
+    },
+
+    /* ── Admin: CRUD de partners ──────────────────────────────────────── */
+    async listAllPartners(filter = {}) {
+      let path = `/funeral_partners?select=*,location:locations_venezuela(state,city)&order=name.asc`;
+      if (filter.activeOnly) path += `&is_active=eq.true`;
+      if (filter.locationId)
+        path += `&location_id=eq.${encodeURIComponent(filter.locationId)}`;
+      const data = await req("GET", path);
+      return Array.isArray(data) ? data : [];
+    },
+    async createPartner(row) {
+      const data = await req("POST", "/funeral_partners", [row], {
+        Prefer: "return=representation",
+      });
+      return (data && data[0]) || null;
+    },
+    async updatePartner(id, patch) {
+      const data = await req(
+        "PATCH",
+        `/funeral_partners?id=eq.${encodeURIComponent(id)}`,
+        patch,
+        { Prefer: "return=representation" },
+      );
+      return (data && data[0]) || null;
+    },
+    async deletePartner(id) {
+      return req("DELETE", `/funeral_partners?id=eq.${encodeURIComponent(id)}`);
+    },
+
+    /* ── Admin: agent_config (key-value) ──────────────────────────────── */
+    async listAgentConfig() {
+      const data = await req(
+        "GET",
+        "/agent_config?select=key,value,description,updated_at&order=key.asc",
+      );
+      return Array.isArray(data) ? data : [];
+    },
+    async getAgentConfigMap() {
+      const rows = await this.listAgentConfig();
+      const map = {};
+      for (const r of rows) map[r.key] = r.value;
+      return map;
+    },
+    async upsertAgentConfig(key, value, description) {
+      const row = { key, value, ...(description !== undefined ? { description } : {}) };
+      const data = await req(
+        "POST",
+        "/agent_config?on_conflict=key",
+        [row],
+        { Prefer: "resolution=merge-duplicates,return=representation" },
+      );
+      return (data && data[0]) || null;
+    },
+    async deleteAgentConfig(key) {
+      return req("DELETE", `/agent_config?key=eq.${encodeURIComponent(key)}`);
+    },
+
+    /* ── Admin: visor de sesiones ─────────────────────────────────────── */
+    async listRecentSessions(limit = 50, offset = 0) {
+      const path =
+        `/chat_sessions?select=*&order=updated_at.desc` +
+        `&limit=${limit}&offset=${offset}`;
       const data = await req("GET", path);
       return Array.isArray(data) ? data : [];
     },
@@ -144,12 +249,26 @@ export function createSupabase(env) {
    no romper el chat. Los logs se pierden pero la conversación funciona.       */
 function makeNoopClient() {
   return {
-    upsertSession:         async () => null,
-    getSession:            async () => null,
-    updateSession:         async () => null,
-    listTurns:             async () => [],
-    insertTurn:            async () => null,
-    findLocationByCity:    async () => null,
+    upsertSession:          async () => null,
+    getSession:             async () => null,
+    updateSession:          async () => null,
+    listTurns:              async () => [],
+    insertTurn:             async () => null,
+    findLocationByCity:     async () => null,
     listPartnersByLocation: async () => [],
+    listStatePartners:      async () => [],
+    listAllLocations:       async () => [],
+    createLocation:         async () => null,
+    updateLocation:         async () => null,
+    deleteLocation:         async () => null,
+    listAllPartners:        async () => [],
+    createPartner:          async () => null,
+    updatePartner:          async () => null,
+    deletePartner:          async () => null,
+    listAgentConfig:        async () => [],
+    getAgentConfigMap:      async () => ({}),
+    upsertAgentConfig:      async () => null,
+    deleteAgentConfig:      async () => null,
+    listRecentSessions:     async () => [],
   };
 }

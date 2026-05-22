@@ -42,3 +42,9 @@ GEMINI_MODEL = "gemini-2.5-flash"
 #   cd worker && wrangler secret put SUPABASE_SERVICE_ROLE_KEY
 # Si SUPABASE_URL o el secret faltan, el chat sigue funcionando (no-op fallback).
 SUPABASE_URL = "https://naebpcyphdcopndqovie.supabase.co"
+
+# Observability deshabilitado explícito. En wrangler 4.x se activaba por
+# defecto y requiere entitlement del plan; sin él el deploy fallaba con
+# code 10007 entitlements.not_available.
+[observability]
+enabled = false
