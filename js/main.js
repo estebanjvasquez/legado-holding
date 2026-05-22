@@ -1101,6 +1101,10 @@ async function sendChatMessage() {
   showTypingIndicator();
 
   try {
+    /* history: turnos previos en formato {role, content}. El turno del usuario
+       actual NO va aquí (recién se hizo push) — va en `message`. Tope de 20
+       turnos previos para no inflar el request en conversaciones largas. */
+    const history = chatMessages.slice(-21, -1);
     const resp = await fetch(CHAT_WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1109,6 +1113,7 @@ async function sendChatMessage() {
         message:   text,
         mode:      chatMode,
         lang:      currentLang,
+        history,
       }),
     });
     removeTypingIndicator();

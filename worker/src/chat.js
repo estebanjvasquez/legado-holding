@@ -1,126 +1,152 @@
 /* =============================================================================
-   Proxy al agente Alma 2 (n8n) + handoff a Invoice Ninja al confirmar.
+   /chat — orquesta el agente Alma (Gemini) + persistencia en Supabase.
 
-   Frontend envía:        { sessionId, message }
-   Worker → Alma 2:       POST {ALMA_WEBHOOK_URL} { sessionId, chatInput }
-   Alma 2 → Worker:       { output, finalize?, extracted_data? }
-   Worker → Frontend:     { output, invitationLink?, invoiceNumber?, total? }
+   Flujo por request:
+     1. Carga/crea sesión en Supabase (chat_sessions).
+     2. Carga historial desde chat_turns (memoria persistente). Si la BD no
+        está disponible cae al `history` que mandó el frontend (fallback).
+     3. Inserta el turno del usuario (background).
+     4. Llama runAlma con el historial reconstruido.
+     5. Persiste todos los events del agente (cada hop, tools, latencias) en
+        background con waitUntil — no bloquea la respuesta al usuario.
+     6. Si la conversación terminó en factura, actualiza chat_sessions con
+        invoice + datos del cliente.
 
-   El contrato de Alma 2 espera que cuando el flujo decide "finalize" devuelva
-   además del HTML el bloque extracted_data con billing_data y
-   selected_product_keys. Si no llega 'finalize', el Worker sólo hace passthrough.
+   El contrato de salida hacia el frontend es el MISMO que antes:
+     { output, finalize?, invoiceNumber?, invitationLink?, total?,
+       isNewClient?, error? }
    ============================================================================= */
 
-import { emergencyCheckout } from "./emergency.js";
+import { runAlma } from "./alma.js";
+import { createSupabase } from "./supabase.js";
 
-const ALMA_TIMEOUT_MS = 30000;
+/* Convierte rows de chat_turns (con role 'user'/'model'/'tool') al formato
+   {role, content} que espera alma.runAlma. Los turnos 'tool' se filtran
+   porque son artifacts internos del loop, no historia conversacional.         */
+function turnsToHistory(turns) {
+  if (!Array.isArray(turns)) return [];
+  return turns
+    .filter((t) => (t.role === "user" || t.role === "model") && t.content)
+    .map((t) => ({
+      role:    t.role === "user" ? "user" : "assistant",
+      content: t.content,
+    }));
+}
 
-async function callAlma(url, payload) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), ALMA_TIMEOUT_MS);
-  try {
-    const r = await fetch(url, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify(payload),
-      signal:  controller.signal,
-    });
-    const text = await r.text();
-    let parsed = text;
-    try { parsed = text ? JSON.parse(text) : null; } catch (_) { /* keep text */ }
-    if (!r.ok) {
-      throw new Error(
-        `Alma 2 -> ${r.status}: ${typeof parsed === "object" ? JSON.stringify(parsed) : String(parsed)}`,
-      );
+/* Persiste un array de events de alma en chat_turns. Cada event ya trae
+   role, hop, latency_ms, tool_name/args/result y error según corresponda. */
+async function persistEvents(db, sessionId, events, model) {
+  if (!Array.isArray(events) || events.length === 0) return;
+  /* Los hacemos en serie para preservar el orden de creación (id asc).
+     Los inserts son baratos y un error individual no debe romper el resto.    */
+  for (const ev of events) {
+    try {
+      await db.insertTurn({
+        session_id:  sessionId,
+        role:        ev.role,
+        content:     ev.content || null,
+        tool_name:   ev.tool_name || null,
+        tool_args:   ev.tool_args || null,
+        tool_result: ev.tool_result || null,
+        model,
+        hop:         typeof ev.hop === "number" ? ev.hop : null,
+        latency_ms:  typeof ev.latency_ms === "number" ? ev.latency_ms : null,
+        error:       ev.error || null,
+      });
+    } catch (e) {
+      console.warn(`[chat] insertTurn failed: ${e.message}`);
     }
-    return parsed;
-  } finally {
-    clearTimeout(timeout);
   }
-}
-
-function extractBilling(data) {
-  const b = (data && data.billing_data) || {};
-  return {
-    name:      (b.name    || "").trim(),
-    email:     (b.email   || "").toLowerCase().trim(),
-    phone:     (b.phone   || "").trim(),
-    id_number: (b.tax_id  || "").trim(),
-    address:   (b.address || "").trim(),
-  };
-}
-
-function extractItems(data) {
-  const keys = data && (data.selected_product_keys || data.selected_services);
-  if (!Array.isArray(keys)) return [];
-  return keys.map((k) => String(k).trim()).filter(Boolean);
 }
 
 export async function handleChat(body, env, executionCtx) {
   const sessionId = (body.sessionId || "").trim();
-  const message   = (body.message   || body.chatInput || "").trim();
+  const message   = (body.message || body.chatInput || "").trim();
+  const lang      = (body.lang || "es").trim();
+  const mode      = (body.mode || "emergency").trim();
+  const fallbackHistory = Array.isArray(body.history) ? body.history : [];
+
   if (!sessionId) throw new Error("sessionId requerido");
   if (!message)   throw new Error("message requerido");
 
-  const almaUrl = env.ALMA_WEBHOOK_URL;
-  if (!almaUrl) throw new Error("ALMA_WEBHOOK_URL no configurado en el Worker");
+  const db = createSupabase(env);
 
-  console.log(`[chat] session=${sessionId} msg="${message.slice(0, 80)}"`);
-
-  const almaResp = await callAlma(almaUrl, { sessionId, chatInput: message });
-
-  /* Alma puede devolver { output } (passthrough) o
-     { output, finalize:true, extracted_data:{...} } (handoff). */
-  const output   = (almaResp && almaResp.output) || "";
-  const finalize = !!(almaResp && almaResp.finalize);
-  const extracted =
-    (almaResp && (almaResp.extracted_data || almaResp.data_to_store)) || null;
-
-  if (!finalize || !extracted) {
-    return { output };
+  /* 1. Cargar (o crear) la sesión. upsertSession es idempotente. */
+  let dbHistory = [];
+  try {
+    await db.upsertSession({
+      session_id: sessionId,
+      lang,
+      mode,
+    });
+    const turns = await db.listTurns(sessionId);
+    dbHistory = turnsToHistory(turns);
+  } catch (e) {
+    console.warn(`[chat] BD no disponible: ${e.message}. Uso fallback history del frontend.`);
   }
 
-  /* Handoff a Invoice Ninja. Si falla la facturación, devolvemos el HTML
-     de Alma + un mensaje de error explicado para que el cliente reintente,
-     pero no rompemos la conversación. */
-  try {
-    const customer = extractBilling(extracted);
-    const items    = extractItems(extracted);
-    if (!customer.email) throw new Error("Email del cliente faltante en extracted_data");
-    if (items.length === 0) throw new Error("Sin productos seleccionados en extracted_data");
+  const history = dbHistory.length > 0 ? dbHistory : fallbackHistory;
 
-    const result = await emergencyCheckout(
-      {
-        customer,
-        items,
-        notes:
-          (extracted.service_type ? `Servicio: ${extracted.service_type}\n` : "") +
-          (extracted.location     ? `Ubicación: ${extracted.location}\n`    : "") +
-          (extracted.religion     ? `Religión: ${extracted.religion}`       : ""),
-      },
-      env,
-      executionCtx,
-    );
+  console.log(
+    `[chat] session=${sessionId} hist=${history.length} (db=${dbHistory.length}, fb=${fallbackHistory.length}) msg="${message.slice(0, 80)}"`,
+  );
 
+  /* 2. Persistir turno del usuario en background. */
+  const userTurnPromise = db
+    .insertTurn({ session_id: sessionId, role: "user", content: message })
+    .catch((e) => console.warn(`[chat] insertTurn(user) failed: ${e.message}`));
+  if (executionCtx?.waitUntil) executionCtx.waitUntil(userTurnPromise);
+
+  /* 3. Llamar al agente. */
+  const result = await runAlma(
+    { sessionId, message, history, lang },
+    env,
+    executionCtx,
+  );
+
+  /* 4. Persistir todos los events del agente + (si aplica) actualizar
+        chat_sessions con factura y datos del cliente.                          */
+  const persistPromise = (async () => {
+    await persistEvents(db, sessionId, result.events, result.model);
+    if (result.finalize) {
+      const c = result.customer || {};
+      await db
+        .updateSession(sessionId, {
+          finalized:          true,
+          invoice_id:         result.invoiceId      || null,
+          invoice_number:     result.invoiceNumber  || null,
+          invoice_total:      result.total          ? Number(result.total) : null,
+          invitation_link:    result.invitationLink || null,
+          customer_email:     c.email     || null,
+          customer_name:      c.name      || null,
+          customer_phone:     c.phone     || null,
+          customer_id_number: c.id_number || null,
+          customer_address:   c.address   || null,
+          product_keys:       result.productKeys || null,
+          notes:              result.notes        || null,
+        })
+        .catch((e) => console.warn(`[chat] updateSession failed: ${e.message}`));
+    }
+  })();
+  if (executionCtx?.waitUntil) {
+    executionCtx.waitUntil(persistPromise);
+  } else {
+    await persistPromise;
+  }
+
+  if (result.finalize) {
     console.log(
       `[chat] finalize ok session=${sessionId} invoice=${result.invoiceNumber}`,
     );
-
-    return {
-      output,
-      finalize:       true,
-      invoiceNumber:  result.invoiceNumber,
-      invitationLink: result.invitationLink,
-      total:          result.invoiceTotal,
-      isNewClient:    result.isNewClient,
-    };
-  } catch (e) {
-    console.error(`[chat] finalize FAILED session=${sessionId}: ${e.message}`);
-    return {
-      output,
-      finalize:      true,
-      error:         "No pudimos generar la factura. Por favor llámanos al 0414-XXX-XXXX o reintenta.",
-      errorDetail:   e.message,
-    };
   }
+
+  /* 5. Devolver al frontend el contrato (sin `events` para no inflar response). */
+  return {
+    output:         result.output,
+    finalize:       result.finalize || undefined,
+    invoiceNumber:  result.invoiceNumber || undefined,
+    invitationLink: result.invitationLink || undefined,
+    total:          result.total || undefined,
+    isNewClient:    result.isNewClient || undefined,
+  };
 }

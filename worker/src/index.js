@@ -36,13 +36,16 @@ export default {
       }
       return json({
         ok: true,
-        service:        "legado-checkout",
-        env:            env.ENVIRONMENT,
-        tokenLoaded:    !!env.IN_TOKEN,
-        inBase:         env.IN_BASE,
-        emailMode:      env.EMAIL_MODE || "explicit",
-        almaConfigured: !!env.ALMA_WEBHOOK_URL,
-        allowedOrigins: getAllowedOrigins(env),
+        service:            "legado-checkout",
+        env:                env.ENVIRONMENT,
+        tokenLoaded:        !!env.IN_TOKEN,
+        inBase:             env.IN_BASE,
+        emailMode:          env.EMAIL_MODE || "explicit",
+        geminiConfigured:   !!env.GEMINI_API_KEY,
+        geminiModel:        env.GEMINI_MODEL || "gemini-2.5-flash",
+        supabaseConfigured: !!(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY),
+        supabaseUrl:        env.SUPABASE_URL || null,
+        allowedOrigins:     getAllowedOrigins(env),
       });
     }
 
