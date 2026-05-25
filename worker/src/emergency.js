@@ -57,14 +57,27 @@ async function resolveEmergencyClient(IN, customer) {
   return { id: created.id, isNew: true };
 }
 
-async function resolveUrgencyProducts(IN, productKeys) {
+async function resolveUrgencyProducts(IN, productKeys, partnerBrand) {
   if (!Array.isArray(productKeys) || productKeys.length === 0) {
     throw new Error("Lista de servicios vacía");
   }
   const resp = await IN.listProducts();
+  const brand = (partnerBrand || "").trim();
+  /* Filtramos siempre por catálogo 'urgencias'. Si vino partnerBrand, además
+     por custom_value3 — esto evita que el bot facture servicios de FZulia
+     bajo el aliado de Caracas, o viceversa. Sin partnerBrand caemos a la
+     búsqueda en todo el catálogo (fallback de compatibilidad). */
   const urg  = (resp.data || []).filter(
-    (p) => !p.is_deleted && p.custom_value1 === "urgencias",
+    (p) =>
+      !p.is_deleted &&
+      p.custom_value1 === "urgencias" &&
+      (!brand || (p.custom_value3 || "") === brand),
   );
+  if (brand && urg.length === 0) {
+    throw new Error(
+      `No hay productos urgencias para el aliado '${brand}'. Verifica que existan productos en Invoice Ninja con custom_value1=urgencias Y custom_value3=${brand}.`,
+    );
+  }
 
   /* El agente puede mandar cualquiera de varios identificadores del producto:
        - product_key   (SKU / nombre interno; es lo que devuelve /emergency-products)
@@ -88,6 +101,14 @@ async function resolveUrgencyProducts(IN, productKeys) {
       .normalize("NFD")
       .replace(DIACRITICS, "");
   const wanted = productKeys.map((k) => String(k).trim()).filter(Boolean);
+  /* Log diagnóstico: brand recibido + keys pedidas vs keys disponibles.
+     Útil cuando el bot pasa un key que no existe (typos, key partial,
+     key de otro aliado por confusión). */
+  console.log(
+    `[emergency] resolveUrgencyProducts brand=${brand || "(none)"} ` +
+    `wanted=${JSON.stringify(wanted)} ` +
+    `available=${JSON.stringify(urg.map((p) => p.product_key))}`,
+  );
 
   const found = wanted.map((key) => {
     const k = norm(key);
@@ -97,12 +118,24 @@ async function resolveUrgencyProducts(IN, productKeys) {
       (p) => norm(p.id)          === k,
       (p) => norm(p.notes)       === k,
       (p) => norm(p.notes).includes(k),
+      /* Última red de seguridad: incluye también product_key como substring
+         (ej: bot pide "Inhumación" y el real es "Inhumación tradicional"). */
+      (p) => norm(p.product_key).includes(k),
+      (p) => k.includes(norm(p.product_key)),
     ];
     for (const test of matchers) {
       const hit = urg.find(test);
       if (hit) return hit;
     }
-    throw new Error(`Producto urgencia no encontrado: '${key}'`);
+    /* Error con info diagnóstica para el modelo. El bot recibe esto en
+       tool_result y puede auto-corregirse o disculparse con contexto. */
+    const available = urg.map((p) => p.product_key).join(", ");
+    throw new Error(
+      `Producto urgencia no encontrado: '${key}'. ` +
+      (brand ? `Brand activo: '${brand}'. ` : "") +
+      `Productos disponibles: ${available || "(ninguno)"}. ` +
+      `Si el aliado no ofrece este servicio, propón otro del catálogo disponible.`,
+    );
   });
 
   return found;
@@ -112,13 +145,14 @@ export async function emergencyCheckout(input, env, executionCtx) {
   const customer = input.customer || {};
   const items    = input.items    || [];
   const notes    = (input.notes   || "").trim();
+  const partnerBrand = (input.partnerBrand || "").trim();
 
   const IN = createIN(env);
-  console.log(`[emergency] start email=${customer.email} items=${items.length}`);
+  console.log(`[emergency] start email=${customer.email} items=${items.length} brand=${partnerBrand || "(none)"}`);
 
   const client = await resolveEmergencyClient(IN, customer);
 
-  const products = await resolveUrgencyProducts(IN, items);
+  const products = await resolveUrgencyProducts(IN, items, partnerBrand);
 
   const today = new Date().toISOString().split("T")[0];
   const line_items = products.map((p) => ({

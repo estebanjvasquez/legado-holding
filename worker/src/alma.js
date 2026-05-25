@@ -110,7 +110,12 @@ B. CONTEXTO Y COBERTURA
    - Si aún no sabes la ciudad y estado, pregúntalo con suavidad.
    - APENAS conozcas la ciudad, llama la tool 'lookup_coverage' con esa ciudad. SOLO una vez por sesión: si ya la llamaste antes y tienes el resultado, no la repitas.
    - Si 'lookup_coverage' devuelve covered=false → discúlpate genuinamente, explica que esa zona aún no tiene un aliado directo, y entrega el teléfono de emergencia. NO avances al catálogo ni a la facturación. Termina ofreciéndote a quedarte conversando si lo necesita.
-   - Si covered=true → continúa al siguiente paso.
+   - Si covered=true → identifica EL ALIADO ACTIVO con esta regla:
+     · partners[] viene ordenado: primero los aliados con scope='city' (aliado directo de esa ciudad), luego los de scope='state' (cobertura estatal).
+     · TOMA EL PRIMERO. Ese es el aliado que coordina esta emergencia.
+     · Guarda mentalmente su 'brand' code (ej: "fzulia", "fcaracas") — lo usarás en list_emergency_products Y create_invoice.
+     · Comunica al usuario con calidez: "Coordinaremos con [nombre del aliado], nuestra funeraria aliada en [ciudad]". Eso da transparencia y confianza.
+   - Continúa al siguiente paso.
 
 C. DATOS DEL FALLECIDO (sólo si hay cobertura)
    - Con mucha delicadeza, conoce más sobre la persona que partió:
@@ -121,8 +126,11 @@ C. DATOS DEL FALLECIDO (sólo si hay cobertura)
    - No pidas todo a la vez. Conversa. Si el usuario ya mencionó alguno, NO lo vuelvas a pedir.
 
 D. PROPONER SERVICIOS
-   - Llama 'list_emergency_products' UNA vez para conocer el catálogo. NUNCA inventes productos ni precios.
+   - Llama 'list_emergency_products' UNA vez, pasando partner_brand=<brand del aliado elegido en paso B>. Sin esto verás precios mezclados de aliados que no aplican a esta ciudad.
+   - Si la respuesta tiene products=[] (vacío) significa que el aliado no tiene servicios cargados en Invoice Ninja. Discúlpate, deriva al teléfono y NO factures.
+   - NUNCA inventes productos ni precios.
    - Propón una combinación coherente con los datos que tienes (ej.: si el usuario habla de cremación, prioriza cremación). Muestra precios reales y total.
+   - Si el fallecido está en una ciudad distinta a la del aliado o la familia menciona repatriar/trasladar, SIEMPRE menciona el servicio de traslado nacional del aliado seleccionado (si existe en su catálogo) como opción explícita. No asumas que el usuario sabe que existe.
    - Espera el OK del usuario o sus ajustes.
 
 E. DATOS DEL CONTRATANTE
@@ -134,7 +142,7 @@ F. RESUMEN Y CONFIRMACIÓN
    - Pide confirmación EXPLÍCITA: "¿Confirmas para generar la factura?"
 
 G. FACTURAR
-   - SOLO después de la confirmación explícita: llama 'create_invoice' con todo (incluyendo deceased_name/relation/religion/age si se conocen).
+   - SOLO después de la confirmación explícita: llama 'create_invoice' con todo (incluyendo deceased_name/relation/religion/age si se conocen Y partner_brand=<mismo brand que usaste en list_emergency_products>).
    - Si la tool devuelve success:true, comunica al usuario que la factura fue enviada a su email y aparecerá un botón de pago seguro. NO inventes números de factura.
    - Si devuelve success:false, discúlpate y entrega el teléfono de emergencia.
 
@@ -143,7 +151,8 @@ REGLAS DURAS
 ══════════════════════════════════════════
 - SIN cobertura confirmada → NO facturar. Derivar a teléfono.
 - SIN email del contratante → no se puede emitir factura.
-- Productos solo desde 'list_emergency_products'. Nunca inventes precios.
+- Productos solo desde 'list_emergency_products' (con partner_brand del aliado elegido). Nunca inventes precios ni mezcles servicios de aliados distintos.
+- El partner_brand que pasas a list_emergency_products y a create_invoice DEBE SER EL MISMO en una misma sesión. No cambies de aliado a mitad de conversación a menos que el usuario diga explícitamente que la familia se mudó a otra ciudad.
 - Si el usuario pregunta por planes preventivos (no emergencia), explica brevemente que ese servicio se contrata en la sección de planes del sitio y vuelve al cuidado emocional.
 - Formato de salida: HTML simple permitido (p, ul, li, strong, br). El markdown NO se renderiza.
 - Teléfono de emergencia para derivar: ${EMERGENCY_PHONE}`;
@@ -169,17 +178,18 @@ Before each reply, re-read the full history and extract every detail the user ha
 PROCESS
 ══════════════════════════════════════════
 A. ACCOMPANY. Hold the grief. Do not advance until the user is ready.
-B. CONTEXT + COVERAGE. As soon as you know the city, call 'lookup_coverage'. If covered=false, apologize, give the emergency phone, and do NOT continue to billing.
+B. CONTEXT + COVERAGE. As soon as you know the city, call 'lookup_coverage'. If covered=false, apologize, give the emergency phone, and do NOT continue to billing. If covered=true, partners[] is ordered with city-direct partners first, then state-coverage partners. PICK THE FIRST as the active partner. Remember its 'brand' code. Tell the user "We'll coordinate with [partner name], our funeral partner in [city]".
 C. DECEASED. Gently learn about the person: name, relation, age, religion.
-D. SERVICES. Call 'list_emergency_products' once. Propose a fitting combination with real prices.
+D. SERVICES. Call 'list_emergency_products' once with partner_brand=<chosen partner's brand>. Without this you'll see mixed prices from partners that don't apply. If products=[] returns empty, apologize and derive to phone. Never invent prices. If the family may need cross-city transfer, surface the partner's national transfer service.
 E. CONTRACT HOLDER. Collect name, email (REQUIRED), phone, ID, address — don't repeat what you have.
 F. SUMMARY + EXPLICIT CONFIRMATION.
-G. INVOICE. Only after confirmation, call 'create_invoice'.
+G. INVOICE. Only after confirmation, call 'create_invoice' with partner_brand=<same as above>.
 
 HARD RULES
 - No coverage → no invoice; derive to phone.
 - No email → no invoice.
-- Products only from 'list_emergency_products'.
+- Products only from 'list_emergency_products' (with partner_brand). Never mix services from different partners.
+- partner_brand passed to list_emergency_products and to create_invoice MUST be the same within a session.
 - HTML output (p, ul, li, strong, br). No markdown.
 - Emergency phone: ${EMERGENCY_PHONE}`;
 
@@ -206,8 +216,17 @@ const TOOLS = [
       {
         name: "list_emergency_products",
         description:
-          "Devuelve el catálogo real de servicios funerarios de urgencia con product_key, precio y descripción. Llámala antes de proponer cualquier servicio.",
-        parameters: { type: "OBJECT", properties: {} },
+          "Devuelve el catálogo de servicios funerarios de urgencia del aliado seleccionado. SIEMPRE pasar partner_brand del aliado que devolvió lookup_coverage para mostrar SOLO los servicios y precios de ese aliado. Cada ciudad tiene su propio aliado con sus propios precios.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            partner_brand: {
+              type: "STRING",
+              description:
+                "Brand code del aliado seleccionado, exactamente como lo devolvió lookup_coverage en partners[].brand (ej: 'fzulia', 'fcaracas'). Si se omite o queda vacío, retorna todo el catálogo sin filtrar (sólo fallback de emergencia).",
+            },
+          },
+        },
       },
       {
         name: "create_invoice",
@@ -240,6 +259,7 @@ const TOOLS = [
             deceased_age:      { type: "INTEGER", description: "Edad del fallecido al momento del fallecimiento." },
             deceased_birth:    { type: "STRING", description: "Fecha de nacimiento del fallecido en formato YYYY-MM-DD si se conoce." },
             city:              { type: "STRING", description: "Ciudad donde está la familia (debe coincidir con lookup_coverage)." },
+            partner_brand:     { type: "STRING", description: "Brand code del aliado que ejecuta el servicio (mismo que pasaste a list_emergency_products). Necesario para validar que los product_keys pertenecen a ese aliado y no a otro." },
             notes:             { type: "STRING", description: "Cualquier nota adicional para la factura." },
           },
           required: ["customer", "product_keys"],
@@ -337,24 +357,39 @@ async function execLookupCoverage(args, env, db, emergencyPhone) {
   }
 }
 
-async function execListProducts(env) {
+async function execListProducts(env, partnerBrand) {
   const IN = createIN(env);
   const resp = await IN.listProducts();
-  const urg = (resp.data || [])
-    .filter((p) => !p.is_deleted && p.custom_value1 === "urgencias")
-    .map((p) => ({
+  const brand = (partnerBrand || "").trim();
+  const all = (resp.data || []).filter(
+    (p) => !p.is_deleted && p.custom_value1 === "urgencias",
+  );
+  /* Filtramos por brand del aliado seleccionado para que el bot vea SOLO
+     los servicios/precios de ese aliado. Si el bot no pasa brand (fallback
+     de emergencia o aliado único), retornamos todo el catálogo y loggeamos
+     un warning — no debería pasar en flujo normal. */
+  const filtered = brand ? all.filter((p) => (p.custom_value3 || "") === brand) : all;
+  if (!brand) {
+    console.warn(`[alma] list_emergency_products sin partner_brand — devolviendo ${all.length} items sin filtrar`);
+  } else if (filtered.length === 0) {
+    console.warn(`[alma] list_emergency_products: brand="${brand}" no matchea ningún producto en IN. Verifica custom_value3.`);
+  }
+  return {
+    partner_brand: brand || null,
+    products: filtered.map((p) => ({
       product_key: p.product_key,
       price:       Number(p.price) || 0,
       description: (p.notes || "").trim(),
       brand:       p.custom_value3 || "",
-    }));
-  return { products: urg };
+    })),
+  };
 }
 
 async function execCreateInvoice(args, env, executionCtx) {
   try {
     const customer = args.customer || {};
     const items    = Array.isArray(args.product_keys) ? args.product_keys : [];
+    const partnerBrand = (args.partner_brand || "").trim();
     if (!customer.email) {
       return { success: false, error: "Email del cliente faltante" };
     }
@@ -370,11 +405,12 @@ async function execCreateInvoice(args, env, executionCtx) {
     if (args.deceased_birth)    noteLines.push(`Fecha de nacimiento: ${args.deceased_birth}`);
     if (args.deceased_religion) noteLines.push(`Rito/Religión: ${args.deceased_religion}`);
     if (args.city)              noteLines.push(`Ciudad: ${args.city}`);
+    if (partnerBrand)           noteLines.push(`Aliado: ${partnerBrand}`);
     if (args.notes)             noteLines.push(`Notas: ${args.notes}`);
     const notes = noteLines.join("\n");
 
     const result = await emergencyCheckout(
-      { customer, items, notes },
+      { customer, items, notes, partnerBrand },
       env,
       executionCtx,
     );
@@ -533,7 +569,7 @@ export async function runAlma(input, env, executionCtx) {
             };
           }
         } else if (fc.name === "list_emergency_products") {
-          result = await execListProducts(env);
+          result = await execListProducts(env, fc.args && fc.args.partner_brand);
         } else if (fc.name === "create_invoice") {
           result = await execCreateInvoice(fc.args || {}, env, executionCtx);
           if (result.success) {
