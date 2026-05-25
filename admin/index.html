@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin — Legado Holding</title>
+  <style>
+    :root {
+      --bg:       #f6f5f2;
+      --surface:  #ffffff;
+      --border:   #e6e3da;
+      --text:     #1b1b1b;
+      --muted:    #6b6b6b;
+      --accent:   #b9974a;   /* dorado de la marca */
+      --accent-d: #8c7034;
+      --danger:   #b8332c;
+      --success:  #2d7a3f;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: var(--text); background: var(--bg); }
+    body { min-height: 100vh; }
+
+    /* ── Login modal ────────────────────────────────────────────── */
+    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 100; }
+    .modal-content { background: var(--surface); padding: 32px; border-radius: 8px; width: min(400px, 90vw); box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+    .modal-content h2 { margin: 0 0 16px; font-size: 20px; }
+    .modal-content p.hint { color: var(--muted); font-size: 13px; margin: 0 0 16px; }
+    .hidden { display: none !important; }
+
+    /* ── Layout ─────────────────────────────────────────────────── */
+    header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; align-items: center; gap: 24px; }
+    header h1 { font-size: 18px; margin: 0; padding: 16px 0; color: var(--accent-d); }
+    nav { display: flex; gap: 4px; flex: 1; }
+    .tab { background: none; border: none; padding: 16px 18px; font-size: 14px; cursor: pointer; color: var(--muted); border-bottom: 3px solid transparent; }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--accent-d); border-bottom-color: var(--accent); font-weight: 600; }
+    .logout { background: none; border: 1px solid var(--border); padding: 8px 14px; font-size: 13px; cursor: pointer; color: var(--muted); border-radius: 4px; }
+    .logout:hover { background: var(--bg); }
+
+    main { padding: 24px; max-width: 1300px; margin: 0 auto; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 20px; margin-bottom: 16px; }
+    .card h3 { margin: 0 0 12px; font-size: 16px; }
+    .card .row-actions { display: flex; gap: 12px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
+
+    /* ── Forms ──────────────────────────────────────────────────── */
+    input[type="text"], input[type="email"], input[type="number"], input[type="password"], textarea, select {
+      width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 4px; font-size: 14px; font-family: inherit; background: var(--surface); color: var(--text);
+    }
+    textarea { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 13px; line-height: 1.5; resize: vertical; }
+    input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); }
+    label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; margin-top: 12px; }
+    label.inline { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
+
+    button.btn { background: var(--accent); color: white; border: none; padding: 9px 16px; border-radius: 4px; font-size: 14px; cursor: pointer; font-weight: 500; }
+    button.btn:hover { background: var(--accent-d); }
+    button.btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    button.btn-secondary:hover { background: var(--bg); }
+    button.btn-danger { background: var(--danger); color: white; border: none; padding: 6px 12px; font-size: 13px; border-radius: 4px; cursor: pointer; }
+    button.btn-danger:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Tables ─────────────────────────────────────────────────── */
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    table th { text-align: left; padding: 10px; border-bottom: 2px solid var(--border); font-weight: 600; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+    table td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    table tr:hover td { background: rgba(185,151,74,0.04); }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+    .badge.active { background: #e6f4ea; color: var(--success); }
+    .badge.inactive { background: #f4e6e6; color: var(--danger); }
+    .badge.state-coverage { background: #fff3d6; color: #8a6d1f; }
+
+    .error { color: var(--danger); font-size: 13px; margin-top: 8px; }
+    .success { color: var(--success); font-size: 13px; margin-top: 8px; }
+    .muted { color: var(--muted); font-size: 13px; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 800px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    .session-detail { background: var(--bg); padding: 16px; border-radius: 4px; margin-top: 12px; font-family: ui-monospace, Consolas, monospace; font-size: 12px; white-space: pre-wrap; max-height: 500px; overflow-y: auto; }
+    .turn { padding: 8px; border-left: 3px solid var(--border); margin-bottom: 8px; }
+    .turn.user  { border-left-color: #4a90c2; }
+    .turn.model { border-left-color: var(--accent); }
+    .turn.tool  { border-left-color: var(--success); background: rgba(45,122,63,0.05); }
+    .turn .role { font-weight: 600; font-size: 11px; text-transform: uppercase; color: var(--muted); }
+  </style>
+</head>
+<body>
+
+  <!-- Login modal -->
+  <div id="login-modal" class="modal">
+    <div class="modal-content">
+      <h2>Legado — Acceso administrador</h2>
+      <p class="hint">Ingresa el ADMIN_TOKEN que cargaste como secret del Worker.</p>
+      <input type="password" id="login-token" placeholder="Admin token" autocomplete="off" />
+      <p id="login-error" class="error hidden"></p>
+      <button id="login-btn" class="btn" style="margin-top: 12px; width: 100%;">Entrar</button>
+    </div>
+  </div>
+
+  <!-- App -->
+  <div id="app" class="hidden">
+    <header>
+      <h1>LEGADO ADMIN</h1>
+      <nav>
+        <button class="tab active" data-tab="locations">Ubicaciones</button>
+        <button class="tab" data-tab="partners">Aliados</button>
+        <button class="tab" data-tab="agent">Agente</button>
+        <button class="tab" data-tab="sessions">Conversaciones</button>
+      </nav>
+      <button id="logout-btn" class="logout">Salir</button>
+    </header>
+
+    <main>
+      <!-- ─── Ubicaciones ──────────────────────────────────────── -->
+      <section id="tab-locations" class="tab-content active">
+        <div class="card">
+          <h3>Agregar ubicación</h3>
+          <div class="grid-2">
+            <div>
+              <label>Estado</label>
+              <input type="text" id="loc-state" placeholder="Ej: Distrito Capital" />
+            </div>
+            <div>
+              <label>Ciudad</label>
+              <input type="text" id="loc-city" placeholder="Ej: Caracas" />
+            </div>
+          </div>
+          <label class="inline" style="margin-top: 14px;">
+            <input type="checkbox" id="loc-is-capital" /> Es capital del estado
+          </label>
+          <div style="margin-top: 14px;">
+            <button id="loc-create-btn" class="btn">Crear ubicación</button>
+            <span id="loc-create-msg" class="muted"></span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="row-actions">
+            <h3 style="margin: 0;">Ubicaciones existentes</h3>
+            <label class="muted">Filtrar:</label>
+            <select id="loc-state-filter" style="width: auto;"></select>
+            <button id="loc-reload-btn" class="btn-secondary btn">Recargar</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Estado</th>
+                <th>Ciudad</th>
+                <th>Capital</th>
+                <th style="width: 180px;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="loc-tbody"><tr><td colspan="4" class="muted">Cargando...</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ─── Aliados ──────────────────────────────────────────── -->
+      <section id="tab-partners" class="tab-content">
+        <div class="card">
+          <h3>Agregar aliado</h3>
+          <div class="grid-2">
+            <div>
+              <label>Ubicación</label>
+              <select id="p-location"></select>
+              <p class="muted" style="margin: 4px 0 0;">Si activas "cubre todo el estado", este es solo el estado de referencia.</p>
+            </div>
+            <div>
+              <label>Nombre</label>
+              <input type="text" id="p-name" placeholder="Funeraria del Zulia" />
+            </div>
+            <div>
+              <label>Brand (debe coincidir con custom_value3 de Invoice Ninja)</label>
+              <input type="text" id="p-brand" placeholder="fzulia / aliados / ..." />
+            </div>
+            <div>
+              <label>Teléfono</label>
+              <input type="text" id="p-phone" placeholder="0261-..." />
+            </div>
+            <div>
+              <label>Email</label>
+              <input type="email" id="p-email" />
+            </div>
+            <div>
+              <label>Persona de contacto</label>
+              <input type="text" id="p-contact" />
+            </div>
+          </div>
+          <label>Dirección</label>
+          <input type="text" id="p-address" />
+          <label>Servicios (separados por coma)</label>
+          <input type="text" id="p-services" placeholder="cremacion, traslado_local, velorio" />
+          <label>Notas</label>
+          <textarea id="p-notes" rows="2"></textarea>
+          <div style="margin-top: 14px; display: flex; gap: 18px; flex-wrap: wrap;">
+            <label class="inline">
+              <input type="checkbox" id="p-state-coverage" /> Cubre todo el estado
+            </label>
+            <label class="inline">
+              <input type="checkbox" id="p-active" checked /> Activo
+            </label>
+          </div>
+          <div style="margin-top: 14px;">
+            <button id="p-create-btn" class="btn">Crear aliado</button>
+            <span id="p-create-msg" class="muted"></span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="row-actions">
+            <h3 style="margin: 0;">Aliados existentes</h3>
+            <button id="p-reload-btn" class="btn-secondary btn">Recargar</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Brand</th>
+                <th>Ubicación</th>
+                <th>Cobertura</th>
+                <th>Servicios</th>
+                <th>Estado</th>
+                <th style="width: 180px;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="p-tbody"><tr><td colspan="7" class="muted">Cargando...</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ─── Agente ──────────────────────────────────────────── -->
+      <section id="tab-agent" class="tab-content">
+        <div class="card">
+          <h3>Configuración del agente</h3>
+          <p class="muted">
+            El prompt admite el placeholder <code>{{emergency_phone}}</code> que se reemplaza por el teléfono configurado abajo.
+            Si dejas un prompt vacío, el Worker usa el default hard-coded de <code>worker/src/alma.js</code> (fallback).
+          </p>
+
+          <label>Modelo</label>
+          <select id="cfg-model">
+            <option value="gemini-2.5-flash">gemini-2.5-flash (rápido, recomendado)</option>
+            <option value="gemini-2.5-pro">gemini-2.5-pro (más potente, más caro)</option>
+            <option value="gemini-2.0-flash">gemini-2.0-flash (legacy)</option>
+            <option value="gemini-2.0-flash-exp">gemini-2.0-flash-exp</option>
+          </select>
+
+          <label>Temperature (0 = determinista, 1 = creativo)</label>
+          <input type="number" id="cfg-temperature" step="0.1" min="0" max="1" />
+
+          <label>Teléfono de emergencia (cuando no hay cobertura o falla la factura)</label>
+          <input type="text" id="cfg-emergency-phone" />
+
+          <label>System prompt en español</label>
+          <textarea id="cfg-prompt-es" rows="20" placeholder="Vacío = usar default de alma.js"></textarea>
+
+          <label>System prompt en inglés</label>
+          <textarea id="cfg-prompt-en" rows="14" placeholder="Vacío = usar default de alma.js"></textarea>
+
+          <div id="cfg-extra-container">
+            <h4 style="margin-top: 24px; font-size: 14px;">Otros valores configurables</h4>
+            <p class="muted" style="margin-top: 0;">Cualquier otra key en la tabla <code>agent_config</code> aparece aquí. Para agregar una nueva, escríbela en el formulario al final.</p>
+            <div id="cfg-extra"></div>
+          </div>
+
+          <div class="card" style="margin-top: 16px; background: var(--bg); border: 1px dashed var(--border);">
+            <h4 style="margin-top: 0; font-size: 14px;">Agregar nuevo valor configurable</h4>
+            <div class="grid-2">
+              <div>
+                <label>Key</label>
+                <input type="text" id="cfg-new-key" placeholder="ej: max_tool_hops" />
+              </div>
+              <div>
+                <label>Value</label>
+                <input type="text" id="cfg-new-value" />
+              </div>
+            </div>
+            <label>Descripción (opcional)</label>
+            <input type="text" id="cfg-new-desc" />
+            <div style="margin-top: 12px;">
+              <button id="cfg-new-btn" class="btn-secondary btn">Agregar key</button>
+            </div>
+          </div>
+
+          <div style="margin-top: 20px; display: flex; gap: 12px; align-items: center;">
+            <button id="cfg-save-btn" class="btn">Guardar configuración</button>
+            <button id="cfg-reload-btn" class="btn-secondary btn">Recargar</button>
+            <span id="cfg-msg" class="muted"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── Conversaciones ──────────────────────────────────── -->
+      <section id="tab-sessions" class="tab-content">
+        <div class="card">
+          <div class="row-actions">
+            <h3 style="margin: 0;">Conversaciones recientes</h3>
+            <button id="s-reload-btn" class="btn-secondary btn">Recargar</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Inicio</th>
+                <th>Session</th>
+                <th>Cliente</th>
+                <th>Ciudad/Fallecido</th>
+                <th>Factura</th>
+                <th style="width: 110px;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="s-tbody"><tr><td colspan="6" class="muted">Cargando...</td></tr></tbody>
+          </table>
+
+          <div id="s-detail" class="hidden">
+            <h4 style="margin-top: 24px;">Detalle de la sesión</h4>
+            <div id="s-detail-content" class="session-detail"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="admin.js"></script>
+</body>
+</html>

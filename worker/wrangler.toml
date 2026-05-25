@@ -29,3 +29,22 @@ EMAIL_MODE = "explicit"
 # (NO recomendado en prod). Requests sin Origin (curl/PowerShell) pasan
 # siempre porque no son sujetas a CORS.
 ALLOWED_ORIGINS = "https://legadoholding.com,https://www.legadoholding.com,http://localhost:5500,http://127.0.0.1:5500,http://localhost:8000,http://127.0.0.1:8000,http://localhost:8080,http://127.0.0.1:8080"
+
+# Modelo de Gemini que ejecuta el agente Alma directamente en el Worker.
+# Ya no se llama a n8n: el loop de function calling vive en src/alma.js.
+# Cambiar aquí si quieres probar otro modelo (gemini-2.0-flash, gemini-2.5-pro, etc.).
+# El secret se carga con: cd worker && wrangler secret put GEMINI_API_KEY
+GEMINI_MODEL = "gemini-2.5-flash"
+
+# Supabase: memoria persistente del bot (chat_sessions) + logs de turnos
+# (chat_turns) para analytics y debugging. URL pública del proyecto; el
+# service_role key se carga aparte como secret:
+#   cd worker && wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+# Si SUPABASE_URL o el secret faltan, el chat sigue funcionando (no-op fallback).
+SUPABASE_URL = "https://naebpcyphdcopndqovie.supabase.co"
+
+# Observability deshabilitado explícito. En wrangler 4.x se activaba por
+# defecto y requiere entitlement del plan; sin él el deploy fallaba con
+# code 10007 entitlements.not_available.
+[observability]
+enabled = false

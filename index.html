@@ -58,6 +58,9 @@
                 PLANS_API_URL: __isDev
                     ? "http://localhost:8787/products"
                     : "https://api.legadoholding.com/products",
+                CHAT_API_URL: __isDev
+                    ? "http://localhost:8787/chat"
+                    : "https://api.legadoholding.com/chat",
             };
         </script>
     </head>
@@ -84,6 +87,13 @@
                         >
                         <a href="#contacto" data-i18n="nav_contacto"
                             >Contacto</a
+                        >
+                        <a
+                            href="https://invoicing.legadoholding.com/client/login"
+                            target="_blank"
+                            rel="noopener"
+                            data-i18n="nav_portal"
+                            >Portal Clientes</a
                         >
 
                         <!-- Botón idioma ES/EN (JS lo gestiona) -->
@@ -155,6 +165,14 @@
                         class="mobile-nav-link"
                         data-i18n="nav_contacto"
                         >Contacto</a
+                    >
+                    <a
+                        href="https://invoicing.legadoholding.com/client/login"
+                        target="_blank"
+                        rel="noopener"
+                        class="mobile-nav-link"
+                        data-i18n="nav_portal"
+                        >Portal Clientes</a
                     >
                     <button
                         class="nav-lang-btn"
@@ -1144,6 +1162,9 @@
         <!-- ════════════════════════════════════════════════════════════
      SCRIPT — cargado al final del body
      ════════════════════════════════════════════════════════════ -->
+        <!-- DOMPurify (Cure53) — sanitiza HTML del bot Alma 2 antes de innerHTML.
+             Vendoreado en js/vendor para evitar dependencia de CDN externo. -->
+        <script src="js/vendor/purify.min.js"></script>
         <script src="js/main.js"></script>
         <script src="js/wizard-generic.js"></script>
     </body>

@@ -1637,6 +1637,77 @@ footer {
     height: 16px;
 }
 
+/* Cards que emite el agente Alma 2 (modo emergencia). El HTML viene del
+   prompt del agente; aquí sólo definimos los estilos. */
+.chat-bubble .service-card {
+    border: 1px solid var(--border);
+    background: var(--background);
+    border-radius: calc(var(--radius) - 0.1rem);
+    padding: 0.6rem 0.75rem;
+    margin: 0.4rem 0;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.chat-bubble .service-card .service-title {
+    font-weight: 600;
+    color: var(--foreground);
+    margin-bottom: 0.25rem;
+    font-size: 0.92rem;
+}
+.chat-bubble .service-card .service-desc {
+    color: var(--foreground);
+    opacity: 0.85;
+    font-size: 0.86rem;
+    line-height: 1.4;
+}
+.chat-bubble .service-card .service-desc b {
+    color: var(--foreground);
+}
+.chat-bubble .service-card .service-desc hr {
+    border: 0;
+    border-top: 1px solid var(--border);
+    margin: 0.4rem 0;
+}
+.chat-bubble .service-card .service-price {
+    margin-top: 0.4rem;
+    color: var(--gold);
+    font-weight: 700;
+    font-size: 0.95rem;
+}
+.chat-bubble .service-card .service-price small {
+    color: var(--foreground);
+    opacity: 0.7;
+    font-weight: 500;
+}
+
+/* Botón "Pagar ahora" — aparece tras finalize con invitation_link de IN. */
+.chat-pay-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 0.7rem 1.1rem;
+    border-radius: var(--radius);
+    background: var(--gradient-gold);
+    color: var(--primary);
+    font-weight: 700;
+    font-size: 0.95rem;
+    text-decoration: none;
+    box-shadow: 0 2px 6px rgba(201, 168, 76, 0.35);
+    transition:
+        transform 0.15s,
+        box-shadow 0.15s;
+}
+.chat-pay-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(201, 168, 76, 0.45);
+}
+.chat-pay-btn small {
+    font-weight: 500;
+    font-size: 0.75rem;
+    opacity: 0.8;
+}
+
 /* =============================================================================
    20. WIZARD MODAL (4 pasos)
    ─────────────────────────────────────────────────────────────────────────────

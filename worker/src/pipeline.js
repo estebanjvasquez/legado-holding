@@ -12,6 +12,28 @@
    ============================================================================= */
 
 import { createIN } from "./invoiceninja.js";
+import { ValidationError } from "./errors.js";
+
+/* Sanitiza un campo de texto que va a parar a Invoice Ninja como nombre
+   o nota. Elimina < y > para prevenir stored XSS contra el backoffice de IN
+   (que renderiza estos campos en su admin/emails); trim, normaliza espacios
+   y trunca a una longitud razonable. Para campos que no son texto libre
+   (cedula, zip), basta con trim + truncate. */
+function sanitizeText(s, maxLen = 200) {
+  if (s === null || s === undefined) return "";
+  return String(s)
+    .replace(/[<>]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxLen);
+}
+
+const MAX_FAMILY = 6;
+const VALID_PAYMENT_TYPES = ["monthly", "annual"];
+const VALID_PLANS = [
+  "esencial-zulia", "vanguardia-zulia",
+  "esencial-selecto", "vanguardia-selecto",
+];
 
 const SLUG_TO_IN = {
   "esencial-selecto":   "esencial-ven",
@@ -27,19 +49,36 @@ const PLAN_NAMES = {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/* ── 1. Parse & validate ───────────────────────────────────────────────── */
+/* ── 1. Parse & validate ─────────────────────────────────────────────────
+   Toda validación de inputs lanza ValidationError → index.js responde 400. */
 function normalize(body) {
   const intent      = (body.intent      || "").toLowerCase();
   const plan        = body.plan         || null;
   const paymentType = (body.paymentType || "monthly").toLowerCase();
   const buyer       = body.buyer        || {};
 
-  const buyerName     = (buyer.name     || "").trim();
-  const buyerLastName = (buyer.lastName || "").trim();
-  const buyerEmail    = (buyer.email    || "").toLowerCase().trim();
+  const buyerName     = sanitizeText(buyer.name,     100);
+  const buyerLastName = sanitizeText(buyer.lastName, 100);
+  const buyerEmail    = (buyer.email   || "").toLowerCase().trim().slice(0, 254);
 
-  if (!buyerEmail) throw new Error("Email del comprador es requerido");
-  if (!plan)       throw new Error("Plan es requerido");
+  if (!buyerEmail)    throw new ValidationError("Email del comprador es requerido");
+  if (!plan)          throw new ValidationError("Plan es requerido");
+
+  /* Validar plan contra whitelist ANTES de tocar IN. Antes este chequeo
+     vivía en buildInvoiceContext (después de crear el cliente), lo que
+     dejaba clientes huérfanos en IN cuando el slug era inválido.            */
+  if (!VALID_PLANS.includes(plan)) {
+    throw new ValidationError(
+      `Plan no reconocido: '${plan}'. Valores: ${VALID_PLANS.join(", ")}`,
+    );
+  }
+  /* paymentType: solo monthly o annual. Antes cualquier valor distinto de
+     'annual' se trataba silenciosamente como 'monthly'.                     */
+  if (!VALID_PAYMENT_TYPES.includes(paymentType)) {
+    throw new ValidationError(
+      `paymentType no reconocido: '${paymentType}'. Valores: ${VALID_PAYMENT_TYPES.join(", ")}`,
+    );
+  }
 
   const planFamily = SLUG_TO_IN[plan] || plan;
   const isVen      = planFamily.endsWith("-ven");
@@ -53,13 +92,20 @@ function normalize(body) {
   const frequencyId    = paymentType === "annual" ? 10 : 5;
 
   const familyRaw = Array.isArray(body.family) ? body.family : [];
+  /* Tope de familiares: alinea backend con el frontend (max 6 en main.js).
+     Sin esto, una llamada directa al Worker podía mandar N familiares.      */
+  if (familyRaw.length > MAX_FAMILY) {
+    throw new ValidationError(
+      `Máximo ${MAX_FAMILY} familiares por póliza (recibidos: ${familyRaw.length})`,
+    );
+  }
   const family = familyRaw
     .map((f) => ({
-      name:      (f.name      || "").trim(),
-      lastName:  (f.lastName  || "").trim(),
-      cedula:    (f.cedula    || "").trim(),
-      birthDate: (f.birthDate || "").trim(),
-      relation:  (f.relation  || f.kinship || "").trim(),
+      name:      sanitizeText(f.name,      80),
+      lastName:  sanitizeText(f.lastName,  80),
+      cedula:    sanitizeText(f.cedula,    40),
+      birthDate: sanitizeText(f.birthDate, 12),
+      relation:  sanitizeText(f.relation || f.kinship, 40),
     }))
     .filter((f) => f.name || f.lastName);
 
@@ -275,16 +321,22 @@ async function createInvoices(IN, ctx, invCtx, executionCtx) {
   console.log(`send_now triggered for ${recurringId}`);
 
   /* Polling — el cron de IN genera la primera factura asíncronamente.
-     Patrón: chequear primero (suele estar listo), dormir entre intentos
-     con intervalos cortos (400ms). Hasta 12 intentos = ~4.4s worst case. */
+     Patrón: chequear primero (suele estar listo), luego backoff escalonado:
+     ráfaga inicial rápida (100/200ms) porque el caso común es factura lista
+     en <500ms, luego se relaja a 400/500ms si IN está lento. 13 intentos
+     totales, ~4.4s worst case. Cambio respecto a 12×400ms: misma cota pero
+     latencia mediana ~mitad porque chequeamos 4 veces en el primer segundo
+     vs 2 veces antes. */
+  const POLL_DELAYS_MS = [100, 100, 200, 200, 400, 400, 500, 500, 500, 500, 500, 500];
+  const MAX_POLL_ATTEMPTS = POLL_DELAYS_MS.length + 1;
   let firstInvoice = null;
-  for (let attempt = 0; attempt < 12 && !firstInvoice; attempt++) {
-    if (attempt > 0) await sleep(400);
+  for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS && !firstInvoice; attempt++) {
+    if (attempt > 0) await sleep(POLL_DELAYS_MS[attempt - 1]);
     const listResp = await IN.listInvoicesByClient(ctx.clientId);
     const list = (listResp.data || []).filter(
       (inv) => inv.recurring_id === recurringId,
     );
-    console.log(`Poll ${attempt + 1}/12: ${list.length} matches`);
+    console.log(`Poll ${attempt + 1}/${MAX_POLL_ATTEMPTS}: ${list.length} matches`);
     if (list.length > 0) firstInvoice = list[0];
   }
 
@@ -344,10 +396,14 @@ export async function processCheckout(body, env, executionCtx) {
   const IN = createIN(env);
   console.log(`Checkout start: plan=${ctx.plan} email=${ctx.customerEmail}`);
 
-  ctx.clientId = await resolveClient(IN, ctx);
-
+  /* Validamos contexto del plan ANTES de tocar clientes. Si el plan no
+     existe en el catálogo de IN, buildInvoiceContext lanza y no llegamos a
+     crear el cliente — evitamos clientes huérfanos asociados a planes
+     fantasma (BUG-001).                                                     */
   const invCtx = await buildInvoiceContext(IN, ctx);
   console.log(`Context built: strategy=${invCtx.strategy} sub=${invCtx.subscriptionId}`);
+
+  ctx.clientId = await resolveClient(IN, ctx);
 
   const result = await createInvoices(IN, ctx, invCtx, executionCtx);
   console.log(`Invoice ${result.invoiceNumber} generated, link=${result.invitationLink ? "ok" : "missing"}`);

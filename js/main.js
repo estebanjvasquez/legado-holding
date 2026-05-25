@@ -26,9 +26,14 @@
 
 /* =============================================================================
    CONFIG
-   ▶ CAMBIA ESTA URL por la de tu webhook de n8n
+   ─────────────────────────────────────────────────────────────────────────────
+   El chat de emergencia habla con el Worker (api.legadoholding.com/chat), que
+   a su vez proxea al agente Alma 2 en n8n y al final emite la factura en
+   Invoice Ninja. En dev apunta al wrangler local; en prod al subdominio api.
    ============================================================================= */
-const CHAT_WEBHOOK_URL = "https://TU-N8N-WEBHOOK-URL/webhook/chat"; // ← CAMBIAR
+const CHAT_WEBHOOK_URL =
+  (typeof window !== "undefined" && window.LEGADO_CONFIG?.CHAT_API_URL) ||
+  "https://api.legadoholding.com/chat";
 
 const WIZARD_WEBHOOK_URL =
   (typeof window !== "undefined" && window.LEGADO_CONFIG?.WIZARD_WEBHOOK_URL) ||
@@ -58,6 +63,7 @@ const LANG = {
   nav_planes: ["Planes", "Plans"],
   nav_como: ["Cómo funciona", "How it works"],
   nav_contacto: ["Contacto", "Contact"],
+  nav_portal: ["Portal Clientes", "Client Portal"],
   nav_cta: ["PROTEGE TU LEGADO", "PROTECT YOUR LEGACY"],
 
   /* ── Hero (sobre fondo de foto de los abuelos) ─────────────────────────── */
@@ -1020,15 +1026,68 @@ function closeChat() {
   $("#chatbot-overlay").classList.add("hidden");
 }
 
+/* Alma 2 (modo emergencia) emite HTML con cards. Para los mensajes normales
+   se mantiene el render markdown. Usamos DOMPurify (Cure53) porque el contenido
+   del agente puede incluir fragmentos del prompt del usuario y un sanitizador
+   por regex no es seguro contra payloads XSS sofisticados (mutation XSS,
+   namespaces SVG/MathML, parser confusion). DOMPurify usa el parser nativo
+   del browser y un whitelist estricto.
+
+   Si DOMPurify no cargó (CDN caído, JS deshabilitado en vendor), caemos a
+   escapeHTML para no romper la página — sin sanitizar significa NO inyectar
+   HTML, solo texto plano. */
+function sanitizeAgentHTML(html) {
+  const s = String(html);
+  if (typeof window.DOMPurify === "undefined") {
+    console.warn("DOMPurify no disponible — usando escape fallback");
+    return escapeHTML(s);
+  }
+  return window.DOMPurify.sanitize(s, {
+    /* Whitelist conservador para las cards de Alma. Si el bot empieza a
+       emitir tags adicionales legítimos, agregarlos aquí explícitamente. */
+    ALLOWED_TAGS: [
+      "p", "br", "strong", "em", "b", "i", "u", "span", "div",
+      "ul", "ol", "li", "a", "h1", "h2", "h3", "h4", "h5", "h6",
+      "blockquote", "code", "pre", "hr",
+    ],
+    ALLOWED_ATTR: ["href", "target", "rel", "class"],
+    /* Cualquier link debe abrir en pestaña nueva con noopener para evitar
+       tabnabbing. Los links a tel:/mailto:/https: pasan; el resto no. */
+    ALLOWED_URI_REGEXP: /^(?:(?:https?|tel|mailto):|\/|#)/i,
+    ADD_ATTR: ["target"],
+  });
+}
+
 function appendChatBubble(role, content) {
   const msgs = $("#chat-messages");
   const wrap = document.createElement("div");
   wrap.className = `chat-bubble-wrap ${role === "user" ? "user" : "bot"}`;
   const bubble = document.createElement("div");
   bubble.className = `chat-bubble ${role === "user" ? "user" : "bot"}${chatMode === "emergency" && role === "assistant" ? " emergency" : ""}`;
-  bubble.innerHTML =
-    role === "assistant" ? simpleMarkdown(content) : escapeHTML(content);
+  if (role === "user") {
+    bubble.innerHTML = escapeHTML(content);
+  } else if (chatMode === "emergency") {
+    bubble.innerHTML = sanitizeAgentHTML(content);
+  } else {
+    bubble.innerHTML = simpleMarkdown(content);
+  }
   wrap.appendChild(bubble);
+  msgs.appendChild(wrap);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+/* Botón "Pagar ahora" que aparece tras finalize → factura en Invoice Ninja.
+   El invitation_link abre el portal de pago de IN en pestaña nueva. */
+function appendPayButton(invitationLink, invoiceNumber, total) {
+  const msgs = $("#chat-messages");
+  const wrap = document.createElement("div");
+  wrap.className = "chat-bubble-wrap bot";
+  const safe = String(invitationLink).replace(/"/g, "&quot;");
+  wrap.innerHTML = `
+    <a class="chat-pay-btn" href="${safe}" target="_blank" rel="noopener">
+      <span>Pagar ahora${total ? " · $" + escapeHTML(String(total)) + " USD" : ""}</span>
+      <small>${invoiceNumber ? "Factura " + escapeHTML(String(invoiceNumber)) : ""}</small>
+    </a>`;
   msgs.appendChild(wrap);
   msgs.scrollTop = msgs.scrollHeight;
 }
@@ -1060,29 +1119,42 @@ async function sendChatMessage() {
   showTypingIndicator();
 
   try {
+    /* history: turnos previos en formato {role, content}. El turno del usuario
+       actual NO va aquí (recién se hizo push) — va en `message`. Tope de 20
+       turnos previos para no inflar el request en conversaciones largas. */
+    const history = chatMessages.slice(-21, -1);
     const resp = await fetch(CHAT_WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        message: text,
-        messages: chatMessages,
-        mode: chatMode,
         sessionId: chatSessionId,
-        lang: currentLang,
+        message:   text,
+        mode:      chatMode,
+        lang:      currentLang,
+        history,
       }),
     });
     removeTypingIndicator();
-    if (!resp.ok) throw new Error("HTTP " + resp.status);
-    const data = await resp.json();
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok && !data.output) {
+      throw new Error(data.error || "HTTP " + resp.status);
+    }
     const reply =
+      data?.output ||
       data?.response ||
       data?.message ||
-      data?.content ||
-      data?.text ||
-      (Array.isArray(data) ? data[0]?.response || data[0]?.message : null) ||
       t(chatMode === "emergency" ? "chat_error_emergency" : "chat_error");
     chatMessages.push({ role: "assistant", content: reply });
     appendChatBubble("assistant", reply);
+
+    /* Si Alma 2 cerró el flujo y el Worker emitió la factura, mostramos
+       botón de pago. Si la facturación falló (error en data.error), pasamos
+       el mensaje del Worker como burbuja de error sin tumbar la conversación. */
+    if (data.finalize && data.invitationLink) {
+      appendPayButton(data.invitationLink, data.invoiceNumber, data.total);
+    } else if (data.finalize && data.error) {
+      appendChatBubble("assistant", data.error);
+    }
   } catch (e) {
     console.error("Chat error:", e);
     removeTypingIndicator();
