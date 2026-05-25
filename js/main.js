@@ -1027,17 +1027,35 @@ function closeChat() {
 }
 
 /* Alma 2 (modo emergencia) emite HTML con cards. Para los mensajes normales
-   se mantiene el render markdown. Sanitiza tags peligrosos en cualquier caso
-   ya que el contenido del agente incluye fragmentos del prompt del usuario. */
+   se mantiene el render markdown. Usamos DOMPurify (Cure53) porque el contenido
+   del agente puede incluir fragmentos del prompt del usuario y un sanitizador
+   por regex no es seguro contra payloads XSS sofisticados (mutation XSS,
+   namespaces SVG/MathML, parser confusion). DOMPurify usa el parser nativo
+   del browser y un whitelist estricto.
+
+   Si DOMPurify no cargó (CDN caído, JS deshabilitado en vendor), caemos a
+   escapeHTML para no romper la página — sin sanitizar significa NO inyectar
+   HTML, solo texto plano. */
 function sanitizeAgentHTML(html) {
-  return String(html)
-    .replace(
-      /<\s*(script|iframe|object|embed|style|link|meta)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi,
-      "",
-    )
-    .replace(/<\s*(script|iframe|object|embed|style|link|meta)\b[^>]*>/gi, "")
-    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-    .replace(/(href|src)\s*=\s*(["'])\s*javascript:[^"']*\2/gi, "");
+  const s = String(html);
+  if (typeof window.DOMPurify === "undefined") {
+    console.warn("DOMPurify no disponible — usando escape fallback");
+    return escapeHTML(s);
+  }
+  return window.DOMPurify.sanitize(s, {
+    /* Whitelist conservador para las cards de Alma. Si el bot empieza a
+       emitir tags adicionales legítimos, agregarlos aquí explícitamente. */
+    ALLOWED_TAGS: [
+      "p", "br", "strong", "em", "b", "i", "u", "span", "div",
+      "ul", "ol", "li", "a", "h1", "h2", "h3", "h4", "h5", "h6",
+      "blockquote", "code", "pre", "hr",
+    ],
+    ALLOWED_ATTR: ["href", "target", "rel", "class"],
+    /* Cualquier link debe abrir en pestaña nueva con noopener para evitar
+       tabnabbing. Los links a tel:/mailto:/https: pasan; el resto no. */
+    ALLOWED_URI_REGEXP: /^(?:(?:https?|tel|mailto):|\/|#)/i,
+    ADD_ATTR: ["target"],
+  });
 }
 
 function appendChatBubble(role, content) {

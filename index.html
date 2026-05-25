@@ -1162,6 +1162,9 @@
         <!-- ════════════════════════════════════════════════════════════
      SCRIPT — cargado al final del body
      ════════════════════════════════════════════════════════════ -->
+        <!-- DOMPurify (Cure53) — sanitiza HTML del bot Alma 2 antes de innerHTML.
+             Vendoreado en js/vendor para evitar dependencia de CDN externo. -->
+        <script src="js/vendor/purify.min.js"></script>
         <script src="js/main.js"></script>
         <script src="js/wizard-generic.js"></script>
     </body>
