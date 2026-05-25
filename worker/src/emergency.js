@@ -101,6 +101,14 @@ async function resolveUrgencyProducts(IN, productKeys, partnerBrand) {
       .normalize("NFD")
       .replace(DIACRITICS, "");
   const wanted = productKeys.map((k) => String(k).trim()).filter(Boolean);
+  /* Log diagnóstico: brand recibido + keys pedidas vs keys disponibles.
+     Útil cuando el bot pasa un key que no existe (typos, key partial,
+     key de otro aliado por confusión). */
+  console.log(
+    `[emergency] resolveUrgencyProducts brand=${brand || "(none)"} ` +
+    `wanted=${JSON.stringify(wanted)} ` +
+    `available=${JSON.stringify(urg.map((p) => p.product_key))}`,
+  );
 
   const found = wanted.map((key) => {
     const k = norm(key);
@@ -110,12 +118,24 @@ async function resolveUrgencyProducts(IN, productKeys, partnerBrand) {
       (p) => norm(p.id)          === k,
       (p) => norm(p.notes)       === k,
       (p) => norm(p.notes).includes(k),
+      /* Última red de seguridad: incluye también product_key como substring
+         (ej: bot pide "Inhumación" y el real es "Inhumación tradicional"). */
+      (p) => norm(p.product_key).includes(k),
+      (p) => k.includes(norm(p.product_key)),
     ];
     for (const test of matchers) {
       const hit = urg.find(test);
       if (hit) return hit;
     }
-    throw new Error(`Producto urgencia no encontrado: '${key}'`);
+    /* Error con info diagnóstica para el modelo. El bot recibe esto en
+       tool_result y puede auto-corregirse o disculparse con contexto. */
+    const available = urg.map((p) => p.product_key).join(", ");
+    throw new Error(
+      `Producto urgencia no encontrado: '${key}'. ` +
+      (brand ? `Brand activo: '${brand}'. ` : "") +
+      `Productos disponibles: ${available || "(ninguno)"}. ` +
+      `Si el aliado no ofrece este servicio, propón otro del catálogo disponible.`,
+    );
   });
 
   return found;
