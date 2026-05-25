@@ -13,6 +13,7 @@ import { createIN } from "./invoiceninja.js";
 import { processCheckout } from "./pipeline.js";
 import { handleChat } from "./chat.js";
 import { handleAdmin } from "./admin.js";
+import { isValidationError } from "./errors.js";
 
 export default {
   async fetch(request, env, executionCtx) {
@@ -76,9 +77,15 @@ export default {
         const result = await handleChat(body, env, executionCtx);
         return json(result, 200);
       } catch (e) {
-        console.error("Chat error:", e.message);
-        if (e.stack) console.error(e.stack);
-        return json({ output: "", error: e.message }, 500);
+        const isValidation = isValidationError(e);
+        if (!isValidation) {
+          console.error("Chat error:", e.message);
+          if (e.stack) console.error(e.stack);
+        }
+        return json(
+          { output: "", error: e.message },
+          isValidation ? 400 : 500,
+        );
       }
     }
 
@@ -86,9 +93,15 @@ export default {
       const result = await processCheckout(body, env, executionCtx);
       return json(result, result.success ? 200 : 400);
     } catch (e) {
-      console.error("Pipeline error:", e.message);
-      if (e.stack) console.error(e.stack);
-      return json({ success: false, message: e.message }, 500);
+      const isValidation = isValidationError(e);
+      if (!isValidation) {
+        console.error("Pipeline error:", e.message);
+        if (e.stack) console.error(e.stack);
+      }
+      return json(
+        { success: false, message: e.message },
+        isValidation ? 400 : 500,
+      );
     }
   },
 };

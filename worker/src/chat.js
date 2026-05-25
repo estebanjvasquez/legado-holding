@@ -19,6 +19,15 @@
 
 import { runAlma } from "./alma.js";
 import { createSupabase } from "./supabase.js";
+import { ValidationError } from "./errors.js";
+
+/* Límites duros para evitar abuso de costos (cada mensaje al chat cuesta
+   tokens de Gemini) y para mantener Supabase saludable. Si un cliente
+   legítimo necesita más espacio, levantarlos aquí.                          */
+const MAX_SESSION_ID  = 128;
+const MAX_MESSAGE     = 4000;
+const MAX_HISTORY_LEN = 40;
+const MAX_HISTORY_ITEM = 6000;
 
 /* Convierte rows de chat_turns (con role 'user'/'model'/'tool') al formato
    {role, content} que espera alma.runAlma. Los turnos 'tool' se filtran
@@ -64,10 +73,22 @@ export async function handleChat(body, env, executionCtx) {
   const message   = (body.message || body.chatInput || "").trim();
   const lang      = (body.lang || "es").trim();
   const mode      = (body.mode || "emergency").trim();
-  const fallbackHistory = Array.isArray(body.history) ? body.history : [];
+  const rawHistory = Array.isArray(body.history) ? body.history : [];
 
-  if (!sessionId) throw new Error("sessionId requerido");
-  if (!message)   throw new Error("message requerido");
+  if (!sessionId) throw new ValidationError("sessionId requerido");
+  if (!message)   throw new ValidationError("message requerido");
+  if (sessionId.length > MAX_SESSION_ID) {
+    throw new ValidationError(`sessionId excede ${MAX_SESSION_ID} caracteres`);
+  }
+  if (message.length > MAX_MESSAGE) {
+    throw new ValidationError(`mensaje excede ${MAX_MESSAGE} caracteres`);
+  }
+  /* Truncamos historial defensivamente: si el frontend manda muchos turnos
+     o turnos enormes, los limitamos para no inflar la llamada a Gemini.     */
+  const fallbackHistory = rawHistory.slice(-MAX_HISTORY_LEN).map((m) => ({
+    role:    m && m.role ? String(m.role) : "user",
+    content: m && m.content ? String(m.content).slice(0, MAX_HISTORY_ITEM) : "",
+  }));
 
   const db = createSupabase(env);
 
