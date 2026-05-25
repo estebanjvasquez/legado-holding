@@ -57,14 +57,27 @@ async function resolveEmergencyClient(IN, customer) {
   return { id: created.id, isNew: true };
 }
 
-async function resolveUrgencyProducts(IN, productKeys) {
+async function resolveUrgencyProducts(IN, productKeys, partnerBrand) {
   if (!Array.isArray(productKeys) || productKeys.length === 0) {
     throw new Error("Lista de servicios vacía");
   }
   const resp = await IN.listProducts();
+  const brand = (partnerBrand || "").trim();
+  /* Filtramos siempre por catálogo 'urgencias'. Si vino partnerBrand, además
+     por custom_value3 — esto evita que el bot facture servicios de FZulia
+     bajo el aliado de Caracas, o viceversa. Sin partnerBrand caemos a la
+     búsqueda en todo el catálogo (fallback de compatibilidad). */
   const urg  = (resp.data || []).filter(
-    (p) => !p.is_deleted && p.custom_value1 === "urgencias",
+    (p) =>
+      !p.is_deleted &&
+      p.custom_value1 === "urgencias" &&
+      (!brand || (p.custom_value3 || "") === brand),
   );
+  if (brand && urg.length === 0) {
+    throw new Error(
+      `No hay productos urgencias para el aliado '${brand}'. Verifica que existan productos en Invoice Ninja con custom_value1=urgencias Y custom_value3=${brand}.`,
+    );
+  }
 
   /* El agente puede mandar cualquiera de varios identificadores del producto:
        - product_key   (SKU / nombre interno; es lo que devuelve /emergency-products)
@@ -112,13 +125,14 @@ export async function emergencyCheckout(input, env, executionCtx) {
   const customer = input.customer || {};
   const items    = input.items    || [];
   const notes    = (input.notes   || "").trim();
+  const partnerBrand = (input.partnerBrand || "").trim();
 
   const IN = createIN(env);
-  console.log(`[emergency] start email=${customer.email} items=${items.length}`);
+  console.log(`[emergency] start email=${customer.email} items=${items.length} brand=${partnerBrand || "(none)"}`);
 
   const client = await resolveEmergencyClient(IN, customer);
 
-  const products = await resolveUrgencyProducts(IN, items);
+  const products = await resolveUrgencyProducts(IN, items, partnerBrand);
 
   const today = new Date().toISOString().split("T")[0];
   const line_items = products.map((p) => ({
