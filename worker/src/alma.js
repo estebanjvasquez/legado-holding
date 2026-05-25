@@ -325,10 +325,14 @@ async function execLookupCoverage(args, env, db, emergencyPhone) {
     };
   } catch (e) {
     console.warn(`[alma] lookup_coverage error: ${e.message}`);
+    /* Fail-CLOSED: si no podemos verificar cobertura, NO asumimos que existe.
+       Vender un servicio que no podemos cumplir es peor que un falso negativo
+       que deriva al teléfono. El bot debe pedir disculpas y dar EMERGENCY_PHONE. */
     return {
-      covered: true,
-      indeterminate: true,
-      message: "No pude verificar cobertura ahora, pero puedes continuar con cuidado.",
+      covered:         false,
+      reason:          "verification_failed",
+      emergency_phone: emergencyPhone,
+      message:         `No pude verificar la cobertura en este momento por un error técnico. Por favor, deriva al teléfono de emergencia ${emergencyPhone}. NO factures.`,
     };
   }
 }
@@ -420,9 +424,14 @@ export async function runAlma(input, env, executionCtx) {
   }
 
   const model = (cfg.model && cfg.model.trim()) || env.GEMINI_MODEL || "gemini-2.5-flash";
+  /* Temperature default 0.3 — el agente sigue reglas estrictas (FASE 0,
+     primer turno sagrado, lookup_coverage obligatorio). A 0.7 el modelo
+     se desvía con frecuencia del prompt. 0.3 conserva calidez suficiente
+     para el tono empático pero respeta la estructura. El admin puede
+     subirlo desde agent_config si necesita más variedad. */
   const temperature = (() => {
     const t = parseFloat(cfg.temperature);
-    return Number.isFinite(t) ? t : 0.7;
+    return Number.isFinite(t) ? t : 0.3;
   })();
   const emergencyPhone =
     (cfg.emergency_phone && cfg.emergency_phone.trim()) || EMERGENCY_PHONE;
@@ -435,6 +444,12 @@ export async function runAlma(input, env, executionCtx) {
   const sysPrompt = (promptFromDb || promptHardcoded).replace(
     /\{\{\s*emergency_phone\s*\}\}/g,
     emergencyPhone,
+  );
+  /* Diagnóstico: nos dice si el bot está leyendo prompt de BD vs hardcoded
+     y si el FASE 0 está presente. Si en producción aparece source=db pero
+     has_fase0=false, hay un row stale en agent_config. */
+  console.log(
+    `[alma] prompt_source=${promptFromDb ? "db" : "hardcoded"} len=${sysPrompt.length} has_fase0=${sysPrompt.includes("FASE 0")} temp=${temperature}`,
   );
 
   const contents = historyToContents(input.history);
