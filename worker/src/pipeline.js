@@ -321,16 +321,22 @@ async function createInvoices(IN, ctx, invCtx, executionCtx) {
   console.log(`send_now triggered for ${recurringId}`);
 
   /* Polling — el cron de IN genera la primera factura asíncronamente.
-     Patrón: chequear primero (suele estar listo), dormir entre intentos
-     con intervalos cortos (400ms). Hasta 12 intentos = ~4.4s worst case. */
+     Patrón: chequear primero (suele estar listo), luego backoff escalonado:
+     ráfaga inicial rápida (100/200ms) porque el caso común es factura lista
+     en <500ms, luego se relaja a 400/500ms si IN está lento. 13 intentos
+     totales, ~4.4s worst case. Cambio respecto a 12×400ms: misma cota pero
+     latencia mediana ~mitad porque chequeamos 4 veces en el primer segundo
+     vs 2 veces antes. */
+  const POLL_DELAYS_MS = [100, 100, 200, 200, 400, 400, 500, 500, 500, 500, 500, 500];
+  const MAX_POLL_ATTEMPTS = POLL_DELAYS_MS.length + 1;
   let firstInvoice = null;
-  for (let attempt = 0; attempt < 12 && !firstInvoice; attempt++) {
-    if (attempt > 0) await sleep(400);
+  for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS && !firstInvoice; attempt++) {
+    if (attempt > 0) await sleep(POLL_DELAYS_MS[attempt - 1]);
     const listResp = await IN.listInvoicesByClient(ctx.clientId);
     const list = (listResp.data || []).filter(
       (inv) => inv.recurring_id === recurringId,
     );
-    console.log(`Poll ${attempt + 1}/12: ${list.length} matches`);
+    console.log(`Poll ${attempt + 1}/${MAX_POLL_ATTEMPTS}: ${list.length} matches`);
     if (list.length > 0) firstInvoice = list[0];
   }
 
