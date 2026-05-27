@@ -63,16 +63,14 @@ async function resolveUrgencyProducts(IN, productKeys, partnerBrand) {
   }
   const resp = await IN.listProducts();
   const brand = (partnerBrand || "").trim();
-  /* Filtramos siempre por catálogo 'urgencias'. Si vino partnerBrand, además
-     por custom_value4 (campo 'aliados' en IN). Fallback temporal a cv3
-     mientras se migran los productos en IN: si cv4 está vacío, usamos cv3.
-     Esto evita downtime durante la migración pero debe removerse cuando
-     todos los productos tengan cv4 seteado. */
+  /* Filtramos por catálogo 'urgencias' + brand del aliado en custom_value4
+     (campo 'aliados' en IN). Esto evita que el bot facture servicios de
+     un aliado bajo el código de otro. */
   const urg  = (resp.data || []).filter(
     (p) =>
       !p.is_deleted &&
       p.custom_value1 === "urgencias" &&
-      (!brand || ((p.custom_value4 || p.custom_value3) || "") === brand),
+      (!brand || (p.custom_value4 || "") === brand),
   );
   if (brand && urg.length === 0) {
     throw new Error(

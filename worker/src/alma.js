@@ -365,21 +365,15 @@ async function execListProducts(env, partnerBrand) {
     (p) => !p.is_deleted && p.custom_value1 === "urgencias",
   );
   /* El brand del aliado vive en custom_value4 (campo etiquetado 'aliados'
-     en Invoice Ninja). custom_value3 está reservado para planFamily de los
-     planes preventivos (wizard legadoweb).
-     Fallback temporal: si cv4 está vacío, leemos cv3 para no romper el
-     servicio durante la migración de datos en IN. El warning loggea qué
-     productos siguen en fallback para guiar la migración manual. */
-  const getBrand = (p) => ((p.custom_value4 || p.custom_value3) || "").trim();
+     en Invoice Ninja). custom_value3 está reservado para clasificación:
+     'urgencias-aliados' vs 'esencial-zulia' / 'vanguardia-zulia' / etc.
+     (planFamily de los planes preventivos del wizard legadoweb). */
+  const getBrand = (p) => (p.custom_value4 || "").trim();
   const filtered = brand ? all.filter((p) => getBrand(p) === brand) : all;
   if (!brand) {
     console.warn(`[alma] list_emergency_products sin partner_brand — devolviendo ${all.length} items sin filtrar`);
   } else if (filtered.length === 0) {
     console.warn(`[alma] list_emergency_products: brand="${brand}" no matchea ningún producto. Verifica custom_value4 (campo 'aliados') en IN.`);
-  }
-  const inFallback = filtered.filter((p) => !p.custom_value4 && p.custom_value3);
-  if (inFallback.length > 0) {
-    console.warn(`[alma] ${inFallback.length} producto(s) aún resuelven brand vía custom_value3 (legacy). Migrar a custom_value4: ${inFallback.map((p) => p.product_key).join(", ")}`);
   }
   return {
     partner_brand: brand || null,
