@@ -364,15 +364,22 @@ async function execListProducts(env, partnerBrand) {
   const all = (resp.data || []).filter(
     (p) => !p.is_deleted && p.custom_value1 === "urgencias",
   );
-  /* Filtramos por brand del aliado seleccionado para que el bot vea SOLO
-     los servicios/precios de ese aliado. Si el bot no pasa brand (fallback
-     de emergencia o aliado único), retornamos todo el catálogo y loggeamos
-     un warning — no debería pasar en flujo normal. */
-  const filtered = brand ? all.filter((p) => (p.custom_value3 || "") === brand) : all;
+  /* El brand del aliado vive en custom_value4 (campo etiquetado 'aliados'
+     en Invoice Ninja). custom_value3 está reservado para planFamily de los
+     planes preventivos (wizard legadoweb).
+     Fallback temporal: si cv4 está vacío, leemos cv3 para no romper el
+     servicio durante la migración de datos en IN. El warning loggea qué
+     productos siguen en fallback para guiar la migración manual. */
+  const getBrand = (p) => ((p.custom_value4 || p.custom_value3) || "").trim();
+  const filtered = brand ? all.filter((p) => getBrand(p) === brand) : all;
   if (!brand) {
     console.warn(`[alma] list_emergency_products sin partner_brand — devolviendo ${all.length} items sin filtrar`);
   } else if (filtered.length === 0) {
-    console.warn(`[alma] list_emergency_products: brand="${brand}" no matchea ningún producto en IN. Verifica custom_value3.`);
+    console.warn(`[alma] list_emergency_products: brand="${brand}" no matchea ningún producto. Verifica custom_value4 (campo 'aliados') en IN.`);
+  }
+  const inFallback = filtered.filter((p) => !p.custom_value4 && p.custom_value3);
+  if (inFallback.length > 0) {
+    console.warn(`[alma] ${inFallback.length} producto(s) aún resuelven brand vía custom_value3 (legacy). Migrar a custom_value4: ${inFallback.map((p) => p.product_key).join(", ")}`);
   }
   return {
     partner_brand: brand || null,
@@ -380,7 +387,7 @@ async function execListProducts(env, partnerBrand) {
       product_key: p.product_key,
       price:       Number(p.price) || 0,
       description: (p.notes || "").trim(),
-      brand:       p.custom_value3 || "",
+      brand:       getBrand(p),
     })),
   };
 }

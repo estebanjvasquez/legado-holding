@@ -64,18 +64,19 @@ async function resolveUrgencyProducts(IN, productKeys, partnerBrand) {
   const resp = await IN.listProducts();
   const brand = (partnerBrand || "").trim();
   /* Filtramos siempre por catálogo 'urgencias'. Si vino partnerBrand, además
-     por custom_value3 — esto evita que el bot facture servicios de FZulia
-     bajo el aliado de Caracas, o viceversa. Sin partnerBrand caemos a la
-     búsqueda en todo el catálogo (fallback de compatibilidad). */
+     por custom_value4 (campo 'aliados' en IN). Fallback temporal a cv3
+     mientras se migran los productos en IN: si cv4 está vacío, usamos cv3.
+     Esto evita downtime durante la migración pero debe removerse cuando
+     todos los productos tengan cv4 seteado. */
   const urg  = (resp.data || []).filter(
     (p) =>
       !p.is_deleted &&
       p.custom_value1 === "urgencias" &&
-      (!brand || (p.custom_value3 || "") === brand),
+      (!brand || ((p.custom_value4 || p.custom_value3) || "") === brand),
   );
   if (brand && urg.length === 0) {
     throw new Error(
-      `No hay productos urgencias para el aliado '${brand}'. Verifica que existan productos en Invoice Ninja con custom_value1=urgencias Y custom_value3=${brand}.`,
+      `No hay productos urgencias para el aliado '${brand}'. Verifica que existan productos en Invoice Ninja con custom_value1=urgencias Y custom_value4=${brand} (campo 'aliados').`,
     );
   }
 

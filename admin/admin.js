@@ -195,6 +195,29 @@ $("#loc-tbody").addEventListener("click", (e) => {
   if (action === "delete") LocationsCtrl.deleteRow(tr.dataset.id);
 });
 
+/* Genera un código de aliado (brand) a partir del nombre. El código va al
+   campo "aliados" (custom_value4) de cada producto en Invoice Ninja, así
+   que debe ser corto, ASCII, sin espacios. Convención: prefijo "f" +
+   palabra clave (ej: "Funeraria del Zulia" → "fzulia").
+   El admin puede editar manualmente si quiere otro código. */
+function generateBrandCode(name) {
+  /* RegExp con escape ASCII para los diacríticos (rango combining marks
+     U+0300..U+036F). Usar el literal /[̀-ͯ]/g rompe si el archivo se
+     re-codifica — el patrón explícito es portátil. */
+  const DIACRITICS = new RegExp("[\\u0300-\\u036f]", "g");
+  const STOPWORDS = /\b(funeraria|funerales|funerario|funerarios|servicios?|funeral|grupo|del|la|el|de|los|las|y|empresa)\b/g;
+  const norm = String(name || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(DIACRITICS, "")
+    .replace(/[^a-z0-9 ]/g, " ")
+    .replace(STOPWORDS, "")
+    .trim()
+    .replace(/\s+/g, "");
+  if (!norm) return "";
+  return (norm.startsWith("f") ? norm : "f" + norm).slice(0, 16);
+}
+
 /* ── Partners ─────────────────────────────────────────────────────────────── */
 const PartnersCtrl = {
   rows: [],
@@ -263,10 +286,17 @@ const PartnersCtrl = {
       notes:          $("#p-notes").value.trim() || null,
     };
     try {
-      await api("/admin/partners", { method: "POST", body: row });
+      const created = await api("/admin/partners", { method: "POST", body: row });
+      const savedBrand = (created && created.data && created.data.brand) || row.brand || "";
       ["p-name","p-brand","p-contact","p-phone","p-email","p-address","p-services","p-notes"].forEach((id) => $("#"+id).value = "");
       $("#p-state-coverage").checked = false; $("#p-active").checked = true;
-      msg.textContent = "Creado ✓"; msg.style.color = "var(--success)";
+      brandTouched = false;
+      /* Mensaje destacado: el admin debe copiar este código al campo
+         "aliados" (custom_value4) de cada producto del aliado en IN.    */
+      msg.innerHTML = savedBrand
+        ? `Creado ✓ — código de aliado: <strong style="font-family: monospace; background: #f5f5f5; padding: 2px 6px; border-radius: 3px;">${escapeHtml(savedBrand)}</strong> · Copia este código al campo "aliados" en cada producto de este aliado en Invoice Ninja.`
+        : `Creado ✓`;
+      msg.style.color = "var(--success)";
       await this.load();
     } catch (e) {
       msg.textContent = "Error: " + e.message; msg.style.color = "var(--danger)";
@@ -288,6 +318,17 @@ const PartnersCtrl = {
 
 $("#p-create-btn").addEventListener("click", () => PartnersCtrl.create());
 $("#p-reload-btn").addEventListener("click", () => PartnersCtrl.load());
+
+/* Auto-rellena el campo brand al escribir el nombre, SOLO si el admin no
+   ha tocado el brand manualmente. Una vez que el admin escribe en brand,
+   marcamos el flag dirty para no sobrescribir. */
+let brandTouched = false;
+$("#p-brand").addEventListener("input", () => { brandTouched = true; });
+$("#p-name").addEventListener("input", (e) => {
+  if (brandTouched) return;
+  const code = generateBrandCode(e.target.value);
+  if (code) $("#p-brand").value = code;
+});
 $("#p-tbody").addEventListener("click", (e) => {
   const tr = e.target.closest("tr"); if (!tr) return;
   const action = e.target.dataset.action;

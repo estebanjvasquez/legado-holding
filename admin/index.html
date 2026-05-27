@@ -174,8 +174,9 @@
               <input type="text" id="p-name" placeholder="Funeraria del Zulia" />
             </div>
             <div>
-              <label>Brand (debe coincidir con custom_value3 de Invoice Ninja)</label>
-              <input type="text" id="p-brand" placeholder="fzulia / aliados / ..." />
+              <label>Código de aliado (campo "aliados" / custom_value4 en Invoice Ninja)</label>
+              <input type="text" id="p-brand" placeholder="se autogenera del nombre — puedes editarlo" />
+              <p class="muted" style="margin: 4px 0 0; font-size: 12px;">Después de crear el aliado, copia este código y pégalo en el campo "aliados" de cada producto en Invoice Ninja.</p>
             </div>
             <div>
               <label>Teléfono</label>
@@ -219,7 +220,7 @@
             <thead>
               <tr>
                 <th>Nombre</th>
-                <th>Brand</th>
+                <th>Código (cv4)</th>
                 <th>Ubicación</th>
                 <th>Cobertura</th>
                 <th>Servicios</th>
