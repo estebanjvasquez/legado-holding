@@ -28,8 +28,9 @@
    CONFIG
    ─────────────────────────────────────────────────────────────────────────────
    El chat de emergencia habla con el Worker (api.legadoholding.com/chat), que
-   a su vez proxea al agente Alma 2 en n8n y al final emite la factura en
-   Invoice Ninja. En dev apunta al wrangler local; en prod al subdominio api.
+   corre el agente Alma directamente (function calling sobre Gemini en
+   worker/src/alma.js) y al final emite la factura en Invoice Ninja. En dev
+   apunta al wrangler local; en prod al subdominio api.
    ============================================================================= */
 const CHAT_WEBHOOK_URL =
   (typeof window !== "undefined" && window.LEGADO_CONFIG?.CHAT_API_URL) ||
@@ -37,14 +38,13 @@ const CHAT_WEBHOOK_URL =
 
 const WIZARD_WEBHOOK_URL =
   (typeof window !== "undefined" && window.LEGADO_CONFIG?.WIZARD_WEBHOOK_URL) ||
-  "https://vmi2945958.contaboserver.net/webhook/legado-payment";
+  "https://api.legadoholding.com";
 
 /* Catálogo de planes — proxy server-side (token de Invoice Ninja queda oculto).
-   En dev apunta al Worker (GET /products); en prod, al webhook de n8n hasta
-   que se despliegue el Worker en producción. */
+   Siempre apunta al Worker (GET /products). */
 const PLANS_API_URL =
   (typeof window !== "undefined" && window.LEGADO_CONFIG?.PLANS_API_URL) ||
-  "https://vmi2945958.contaboserver.net/webhook/List_Products";
+  "https://api.legadoholding.com/products";
 
 /* =============================================================================
    i18n / LANG — Diccionario bilingüe ES / EN
@@ -559,7 +559,7 @@ async function loadPlansFromAPI() {
     if (!resp.ok) throw new Error("HTTP " + resp.status);
     const raw = await resp.json();
 
-    /* n8n puede devolver un array directo o { data: [...] } — normalizar ambos */
+    /* El Worker puede devolver un array directo o { data: [...] } — normalizar ambos */
     const list = Array.isArray(raw) ? raw : (raw.data || []);
     const products = list.filter(
       (p) => !p.is_deleted && p.custom_value1 === "legadoweb",

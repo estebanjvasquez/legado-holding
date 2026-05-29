@@ -16,3 +16,4 @@ worker/.wrangler/
 # Wrangler auto-config generado si se hace `wrangler deploy` desde el cwd
 # equivocado. Si aparece en el root, es artefacto y debe borrarse.
 wrangler.jsonc
+legado-holding/
