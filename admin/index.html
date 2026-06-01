@@ -94,10 +94,13 @@
   <div id="login-modal" class="modal">
     <div class="modal-content">
       <h2>Legado — Acceso administrador</h2>
-      <p class="hint">Ingresa el ADMIN_TOKEN que cargaste como secret del Worker.</p>
-      <input type="password" id="login-token" placeholder="Admin token" autocomplete="off" />
+      <p class="hint">Usa tus credenciales de Invoice Ninja. Solo usuarios con rol de administrador pueden entrar.</p>
+      <label for="login-email">Email</label>
+      <input type="email" id="login-email" placeholder="admin@legadoholding.com" autocomplete="username" />
+      <label for="login-password" style="margin-top:12px">Contraseña</label>
+      <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" />
       <p id="login-error" class="error hidden"></p>
-      <button id="login-btn" class="btn" style="margin-top: 12px; width: 100%;">Entrar</button>
+      <button id="login-btn" class="btn" style="margin-top: 16px; width: 100%;">Entrar</button>
     </div>
   </div>
 

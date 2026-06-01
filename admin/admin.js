@@ -9,13 +9,23 @@ const API_BASE =
   "https://api.legadoholding.com";
 
 const TOKEN_KEY = "legado_admin_token";
+const USER_KEY  = "legado_admin_user";
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
 
-const getToken   = () => localStorage.getItem(TOKEN_KEY) || "";
-const setToken   = (t) => localStorage.setItem(TOKEN_KEY, t);
-const clearToken = ()  => localStorage.removeItem(TOKEN_KEY);
+/* sessionStorage: el token se pierde al cerrar la pestaña. Reduce ventana
+   de exposición vs localStorage (XSS sigue siendo riesgo, pero el atacante
+   no puede usar un token que ya no está). */
+const getToken   = () => sessionStorage.getItem(TOKEN_KEY) || "";
+const setToken   = (t) => sessionStorage.setItem(TOKEN_KEY, t);
+const clearToken = ()  => { sessionStorage.removeItem(TOKEN_KEY); sessionStorage.removeItem(USER_KEY); };
+
+const getUser = () => {
+  try { return JSON.parse(sessionStorage.getItem(USER_KEY) || "null"); }
+  catch (_) { return null; }
+};
+const setUser = (u) => sessionStorage.setItem(USER_KEY, JSON.stringify(u));
 
 /* ── HTTP wrapper ─────────────────────────────────────────────────────────── */
 async function api(path, opts = {}) {
@@ -56,30 +66,57 @@ function formatDate(iso) {
 }
 
 /* ── Login ────────────────────────────────────────────────────────────────── */
-async function tryLogin(token) {
-  setToken(token);
-  await api("/admin/health");
+async function tryLogin(email, password) {
+  /* /admin/login es público y verifica creds contra IN. Devuelve token IN
+     personal del usuario + datos básicos. */
+  const r = await fetch(API_BASE + "/admin/login", {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify({ email, password }),
+  });
+  const text = await r.text();
+  let body = text;
+  try { body = text ? JSON.parse(text) : null; } catch (_) { /* keep text */ }
+  if (!r.ok) {
+    const msg = (body && body.error) || `HTTP ${r.status}`;
+    throw new Error(msg);
+  }
+  if (!body || !body.token) throw new Error("Respuesta inválida del servidor");
+  setToken(body.token);
+  setUser(body.user || null);
 }
 
 $("#login-btn").addEventListener("click", async () => {
-  const t = $("#login-token").value.trim();
-  const errEl = $("#login-error");
+  const email    = ($("#login-email").value    || "").trim();
+  const password = ($("#login-password").value || "");
+  const errEl    = $("#login-error");
+  const btn      = $("#login-btn");
   errEl.classList.add("hidden");
-  if (!t) { errEl.textContent = "Ingresa el token."; errEl.classList.remove("hidden"); return; }
+  if (!email || !password) {
+    errEl.textContent = "Email y contraseña son requeridos.";
+    errEl.classList.remove("hidden");
+    return;
+  }
+  btn.disabled = true;
   try {
-    await tryLogin(t);
+    await tryLogin(email, password);
+    $("#login-password").value = "";
     $("#login-modal").classList.add("hidden");
     $("#app").classList.remove("hidden");
     init();
   } catch (e) {
     clearToken();
-    errEl.textContent = "Token inválido: " + e.message;
+    errEl.textContent = e.message;
     errEl.classList.remove("hidden");
+  } finally {
+    btn.disabled = false;
   }
 });
 
-$("#login-token").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") $("#login-btn").click();
+["#login-email", "#login-password"].forEach((sel) => {
+  $(sel).addEventListener("keydown", (e) => {
+    if (e.key === "Enter") $("#login-btn").click();
+  });
 });
 
 $("#logout-btn").addEventListener("click", () => {

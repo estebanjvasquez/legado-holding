@@ -1,11 +1,14 @@
 /* =============================================================================
    Endpoints administrativos del Worker.
 
-   Todos los endpoints viven bajo /admin/* y requieren el header
-   X-Admin-Token con el valor de env.ADMIN_TOKEN. La UI estática vive en
-   /admin/index.html (servida por Apache vía cPanel) y consume estos endpoints.
+   Auth: cada admin se autentica con sus credenciales de Invoice Ninja vía
+   POST /admin/login (proxy a IN /api/v1/login). Si el usuario tiene
+   is_admin=true en IN, devolvemos su token de IN y la UI lo envía en
+   X-Admin-Token. Para sobrevivir caídas de IN, env.ADMIN_TOKEN sigue
+   funcionando como backdoor de emergencia.
 
    Rutas:
+     POST   /admin/login                → email+password → { token, user }
      GET    /admin/locations            → listar ubicaciones
      POST   /admin/locations            → crear ubicación
      PATCH  /admin/locations/:id        → actualizar
@@ -27,25 +30,201 @@
 
 import { createSupabase } from "./supabase.js";
 
-function unauthorized() {
-  return new Response(JSON.stringify({ error: "unauthorized" }), {
-    status: 401,
-    headers: { "Content-Type": "application/json" },
-  });
-}
+/* Cache in-isolate de validaciones de tokens IN. Evita pegarle a IN en
+   cada request del admin. TTL corto porque revocar un usuario en IN debe
+   surtir efecto pronto. Es por-isolate (no compartido entre PoPs); en la
+   práctica con tráfico bajo un admin ve ~1 cache miss al inicio y luego
+   hits durante su sesión. */
+const TOKEN_VALIDATION_TTL_MS = 5 * 60 * 1000;
+const tokenValidationCache    = new Map(); // token → { valid, until }
 
-function requireAdmin(request, env) {
-  const expected = (env.ADMIN_TOKEN || "").trim();
-  if (!expected) return false;
-  const got = (request.headers.get("X-Admin-Token") || "").trim();
-  return got && got === expected;
-}
-
-function jsonResponse(obj, status = 200, extraHeaders = {}) {
+function jsonResp(obj, status, corsHeaders) {
   return new Response(JSON.stringify(obj), {
     status,
-    headers: { "Content-Type": "application/json", ...extraHeaders },
+    headers: { "Content-Type": "application/json", ...corsHeaders },
   });
+}
+
+/* Valida que un token IN sigue activo pegándole a /users?per_page=1. No
+   re-chequea is_admin en cada request — ese flag se verificó al login y
+   si el admin pierde su rol en IN, el equipo debe desactivar al usuario
+   (lo cual invalida el token). Trade-off: hasta 5 min de staleness. */
+async function isInTokenValid(token, env) {
+  if (!token || !env.IN_BASE) return false;
+  const now = Date.now();
+  const cached = tokenValidationCache.get(token);
+  if (cached && cached.until > now) return cached.valid;
+
+  let valid = false;
+  try {
+    const r = await fetch(env.IN_BASE + "/users?per_page=1", {
+      headers: { "X-API-TOKEN": token, "Accept": "application/json" },
+    });
+    valid = r.ok;
+  } catch (_) {
+    valid = false;
+  }
+  tokenValidationCache.set(token, { valid, until: now + TOKEN_VALIDATION_TTL_MS });
+  return valid;
+}
+
+async function requireAdmin(request, env) {
+  const got = (request.headers.get("X-Admin-Token") || "").trim();
+  if (!got) return false;
+
+  /* Backdoor: token compartido configurado en env.ADMIN_TOKEN. Útil si IN
+     se cae o si necesitamos acceso de emergencia. */
+  const expected = (env.ADMIN_TOKEN || "").trim();
+  if (expected && got === expected) return true;
+
+  /* Camino normal: el token vino de POST /admin/login y es el API token
+     personal del admin en IN. */
+  return await isInTokenValid(got, env);
+}
+
+/* Llama a IN /login con email+password y normaliza la respuesta. IN v5
+   devuelve la lista de company_users del cual extraemos el token API
+   personal del usuario y el flag is_admin. La forma exacta varía entre
+   versiones — manejamos los casos conocidos y logueamos lo que no
+   reconozcamos para poder ajustar después. */
+async function loginToIN(env, email, password) {
+  if (!env.IN_BASE) throw new Error("IN_BASE no configurado");
+  const r = await fetch(env.IN_BASE + "/login", {
+    method: "POST",
+    headers: {
+      "Content-Type":     "application/json",
+      "X-Requested-With": "XMLHttpRequest",
+      "Accept":           "application/json",
+    },
+    body: JSON.stringify({ email, password }),
+  });
+  const text = await r.text();
+  let parsed = text;
+  try { parsed = text ? JSON.parse(text) : null; } catch (_) { /* keep text */ }
+
+  if (!r.ok) {
+    const msg = (parsed && parsed.message) || `IN login -> ${r.status}`;
+    const err = new Error(msg);
+    err.status = r.status;
+    throw err;
+  }
+
+  /* Normalizar: parsed.data puede ser objeto o array. El elemento puede
+     ser un User (email al tope) o un CompanyUser (email en .user.email).
+     Probamos las cuatro combinaciones. */
+  let entry = parsed?.data ?? parsed;
+  if (Array.isArray(entry)) entry = entry[0];
+
+  if (!entry || typeof entry !== "object") {
+    const topKeys = parsed && typeof parsed === "object" ? Object.keys(parsed).join(",") : typeof parsed;
+    console.error(`[admin login] respuesta vacia o no-objeto. top:[${topKeys}]`);
+    throw new Error("Respuesta de IN inesperada en login");
+  }
+
+  /* Detectar shape: User al tope vs CompanyUser con user anidado. */
+  const userInfo =
+    (entry.email && entry)            ||  // shape A: User
+    (entry.user?.email && entry.user) ||  // shape B: CompanyUser → .user
+    null;
+
+  if (!userInfo) {
+    const entryKeys = Object.keys(entry).join(",");
+    const nestedUserKeys = entry.user && typeof entry.user === "object" ? Object.keys(entry.user).join(",") : "no_user";
+    console.error(`[admin login] shape desconocida. entry:[${entryKeys}] entry.user:[${nestedUserKeys}]`);
+    throw new Error("Respuesta de IN inesperada en login");
+  }
+
+  /* Token: probar lugares conocidos. IN v5 usa varias formas:
+     - string en .token
+     - objeto { token: "..." } en .token, .company_token, .api_token
+     - elemento en .tokens[] */
+  const extractToken = (v) => {
+    if (!v) return null;
+    if (typeof v === "string") return v;
+    if (typeof v === "object" && typeof v.token === "string") return v.token;
+    return null;
+  };
+
+  /* Buscar token en el entry (CompanyUser) y dentro del userInfo. */
+  const tokenSources = [
+    entry.token, entry.company_token, entry.api_token,
+    userInfo.token, userInfo.company_token, userInfo.api_token,
+  ];
+  let token = null;
+  for (const t of tokenSources) {
+    token = extractToken(t);
+    if (token) break;
+  }
+
+  /* is_admin puede estar en el entry (CompanyUser) o en userInfo. */
+  let isAdmin = !!(entry.is_admin || entry.is_owner || userInfo.is_admin);
+
+  /* Recorrer company_users si existe en cualquiera de los dos niveles. */
+  const cuList = (Array.isArray(userInfo.company_users) && userInfo.company_users) ||
+                 (Array.isArray(entry.company_users)    && entry.company_users)    ||
+                 [];
+  for (const cu of cuList) {
+    if (cu.is_admin || cu.is_owner) isAdmin = true;
+    if (!token) {
+      token =
+        extractToken(cu.token)         ||
+        extractToken(cu.company_token) ||
+        extractToken(cu.api_token)     ||
+        (Array.isArray(cu.tokens) && cu.tokens[0] ? extractToken(cu.tokens[0]) : null);
+    }
+  }
+
+  if (!token) {
+    const entryKeys = Object.keys(entry).join(",");
+    const userKeys  = Object.keys(userInfo).join(",");
+    const cuKeys    = cuList[0] ? Object.keys(cuList[0]).join(",") : "no_company_users";
+    console.error(`[admin login] sin token. entry:[${entryKeys}] user:[${userKeys}] cu[0]:[${cuKeys}]`);
+    throw new Error("No se pudo extraer token API del usuario IN — revisa wrangler tail");
+  }
+
+  console.log(`[admin login] OK email=${userInfo.email} isAdmin=${isAdmin}`);
+  return { token, user: userInfo, isAdmin };
+}
+
+async function handleLogin(request, env, corsHeaders) {
+  const json = (obj, status = 200) => jsonResp(obj, status, corsHeaders);
+  let body;
+  try { body = await request.json(); } catch (_) { return json({ error: "JSON inválido" }, 400); }
+  const email    = String(body.email    || "").trim().toLowerCase();
+  const password = String(body.password || "");
+  if (!email || !password) {
+    return json({ error: "Email y contraseña son requeridos" }, 400);
+  }
+
+  try {
+    const { token, user, isAdmin } = await loginToIN(env, email, password);
+    if (!isAdmin) {
+      return json({ error: "Solo administradores pueden acceder al panel." }, 403);
+    }
+    /* Pre-poblar cache para que el primer GET no pegue a IN otra vez. */
+    tokenValidationCache.set(token, {
+      valid: true,
+      until: Date.now() + TOKEN_VALIDATION_TTL_MS,
+    });
+    return json({
+      token,
+      user: {
+        id:         user.id || user.hashed_id || null,
+        first_name: user.first_name || "",
+        last_name:  user.last_name  || "",
+        email:      user.email,
+      },
+    });
+  } catch (e) {
+    console.error(`[admin login] ${email} → ${e.message}`);
+    /* IN respondió 4xx → creds malas: mensaje genérico. */
+    if (e.status === 400 || e.status === 401 || e.status === 422) {
+      return json({ error: "Credenciales inválidas" }, 401);
+    }
+    /* Cualquier otro fallo (parseo de respuesta, token no encontrado,
+       IN caído) → propagar el mensaje real para poder debuggear. */
+    return json({ error: e.message }, e.status || 500);
+  }
 }
 
 /* dispatch principal — index.js lo llama para todo /admin/*  */
@@ -58,16 +237,18 @@ export async function handleAdmin(request, env, corsHeaders) {
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
 
-  if (!requireAdmin(request, env)) {
-    return new Response(JSON.stringify({ error: "unauthorized" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json", ...corsHeaders },
-    });
-  }
-
   const url    = new URL(request.url);
   const method = request.method;
   const path   = url.pathname;
+
+  /* Login es público — hace su propia verificación contra IN. */
+  if (path === "/admin/login" && method === "POST") {
+    return await handleLogin(request, env, corsHeaders);
+  }
+
+  if (!(await requireAdmin(request, env))) {
+    return json({ error: "unauthorized" }, 401);
+  }
 
   const db = createSupabase(env);
 
