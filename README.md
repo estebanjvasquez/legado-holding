@@ -1,61 +1,35 @@
 # LEGADO Holding — Sitio web y plataforma de checkout
 
 Sitio bilingüe (ES/EN) de previsión funeraria para venezolanos en EE. UU., con
-catálogo de planes, wizard de afiliación de 4 pasos, chatbot de emergencia
-(agente Alma sobre Gemini) y panel administrativo — todo orquestado por un
-Cloudflare Worker que habla con Invoice Ninja y Supabase.
+catálogo de planes, wizard de afiliación de 4 pasos, generación de factura
+recurrente y envío de correo de cobro — todo conectado a Invoice Ninja a
+través de un Cloudflare Worker propio.
 
 ```
-            ┌──────────────────────────────┐
-            │  legadoholding.com           │
-            │  (Apache + HTML/CSS/JS)      │
-            │                              │
-            │  · Sitio público (planes)    │
-            │  · Wizard de compra          │
-            │  · Chatbot Alma (emergencia) │
-            │  · /v2/admin/  panel admin   │
-            └─────────┬────────────────────┘
-                      │  fetch JSON (HTTPS)
-                      ▼
-            ┌──────────────────────────────┐
-            │  api.legadoholding.com       │
-            │  Cloudflare Worker           │
-            │                              │
-            │  POST /          checkout    │
-            │  POST /chat      Alma + IN   │
-            │  POST /admin/login           │
-            │  GET  /admin/*   CRUD admin  │
-            └────┬─────────┬───────────┬───┘
-                 │         │           │
-        X-API-TOKEN  Gemini API   service_role
-                 ▼         ▼           ▼
-       ┌──────────────┐ ┌────────┐ ┌─────────────┐
-       │ Invoice      │ │ Gemini │ │ Supabase    │
-       │ Ninja v5     │ │ LLM    │ │ (sessions,  │
-       │              │ │        │ │  turns,     │
-       │ Clientes,    │ │ Alma   │ │  config,    │
-       │ productos,   │ │ tools  │ │  locations, │
-       │ facturas     │ │ runner │ │  partners)  │
-       └──────────────┘ └────────┘ └─────────────┘
+                ┌────────────────────────────┐
+                │   legadoholding.com        │
+                │   (Apache + HTML/CSS/JS)   │
+                └─────────────┬──────────────┘
+                              │
+                              │  fetch JSON (HTTPS)
+                              ▼
+                ┌────────────────────────────┐
+                │  api.legadoholding.com     │
+                │  Cloudflare Worker         │
+                │  (JS + secret IN_TOKEN)    │
+                └─────────────┬──────────────┘
+                              │
+                              │  X-API-TOKEN
+                              ▼
+                ┌────────────────────────────┐
+                │ invoicing.legadoholding.com│
+                │ Invoice Ninja v5           │
+                │ (clientes, facturas, mail) │
+                └────────────────────────────┘
 ```
 
-> Sitio estático puro: sin Node.js, sin bundler, sin framework. Lo único que
-> se ejecuta del lado servidor es el Worker (Cloudflare edge).
-
----
-
-## 📚 Documentación adicional
-
-Este README es la **referencia técnica de dev/ops**. Para otras audiencias:
-
-- [`docs/onboarding.md`](docs/onboarding.md) — bienvenida y contexto general
-  para nuevos miembros del equipo. Material base para presentación de
-  inducción.
-- [`docs/admin-manual.md`](docs/admin-manual.md) — manual operativo del panel
-  admin (login, ubicaciones, aliados, configuración del agente, auditoría
-  de conversaciones).
-- [`docs/user-manual.md`](docs/user-manual.md) — manual para clientes finales
-  (contratar plan, usar el chatbot de emergencia, preguntas frecuentes).
+> Sitio estático puro: sin Node.js, sin bundler, sin framework. Lo único
+> que se ejecuta del lado servidor es el Worker.
 
 ---
 
@@ -159,47 +133,31 @@ Usuario              Frontend            Worker             Invoice Ninja
 
 ```
 legado-holding/
-├── README.md                       ← este archivo (referencia técnica)
-├── .gitignore                      ← excluye worker/.dev.vars, .wrangler/, etc.
-├── .cpanel.yml                     ← deploy estático: copia archivos a /v2 en git push
-├── index.html                      ← página pública única; LEGADO_CONFIG inline
+├── README.md                       ← este archivo
+├── .gitignore                      ← excluye worker/.dev.vars, .wrangler/, node_modules
+├── index.html                      ← página única, contiene LEGADO_CONFIG
 ├── terminos-condiciones.txt        ← texto legal mostrado en el wizard
 ├── css/
-│   └── main.css                    ← estilos de toda la página pública
+│   └── main.css                    ← estilos de toda la página
 ├── images/                         ← fotos, logo, fondos
 ├── js/
-│   ├── main.js                     ← TODO el JS público (i18n, planes, wizard, chat)
+│   ├── main.js                     ← TODO el JS del sitio (i18n, planes, wizard, chat)
+│   ├── gtag.js                     ← inicialización de Google Analytics
 │   └── wizard-generic.js           ← helpers del wizard
-├── admin/                          ← Panel administrativo (servido en /v2/admin/)
-│   ├── index.html                  ← UI del admin (login + tabs)
-│   └── admin.js                    ← lógica del admin (CRUD + auth via IN)
-├── docs/                           ← Documentación para distintas audiencias
-│   ├── onboarding.md               ← inducción para equipo / presentación
-│   ├── admin-manual.md             ← manual operativo del panel admin
-│   └── user-manual.md              ← manual para clientes finales
-└── worker/                         ← Cloudflare Worker (backend serverless)
+└── worker/                         ← Cloudflare Worker (backend ligero)
     ├── package.json                ← scripts npm (dev / deploy / tail)
     ├── wrangler.toml               ← config del Worker (rutas, vars públicas)
     ├── .dev.vars.example           ← plantilla; copiar a .dev.vars (gitignored)
     └── src/
-        ├── index.js                ← router HTTP, CORS, dispatch a otros módulos
-        ├── invoiceninja.js         ← cliente HTTP de IN
-        ├── pipeline.js             ← orquestador del checkout legadoweb (planes)
-        ├── chat.js                 ← endpoint /chat (entrada del bot)
-        ├── alma.js                 ← loop de function calling con Gemini
-        ├── emergency.js            ← pipeline de checkout para servicios urgencia
-        ├── admin.js                ← endpoints /admin/* + auth contra IN
-        ├── supabase.js             ← cliente de Supabase (sessions, config, etc.)
-        └── errors.js               ← clases de error tipadas
+        ├── index.js                ← router HTTP, CORS, health
+        ├── invoiceninja.js         ← cliente HTTP de IN (todos los endpoints)
+        └── pipeline.js             ← orquestador del checkout (normalize → cliente → factura → email)
 ```
 
 Lo que **NO** se commitea (ver `.gitignore`):
-- `.claude/settings.local.json` → config local de Claude Code (con tokens)
-- `worker/.dev.vars` → token de IN y secrets para desarrollo local
+- `worker/.dev.vars` → token de IN para desarrollo local
 - `worker/.wrangler/` → caché de wrangler
 - `worker/node_modules/` → si en algún momento se añaden dependencias
-- `.scratch/` → archivos scratch de debugging
-- `legado-holding/` → carpeta duplicada de OneDrive (artefacto)
 
 ---
 
@@ -209,7 +167,7 @@ Lo que **NO** se commitea (ver `.gitignore`):
 |---|---|---|
 | Frontend | HTML5 + CSS3 + JavaScript ES2017+ vanilla | Sin build step, sin transpilación |
 | i18n | Diccionario en `js/main.js` (`LANG`) | ES/EN, atributos `data-i18n` |
-| Analytics | Google Analytics 4 (gtag) | Snippet inline en `index.html` |
+| Analytics | Google Analytics 4 (gtag.js) | Configurar ID en `js/gtag.js` |
 | Worker | Cloudflare Workers (V8 isolates) | Runtime tipo Service Worker, no Node |
 | Worker tooling | Wrangler 3+ | CLI oficial de Cloudflare |
 | Facturación | Invoice Ninja v5 (self-hosted) | REST API en `/api/v1` |
@@ -821,23 +779,16 @@ por checkout y permite logear exactamente cuándo se disparó.
 ```
 legado-holding/
 ├── .claude/
-│   └── settings.local.json         (gitignored)
-├── .cpanel.yml
+│   └── settings.local.json
 ├── .gitignore
 ├── README.md
-├── admin/
-│   ├── admin.js
-│   └── index.html
 ├── css/
 │   └── main.css
-├── docs/
-│   ├── admin-manual.md
-│   ├── onboarding.md
-│   └── user-manual.md
 ├── images/
 │   └── (logos, fotos, fondos)
 ├── index.html
 ├── js/
+│   ├── gtag.js
 │   ├── main.js
 │   └── wizard-generic.js
 ├── terminos-condiciones.txt
@@ -845,15 +796,9 @@ legado-holding/
     ├── .dev.vars.example
     ├── package.json
     ├── src/
-    │   ├── admin.js
-    │   ├── alma.js
-    │   ├── chat.js
-    │   ├── emergency.js
-    │   ├── errors.js
     │   ├── index.js
     │   ├── invoiceninja.js
-    │   ├── pipeline.js
-    │   └── supabase.js
+    │   └── pipeline.js
     └── wrangler.toml
 ```
 

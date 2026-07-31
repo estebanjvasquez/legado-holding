@@ -17,3 +17,7 @@ worker/.wrangler/
 # equivocado. Si aparece en el root, es artefacto y debe borrarse.
 wrangler.jsonc
 legado-holding/
+
+# Documentación comercial interna (pricing, márgenes, costos, propuestas)
+docs/cost-and-pricing.md
+docs/proposal-client.md
