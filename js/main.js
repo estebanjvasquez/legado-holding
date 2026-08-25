@@ -932,8 +932,9 @@ function openChat(mode) {
     `chat-header ${mode === "emergency" ? "emergency" : "normal"}`;
   $("#chat-title").textContent =
     mode === "emergency" ? t("chat_emergency") : t("chat_title");
-  $("#chat-header-icon").innerHTML =
-    mode === "emergency" ? alertIcon() : chatIcon();
+  /* Ícono de marca (círculos concéntricos de LEGADO) en vez de un ícono de
+     chat/alerta genérico — Alma es siempre Alma, en ambos modos. */
+  $("#chat-header-icon").innerHTML = almaIconHTML();
   $("#chat-input").placeholder =
     mode === "emergency" ? t("chat_ph_emergency") : t("chat_placeholder");
   $("#chat-send-btn").className =
@@ -1856,13 +1857,12 @@ function showToast(msg, type = "info") {
 }
 
 /* =============================================================================
-   ICONS (SVG inline reutilizables)
+   ICONS
    ============================================================================= */
-function chatIcon() {
-  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>`;
-}
-function alertIcon() {
-  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
+/* Ícono de marca LEGADO (círculos concéntricos, sin el nombre) usado en el
+   header del chat de Alma — mismo ícono en modo normal y de emergencia. */
+function almaIconHTML() {
+  return `<img src="images/IconoLegado.png" alt="Alma" width="20" height="20">`;
 }
 
 /* =============================================================================

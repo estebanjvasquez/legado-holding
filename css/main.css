@@ -1495,6 +1495,14 @@ footer {
     width: 18px;
     height: 18px;
 }
+.chat-header-left img {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+    flex-shrink: 0;
+}
 .chat-header-title {
     font-weight: 600;
     font-size: 0.9rem;
