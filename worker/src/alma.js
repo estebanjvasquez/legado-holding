@@ -538,9 +538,15 @@ export async function runAlma(input, env, executionCtx) {
     console.warn(`[alma] no se pudo leer agent_config: ${e.message}`);
   }
 
-  const model = (cfg.model && cfg.model.trim()) || env.OPENAI_MODEL || "gpt-5.6-luna";
+  let model = (cfg.model && cfg.model.trim()) || env.OPENAI_MODEL || "gpt-5.6-luna";
   if (/^gemini/i.test(model)) {
-    console.warn(`[alma] agent_config.model="${model}" parece un modelo de Gemini — Alma ahora llama a OpenAI, actualiza el valor desde el panel admin.`);
+    /* agent_config.model quedó con un valor de la era Gemini (editado desde
+       el panel admin antes de este cambio de proveedor) — usarlo tal cual
+       rompe el chat entero contra la API de OpenAI. Ignorarlo y caer al
+       default es más seguro que fallar 100% de las conversaciones; igual
+       queda el log para que el admin lo corrija desde el panel. */
+    console.warn(`[alma] agent_config.model="${model}" es un modelo de Gemini obsoleto (Alma ahora llama a OpenAI) — ignorando, actualízalo desde el panel admin.`);
+    model = env.OPENAI_MODEL || "gpt-5.6-luna";
   }
   const temperature = (() => {
     const t = parseFloat(cfg.temperature);
