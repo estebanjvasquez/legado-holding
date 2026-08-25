@@ -5,7 +5,7 @@
    Cualquier validación de input del cliente (campos faltantes, formato malo,
    tamaño excedido, valores no permitidos) DEBE lanzar ValidationError. Los
    errores que sí son del servidor (Invoice Ninja caído, Supabase inválido,
-   Gemini error, etc.) se quedan como Error genérico → 500.
+   OpenAI error, etc.) se quedan como Error genérico → 500.
    ============================================================================= */
 
 export class ValidationError extends Error {

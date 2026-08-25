@@ -247,11 +247,11 @@
 
           <label>Modelo</label>
           <select id="cfg-model">
-            <option value="gemini-2.5-flash">gemini-2.5-flash (rápido, recomendado)</option>
-            <option value="gemini-2.5-pro">gemini-2.5-pro (más potente, más caro)</option>
-            <option value="gemini-2.0-flash">gemini-2.0-flash (legacy)</option>
-            <option value="gemini-2.0-flash-exp">gemini-2.0-flash-exp</option>
+            <option value="gpt-5.6-luna">gpt-5.6-luna (recomendado)</option>
           </select>
+          <p class="muted" style="margin-top: 4px;">
+            Alma llama a la API de OpenAI (antes Gemini) — si necesitas otro modelo, edita esta lista en <code>admin/index.html</code> o escribe el id directo en la key <code>model</code> desde "Otros" abajo.
+          </p>
 
           <label>Temperature (0 = determinista, 1 = creativo)</label>
           <input type="number" id="cfg-temperature" step="0.1" min="0" max="1" />

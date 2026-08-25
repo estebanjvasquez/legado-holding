@@ -1,5 +1,5 @@
 /* =============================================================================
-   /chat — orquesta el agente Alma (Gemini) + persistencia en Supabase.
+   /chat — orquesta el agente Alma (OpenAI) + persistencia en Supabase.
 
    Flujo por request:
      1. Carga/crea sesión en Supabase (chat_sessions).
@@ -13,7 +13,7 @@
 
    Alma ya no factura (ver worker/src/alma.js) — el contrato de salida hacia
    el frontend es:
-     { output, handoff?, partnerName?, partnerPhone?, error? }
+     { output, handoff?, partnerName?, partnerPhone?, waHandoffPhone?, waHandoffText?, error? }
    ============================================================================= */
 
 import { runAlma } from "./alma.js";
@@ -21,7 +21,7 @@ import { createSupabase } from "./supabase.js";
 import { ValidationError } from "./errors.js";
 
 /* Límites duros para evitar abuso de costos (cada mensaje al chat cuesta
-   tokens de Gemini) y para mantener Supabase saludable. Si un cliente
+   tokens de OpenAI) y para mantener Supabase saludable. Si un cliente
    legítimo necesita más espacio, levantarlos aquí.                          */
 const MAX_SESSION_ID  = 128;
 const MAX_MESSAGE     = 4000;
@@ -83,7 +83,7 @@ export async function handleChat(body, env, executionCtx) {
     throw new ValidationError(`mensaje excede ${MAX_MESSAGE} caracteres`);
   }
   /* Truncamos historial defensivamente: si el frontend manda muchos turnos
-     o turnos enormes, los limitamos para no inflar la llamada a Gemini.     */
+     o turnos enormes, los limitamos para no inflar la llamada a OpenAI.     */
   const fallbackHistory = rawHistory.slice(-MAX_HISTORY_LEN).map((m) => ({
     role:    m && m.role ? String(m.role) : "user",
     content: m && m.content ? String(m.content).slice(0, MAX_HISTORY_ITEM) : "",
@@ -131,7 +131,7 @@ export async function handleChat(body, env, executionCtx) {
         metadata (JSON) con lo que se resolvió en esta sesión.               */
   const persistPromise = (async () => {
     await persistEvents(db, sessionId, result.events, result.model);
-    if (result.coverage || result.handoff) {
+    if (result.coverage || result.handoff || result.waHandoff || result.lead) {
       const meta = result.coverage?.covered
         ? { coverage: "covered", coverage_city: result.coverage.city, coverage_state: result.coverage.state }
         : result.coverage
@@ -140,6 +140,14 @@ export async function handleChat(body, env, executionCtx) {
       if (result.handoff) {
         meta.handoff_partner_name  = result.handoff.partnerName  || null;
         meta.handoff_partner_phone = result.handoff.partnerPhone || null;
+      }
+      if (result.waHandoff) {
+        meta.wa_handoff_phone = result.waHandoff.phone || null;
+      }
+      if (result.lead) {
+        meta.lead_tipo        = result.lead.tipo || null;
+        meta.lead_plan_id     = result.lead.planId ?? null;
+        meta.lead_servicio_id = result.lead.servicioId ?? null;
       }
       await db
         .updateSession(sessionId, { metadata: meta })
@@ -154,9 +162,11 @@ export async function handleChat(body, env, executionCtx) {
 
   /* 5. Devolver al frontend el contrato (sin `events` para no inflar response). */
   return {
-    output:       result.output,
-    handoff:      !!result.handoff || undefined,
-    partnerName:  result.handoff?.partnerName  || undefined,
-    partnerPhone: result.handoff?.partnerPhone || undefined,
+    output:        result.output,
+    handoff:       !!result.handoff || undefined,
+    partnerName:   result.handoff?.partnerName  || undefined,
+    partnerPhone:  result.handoff?.partnerPhone || undefined,
+    waHandoffPhone: result.waHandoff?.phone || undefined,
+    waHandoffText:  result.waHandoff?.text  || undefined,
   };
 }

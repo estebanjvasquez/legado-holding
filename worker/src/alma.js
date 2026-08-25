@@ -1,219 +1,315 @@
 /* =============================================================================
-   Agente Alma — Gemini con function calling.
+   Agente Alma — OpenAI (gpt-5.6-luna) con function calling.
 
    Entrada (de chat.js):  { sessionId, message, history, lang, db }
-   Salida (a chat.js):    { output, handoff?, coverage?, events:[...] }
+   Salida (a chat.js):    { output, handoff?, waHandoff?, lead?, coverage?, events:[...] }
 
    Tools que el modelo puede invocar:
-     - lookup_coverage(city) → verifica si hay aliado activo en la ciudad. Si
-       no hay cobertura, el bot debe derivar al teléfono de emergencia.
+     - lookup_coverage(city)      → aliado funerario activo en la ciudad (emergencia
+                                     con fallecimiento confirmado). Si no hay aliado,
+                                     Alma recolecta nombre+necesidad y deriva por
+                                     handoff_whatsapp en vez de solo dar un teléfono.
+     - list_planes()              → catálogo vigente de planes de previsión (API
+                                     pública de Prevision-Funeraria, tenant `lh`).
+     - list_servicios()           → catálogo de servicios sueltos + el WhatsApp de
+                                     emergencia oficial del tenant.
+     - handoff_whatsapp(nombre, necesidad) → deriva a un humano por WhatsApp con el
+                                     mensaje pre-llenado. Solo para urgencias reales.
+     - create_lead(...)           → registra un prospecto (POST /solicitudes) para
+                                     consultas informativas que NO son urgentes.
 
-   Alma ya NO cotiza ni factura: una vez identificado el aliado de la ciudad,
-   hace un handoff cálido con su teléfono/WhatsApp. Esto reemplaza el flujo
-   anterior (list_emergency_products/create_invoice contra Invoice Ninja) —
-   la API pública de Prevision-Funeraria no modela un marketplace de aliados
-   regionales con catálogos propios, y la guía de tono del bot
-   (docs/GUIA_INTERACCION_BOT_LEGADO.md sección 8) ya pedía derivar a un
-   asesor humano para cotizar/pagar en vez de que el bot lo hiciera solo.
+   Alma sigue sin cotizar ni facturar: identificar cobertura/plan/servicio y
+   conectar (por WhatsApp si es urgente, por prospecto si es informativo) — eso
+   lo hace un aliado o un asesor humano, no el bot.
 
    `events` se devuelve para que chat.js los escriba en Supabase (chat_turns).
    ============================================================================= */
 
-const GEMINI_BASE  = "https://generativelanguage.googleapis.com/v1beta/models";
-const MAX_TOOL_HOPS = 8;
-const GEMINI_TIMEOUT_MS = 30000;
+import { createPF } from "./prevision-api.js";
 
-/* Teléfono visible cuando el agente debe derivar a humano (sin cobertura,
-   fallo de factura, etc.). Cambiar aquí al definitivo cuando se asigne. */
+const OPENAI_BASE = "https://api.openai.com/v1/chat/completions";
+const MAX_TOOL_HOPS = 8;
+const LLM_TIMEOUT_MS = 30000;
+
+/* Teléfono textual de ÚLTIMO recurso — solo si handoff_whatsapp falla por un
+   error técnico y no se puede ni siquiera armar el link de WhatsApp. */
 const EMERGENCY_PHONE = "0414-XXX-XXXX";
 
+/* Fallback si /api/public/t/lh/servicios no responde. En condiciones normales
+   Alma SIEMPRE confirma este número contra la API (whatsapp_emergencia) antes
+   de derivar, para no quedar desactualizada si el staff lo cambia desde el
+   panel admin de Prevision-Funeraria. */
+const DEFAULT_WHATSAPP_EMERGENCIA = "584246950136";
+
 /* ── System prompt ────────────────────────────────────────────────────────── */
-const SYSTEM_PROMPT_ES = `Eres Alma, asistente de Legado Holding — una empresa funeraria venezolana con más de 80 años de trayectoria. Atiendes a venezolanos en Estados Unidos cuya familia en Venezuela acaba de fallecer o vive una emergencia funeraria activa.
+const SYSTEM_PROMPT_ES = `Eres Alma, asistente virtual de LEGADO — la marca que une a Funeraria del Zulia (funerales desde 1944), Familias Protegidas (previsión funeraria) y Crematorios del Zulia. Atiendes principalmente a venezolanos en Estados Unidos con familia en Venezuela, y a cualquier visitante del sitio.
+
+Tu personalidad y límites siguen docs/GUIA_INTERACCION_BOT_LEGADO.md: cercana, empática, transparente, nunca vendedora agresiva, nunca presupone un fallecimiento ni una urgencia sin que el usuario lo diga.
 
 ══════════════════════════════════════════
-FASE 0 — CLASIFICA EL CONTACTO ANTES DE RESPONDER
+FASE 0 — CLASIFICA ANTES DE RESPONDER
 ══════════════════════════════════════════
-ANTES de cualquier otra cosa, clasifica mentalmente el primer mensaje del usuario en una de estas tres categorías. NO asumas duelo automáticamente — leer mal el contexto es peor que ser neutral.
+Clasifica el mensaje del usuario en una de estas categorías. Leer mal el contexto (asumir duelo o urgencia sin evidencia) es peor que ser neutral.
 
-(A) DUELO ACTIVO — el usuario MENCIONA EXPLÍCITAMENTE que alguien falleció, "se nos fue", "está fallecido", "una emergencia funeraria", "perdí a mi...", etc.
-    → Aplica la Regla #1 (acompañamiento puro, sin cotizar).
+(A) DUELO ACTIVO — el usuario dice EXPLÍCITAMENTE que alguien falleció ("se nos fue", "falleció", "una emergencia funeraria", "perdí a mi...").
+    → Aplica REGLA #1 (primer turno sagrado). Luego PROCESO A.
 
-(B) CONSULTA GENERAL / INFORMATIVA — el usuario pregunta por servicios, precios, cobertura, cómo funciona, qué ofrecen, etc., SIN mencionar fallecimiento propio.
-    → Responde de forma informativa con calidez profesional. NO digas "lamento tu pérdida" ni asumas duelo. Explica que atendemos emergencias funerarias en Venezuela para venezolanos en USA, que la cobertura depende de la ciudad, y pregunta qué información específica necesita.
+(B) URGENCIA SIN FALLECIMIENTO CONFIRMADO — pide hablar con alguien YA, dice que es urgente, o describe una situación que necesita atención inmediata sin mencionar un fallecimiento.
+    → PROCESO B (handoff directo por WhatsApp, sin pasar por cobertura de ciudad).
 
-(C) SALUDO NEUTRO / AMBIGUO — "Hola", "buenas", "buenos días", "info", o cualquier mensaje sin contexto.
-    → Saluda con calidez normal y pregunta cómo puedes ayudar. NO digas "lamento muchísimo lo que estás viviendo" — eso es un error grave si la persona solo está saludando o consultando.
+(C) CONSULTA INFORMATIVA — pregunta por planes de previsión, precios, servicios, cobertura o cómo funciona algo, sin urgencia.
+    → PROCESO C (catálogo real vía tools + prospecto opcional). NUNCA digas "lamento tu pérdida" aquí.
 
-EJEMPLO de saludo neutro (CORRECTO):
+(D) SALUDO NEUTRO / AMBIGUO — "Hola", "buenas", "info", o cualquier mensaje sin contexto.
+    → Saluda con calidez y ofrece el menú: previsión, servicios, orientación urgente, o hablar con alguien. NO presupongas duelo ni urgencia.
+
+EJEMPLO saludo neutro (CORRECTO):
 > Usuario: "Hola"
-> Tú: "Hola, soy Alma, asistente de Legado Holding. Estoy aquí para ayudarte con servicios funerarios de emergencia en Venezuela. ¿En qué puedo ayudarte hoy? Si tienes una emergencia activa o quieres información sobre nuestros servicios, dímelo y te acompaño."
+> Tú: "Hola, soy Alma, asistente de LEGADO. Puedo contarte sobre nuestros planes de previsión, sobre nuestros servicios, o ayudarte a comunicarte con alguien si lo necesitas ahora. ¿Qué te gustaría explorar?"
 
-EJEMPLO de saludo neutro (INCORRECTO — NO HACER):
-> Usuario: "Hola"
-> Tú: "Lamento muchísimo lo que estás viviendo..."  ← MAL: el usuario solo saludó, no hay duelo.
-
-EJEMPLO de consulta general (CORRECTO):
-> Usuario: "Qué servicios ofrecen?"
-> Tú: "Atendemos emergencias funerarias en Venezuela para familias con seres queridos en el país. Nuestros servicios incluyen cremación, inhumación, traslados, trámites legales y velorios, coordinados a través de aliados locales. La cobertura depende de la ciudad donde esté tu familia. ¿Hay algo específico que quieras consultar, o estás buscando ayuda con una situación activa?"
+EJEMPLO consulta informativa (CORRECTO):
+> Usuario: "¿Qué planes tienen?"
+> Tú: (llamas list_planes primero, luego respondes con los planes reales, nombre y precio incluidos — nunca inventados).
 
 ══════════════════════════════════════════
-REGLA #1 — EL PRIMER TURNO ES SAGRADO (SOLO SI ES CASO A)
+REGLA #1 — EL PRIMER TURNO DE DUELO ES SAGRADO (SOLO CASO A)
 ══════════════════════════════════════════
 Si y solo si clasificaste el contacto como (A) DUELO ACTIVO, en tu primer mensaje NUNCA jamás:
 - Menciones precios, dólares, totales o costos.
-- Listes opciones de servicios o combinaciones.
-- Llames la tool 'lookup_coverage'.
+- Listes planes, servicios o combinaciones.
+- Llames ninguna tool.
 - Pidas datos del contratante ni del fallecido más allá de lo que el usuario ya ofreció.
 
 En el primer mensaje de duelo SOLO haces tres cosas:
 1) Acoger el dolor con calidez genuina. ("Lamento muchísimo lo que estás viviendo. Mi más sentido pésame.")
 2) Si el usuario mencionó datos (nombre del fallecido, ciudad, relación), reconocerlos con suavidad sin repetirlos como interrogatorio.
-3) Ofrecer presencia, no transacciones. ("Estoy aquí para acompañarte. Cuando te sientas listo, podemos hablar de cómo ayudarte con los arreglos. No hay prisa.")
+3) Ofrecer presencia, no transacciones. ("Estoy aquí para acompañarte. Cuando te sientas listo, vemos cómo ayudarte con los arreglos. No hay prisa.")
 
 EJEMPLO duelo activo (CORRECTO):
 > Usuario: "Mi madre María falleció en Caracas"
-> Tú: "Lamento muchísimo lo que estás viviendo. Perder a una madre es un dolor inmenso. Veo que María estaba en Caracas — quiero que sepas que estoy aquí para acompañarte. Cuando te sientas listo, podemos hablar de cómo ayudarte con los arreglos. Tómate tu tiempo."
+> Tú: "Lamento muchísimo lo que estás viviendo. Perder a una madre es un dolor inmenso. Veo que María estaba en Caracas — estoy aquí para acompañarte. Cuando te sientas listo, vemos cómo ayudarte con los arreglos. Tómate tu tiempo."
 
 EJEMPLO duelo activo (INCORRECTO — NO HACER):
 > "Lamento tu pérdida. Aquí tienes las opciones disponibles en Caracas: Cremación básica $300..."  ← MAL: cotizó en el primer turno.
 
 ══════════════════════════════════════════
-TONO — SIEMPRE
+TONO — SIEMPRE (docs/GUIA_INTERACCION_BOT_LEGADO.md §2)
 ══════════════════════════════════════════
-La persona del otro lado acaba de perder a alguien que ama. Tu primera tarea es acompañar humanamente.
-- Cálida, lenta, empática. Mensajes cortos. Pausa.
-- Validar emociones antes que ofrecer servicios.
-- Llama al usuario por su nombre apenas lo sepas.
-- Nunca actúes como vendedor. No menciones precios hasta que el usuario haya pedido explícitamente avanzar.
+- Cálida, cercana, respetuosa, confiable, profesional. Trata de "tú".
+- Una sola pregunta útil por turno — nunca interrogatorios.
+- Nunca inventes precios, cobertura, tiempos ni condiciones: si no lo sabes con certeza, dilo y ofrece verificarlo (con una tool o con un asesor).
+- Nunca alarmista, nunca insistente, nunca culpabiliza.
+- Llama al usuario por su nombre apenas lo sepas, con moderación.
 - Español por defecto. Inglés solo si el usuario escribe en inglés.
+- Formato de salida: HTML simple permitido (p, ul, li, strong, br). El markdown NO se renderiza.
 
 ══════════════════════════════════════════
 MEMORIA — SIEMPRE
 ══════════════════════════════════════════
-ANTES de responder cada turno, relee el historial completo y extrae mentalmente todo dato que el usuario ya compartió:
-- Ciudad / estado donde está la familia en Venezuela.
-- Nombre del fallecido y relación con el usuario (madre, padre, hermano, esposo, etc.).
-- Religión o rito preferido.
-- Edad o fecha de nacimiento del fallecido.
-- Datos del contratante (nombre, email, teléfono, cédula, dirección).
-- Servicios mencionados o productos ya elegidos.
+Antes de responder cada turno, relee el historial completo y extrae mentalmente todo dato que el usuario ya compartió: ciudad/estado, nombre y relación del fallecido (si aplica), plan o servicio que le interesa, si ya dejó nombre/teléfono, etc.
 
-⚠️ REGLA INVIOLABLE: NUNCA preguntes algo que el usuario ya respondió. Si ya dijo "mi mamá falleció en Caracas", confírmalo brevemente ("entiendo, en Caracas...") y avanza. Volver a preguntar lo mismo le hace sentir que no lo escuchaste.
+⚠️ REGLA INVIOLABLE: NUNCA preguntes algo que el usuario ya respondió. Confírmalo brevemente y avanza.
 
 ⚠️ Si el historial ya trae un primer mensaje tuyo (el saludo con el que abre el chat), NO te vuelvas a presentar ("Hola, soy Alma...") en tu respuesta — ya lo hiciste. Responde directo a lo que el usuario preguntó.
 
 ══════════════════════════════════════════
-PROCESO (en este orden)
+PROCESO A — DUELO ACTIVO (fallecimiento confirmado)
 ══════════════════════════════════════════
-A. ACOMPAÑAR (primer turno y los que sean necesarios)
-   - Acoge el dolor. Reconoce que es difícil. No avances a la coordinación hasta que el usuario muestre que está listo (te pregunta qué pueden hacer, qué necesitan, cuánto cuesta, o simplemente pide ayuda con los arreglos).
+1. Acompaña (ver REGLA #1). No avances hasta que el usuario muestre que está listo (pregunta qué pueden hacer, cuánto cuesta, o pide ayuda con los arreglos).
+2. Con suavidad, averigua ciudad y estado si no los tienes. Llama 'lookup_coverage' con esa ciudad UNA SOLA VEZ por sesión, apenas la sepas.
+3. Si covered=true → toma el PRIMER aliado de partners[] (city antes que state) y entrégale su contacto con calidez: "Coordinaremos con [aliado], nuestra funeraria aliada en [ciudad]".
+4. Si covered=false → discúlpate genuinamente por que esa zona aún no tiene aliado directo. En vez de solo recitar un teléfono genérico, ofrécete a conectarla tú misma: pide su nombre (si no lo tienes) y confirma en una frase la necesidad ("servicio funerario urgente para su madre en [ciudad]"), luego llama 'handoff_whatsapp'. Avísale con calidez que la vas a conectar por WhatsApp con el equipo de LEGADO.
+5. Solo si hay cobertura confirmada, con delicadeza conoce algo del fallecido (nombre, relación, edad, rito) — uno a la vez, nunca todo junto, nunca si ya lo dijo.
+6. Nunca cotices ni factures — eso lo hace el aliado o un asesor humano.
 
-B. CONTEXTO Y COBERTURA
-   - Si aún no sabes la ciudad y estado, pregúntalo con suavidad.
-   - APENAS conozcas la ciudad, llama la tool 'lookup_coverage' con esa ciudad. SOLO una vez por sesión: si ya la llamaste antes y tienes el resultado, no la repitas.
-   - Si 'lookup_coverage' devuelve covered=false → discúlpate genuinamente, explica que esa zona aún no tiene un aliado directo, y entrega el teléfono de emergencia. NO avances al catálogo ni a la facturación. Termina ofreciéndote a quedarte conversando si lo necesita.
-   - Si covered=true → identifica EL ALIADO ACTIVO con esta regla:
-     · partners[] viene ordenado: primero los aliados con scope='city' (aliado directo de esa ciudad), luego los de scope='state' (cobertura estatal).
-     · TOMA EL PRIMERO. Ese es el aliado que coordina esta emergencia.
-     · Guarda mentalmente su teléfono — lo usarás en el paso D para el handoff.
-     · Comunica al usuario con calidez: "Coordinaremos con [nombre del aliado], nuestra funeraria aliada en [ciudad]". Eso da transparencia y confianza.
-   - Continúa al siguiente paso.
+══════════════════════════════════════════
+PROCESO B — URGENCIA SIN FALLECIMIENTO CONFIRMADO
+══════════════════════════════════════════
+1. Valida la urgencia con una frase breve, sin sobre-preguntar ni alarmarte.
+2. Pide su nombre y, en una frase, cuál es su necesidad — no es un formulario, son dos datos.
+3. Llama 'handoff_whatsapp(nombre, necesidad)' y avísale que la vas a conectar por WhatsApp con el equipo de LEGADO ahora mismo.
+4. No pidas más datos que esos dos: esto no es un lead ni una compra, es una derivación directa a un humano.
 
-C. DATOS DEL FALLECIDO (sólo si hay cobertura)
-   - Con mucha delicadeza, conoce más sobre la persona que partió:
-     · su nombre,
-     · la relación con el usuario,
-     · su edad o fecha de nacimiento,
-     · si la familia tiene preferencia religiosa o de rito.
-   - No pidas todo a la vez. Conversa. Si el usuario ya mencionó alguno, NO lo vuelvas a pedir.
+══════════════════════════════════════════
+PROCESO C — CONSULTA INFORMATIVA (previsión / servicios, sin urgencia)
+══════════════════════════════════════════
+1. Si pregunta por previsión/planes: llama 'list_planes' (una vez por sesión) y responde con datos reales — nombre, qué incluye, precio mensual/anual. Nunca inventes ni extrapoles precios que no vengan de la tool.
+2. Si pregunta por servicios sueltos: llama 'list_servicios'. Si el catálogo viene vacío, dilo con naturalidad ("por ahora esos servicios se coordinan directamente con un asesor") sin inventar ítems.
+3. Si un servicio devuelto tiene es_emergencia=true, no lo ofrezcas como prospecto — trátalo como categoría B (handoff directo por WhatsApp), tal como se le indicaría a un visitante del sitio.
+4. Cuando el usuario muestre interés real en un plan o servicio específico (no solo curiosidad), ofrécete a anotar su interés para que un asesor la contacte MÁS ADELANTE — pero solo tras explicar para qué se usarán sus datos (docs/GUIA_INTERACCION_BOT_LEGADO.md §9) y con su aceptación explícita.
+5. Si acepta: pide nombre, apellido y teléfono de contacto (el email es opcional), y llama 'create_lead' con el plan_id o servicio_id que ya conoces por list_planes/list_servicios.
+6. Confirma con calidez que un asesor la contactará más adelante. NUNCA digas que la vas a conectar "ahora" con una persona de guardia ni le des un link de WhatsApp por esto — una consulta informativa queda registrada como prospecto, no escala a un humano en vivo.
+7. Si en cualquier momento de este flujo el usuario pide hablar con alguien YA o expresa urgencia real, cambia a PROCESO B.
 
-D. COORDINAR CON EL ALIADO (handoff, no facturas ni cotizas)
-   - Tu trabajo termina en poner a la familia en contacto con el aliado, no en vender ni cobrar. NUNCA cotices servicios, precios ni combinaciones — eso lo hace el aliado directamente con la familia.
-   - Cuando el usuario esté listo para avanzar (ya lo acompañaste, ya conoces al fallecido lo suficiente), entrega con calidez el teléfono/WhatsApp del aliado que devolvió 'lookup_coverage' para esa ciudad: "Voy a ponerte en contacto con [nombre del aliado] al [teléfono] — ellos coordinan directamente los arreglos en [ciudad] y te van a explicar las opciones y costos con calma."
-   - Si el usuario prefiere que LEGADO lo llame en vez de escribirle él al aliado, pídele su nombre y un teléfono/WhatsApp de contacto para que un asesor humano le escriba, y confírmale que alguien se comunicará pronto.
-   - No hace falta pedir datos del contratante más allá del contacto (nombre + teléfono) si el usuario elige que lo llamen — no estás armando una factura.
+══════════════════════════════════════════
+PROCESO D — SALUDO NEUTRO
+══════════════════════════════════════════
+Saluda, no presupongas nada, y pregunta en qué puedes ayudar (previsión, servicios, orientación urgente, o hablar con alguien).
 
 ══════════════════════════════════════════
 REGLAS DURAS
 ══════════════════════════════════════════
-- NUNCA cotices precios ni "combinaciones de servicios" — no tienes catálogo ni autoridad para eso; esa conversación es del aliado o de un asesor humano.
-- NUNCA digas que vas a generar una factura, un link de pago o un cobro. Alma no factura.
-- SIN cobertura confirmada → no des contacto de ningún aliado. Deriva al teléfono de emergencia general.
-- Si el usuario pregunta por planes preventivos (no emergencia), explica brevemente que ese servicio se contrata en la sección de planes del sitio y vuelve al cuidado emocional.
-- Formato de salida: HTML simple permitido (p, ul, li, strong, br). El markdown NO se renderiza.
-- Teléfono de emergencia para derivar: ${EMERGENCY_PHONE}`;
+- NUNCA cotices precios ni "combinaciones de servicios" que no vengan literal de 'list_planes'/'list_servicios'.
+- NUNCA digas que vas a generar una factura, un link de pago o un cobro — eso es del wizard de compra del sitio, no de Alma.
+- NUNCA uses 'handoff_whatsapp' para una consulta puramente informativa — para eso usa 'create_lead'.
+- NUNCA uses 'create_lead' para una urgencia — para eso usa 'handoff_whatsapp'.
+- 'list_planes', 'list_servicios' y 'lookup_coverage': como máximo una vez por sesión, salvo que el usuario pida explícitamente actualizar el dato.
+- Sin cobertura confirmada en PROCESO A ni datos mínimos en PROCESO B → no derives por WhatsApp todavía, sigue preguntando el dato que falta.
+- Teléfono de emergencia textual de ÚLTIMO recurso (solo si 'handoff_whatsapp' falla por un error técnico): ${EMERGENCY_PHONE}`;
 
-const SYSTEM_PROMPT_EN = `You are Alma, an assistant at Legado Holding — a Venezuelan funeral services company with over 80 years of experience. You serve Venezuelans living in the USA whose family in Venezuela has just passed away or is facing an active funeral emergency.
+const SYSTEM_PROMPT_EN = `You are Alma, LEGADO's virtual assistant — the brand behind Funeraria del Zulia (funeral services since 1944), Familias Protegidas (funeral pre-planning) and Crematorios del Zulia. You mostly serve Venezuelans in the USA with family in Venezuela, and any site visitor.
+
+Your personality and limits follow docs/GUIA_INTERACCION_BOT_LEGADO.md: warm, empathetic, transparent, never a pushy salesperson, never presuming a death or an emergency unless the user says so.
+
+══════════════════════════════════════════
+PHASE 0 — CLASSIFY BEFORE REPLYING
+══════════════════════════════════════════
+(A) ACTIVE GRIEF — user explicitly says someone passed away. → RULE #1, then PROCESS A.
+(B) URGENCY WITHOUT A CONFIRMED DEATH — user asks to talk to someone now / describes an urgent situation without mentioning a death. → PROCESS B (direct WhatsApp handoff, no city lookup).
+(C) INFORMATIONAL QUERY — asks about pre-planning, prices, services, coverage, no urgency. → PROCESS C (real catalog via tools + optional lead). Never say "I'm sorry for your loss" here.
+(D) NEUTRAL GREETING / AMBIGUOUS — greet warmly and offer the menu (pre-planning, services, urgent help, talk to someone). Never presume grief or urgency.
+
+══════════════════════════════════════════
+RULE #1 — THE FIRST GRIEF TURN IS SACRED (CASE A ONLY)
+══════════════════════════════════════════
+In your first message for an active-grief contact, NEVER mention prices, list services, call any tool, or ask for more data than the user already gave. Only: (1) hold the grief with genuine warmth, (2) softly acknowledge any details already shared, (3) offer presence, not transactions — arrangements can wait.
 
 ══════════════════════════════════════════
 TONE — ALWAYS
 ══════════════════════════════════════════
-The person on the other end has just lost someone they love. Your first job is NOT to sell or quote; it is to accompany them with humanity.
-- Warm, slow, empathetic. Short messages. Acknowledge feelings first.
-- Never act as a salesperson. Never mention prices or "options" until the user has explicitly asked to move toward coordination.
-- English only if the user writes in English. Use their name once you know it.
+Warm, close, respectful, reliable, professional. One useful question per turn. Never invent prices, coverage, timelines or conditions — say so and offer to verify (via a tool or a human advisor) instead. Never alarmist or pushy. Use their name once you know it, sparingly. English only if the user writes in English. HTML output allowed (p, ul, li, strong, br); markdown is not rendered.
 
 ══════════════════════════════════════════
 MEMORY — ALWAYS
 ══════════════════════════════════════════
-Before each reply, re-read the full history and extract every detail the user has already shared (city/state, deceased's name and relation, religion, age, services mentioned, contract holder info).
-
-⚠️ INVIOLABLE RULE: NEVER re-ask anything the user has already answered. If they said "my mother passed in Caracas", confirm briefly and move on.
-
-⚠️ If the history already has a first message from you (the chat's opening greeting), do NOT introduce yourself again ("Hi, I'm Alma...") — you already did. Answer what the user asked directly.
+Before each reply, re-read the full history and never re-ask anything already answered. If the history already has your opening greeting, don't re-introduce yourself.
 
 ══════════════════════════════════════════
-PROCESS
+PROCESS A — ACTIVE GRIEF (confirmed death)
 ══════════════════════════════════════════
-A. ACCOMPANY. Hold the grief. Do not advance until the user is ready.
-B. CONTEXT + COVERAGE. As soon as you know the city, call 'lookup_coverage'. If covered=false, apologize and give the emergency phone. If covered=true, partners[] is ordered with city-direct partners first, then state-coverage partners. PICK THE FIRST as the active partner. Tell the user "We'll coordinate with [partner name], our funeral partner in [city]".
-C. DECEASED. Gently learn about the person: name, relation, age, religion.
-D. HANDOFF (no quoting, no invoicing). Your job ends at connecting the family with the partner, not selling. NEVER quote prices or service combinations — that's the partner's or a human advisor's conversation. When the user is ready, warmly share the partner's phone/WhatsApp from 'lookup_coverage': "I'll connect you with [partner name] at [phone] — they coordinate arrangements directly in [city] and will walk you through options and costs." If the user would rather have LEGADO call them, collect just a name and phone/WhatsApp so a human advisor can reach out.
+Hold the grief first (RULE #1). Once ready, gently learn city/state and call 'lookup_coverage' once. covered=true → use the FIRST partner in partners[] (city before state) and warmly share their contact. covered=false → apologize, then offer to connect them yourself: get their name and a one-line description of the need, then call 'handoff_whatsapp' instead of just reciting a generic phone number. Only with confirmed coverage, gently learn about the deceased (name, relation, age, faith) one at a time.
+
+══════════════════════════════════════════
+PROCESS B — URGENCY WITHOUT A CONFIRMED DEATH
+══════════════════════════════════════════
+Validate briefly, get their name and a one-line need, then call 'handoff_whatsapp(name, need)' and tell them you're connecting them via WhatsApp with the LEGADO team right now. Don't collect more than those two fields — this is a direct handoff, not a lead.
+
+══════════════════════════════════════════
+PROCESS C — INFORMATIONAL QUERY (pre-planning / services, no urgency)
+══════════════════════════════════════════
+Call 'list_planes' and/or 'list_servicios' (once per session) and answer only with real data from them — never invented prices. If a returned service has es_emergencia=true, treat it as PROCESS B instead of offering a lead. When the user shows real interest in a specific plan/service, explain what their data will be used for and, only with explicit acceptance, collect name, last name and phone (email optional) and call 'create_lead' with the plan_id/servicio_id you already know. Confirm warmly that an advisor will reach out later — never say you're connecting them "now" with someone on call for this; an informational query only becomes a recorded lead, never a live handoff. If urgency comes up at any point, switch to PROCESS B.
+
+══════════════════════════════════════════
+PROCESS D — NEUTRAL GREETING
+══════════════════════════════════════════
+Greet warmly, presume nothing, offer the menu (pre-planning, services, urgent help, talk to someone).
 
 HARD RULES
-- NEVER quote prices or "service combinations" — you have no catalog or authority to do that.
-- NEVER say you'll generate an invoice or payment link. Alma does not invoice.
-- No coverage confirmed → don't give out any partner contact; derive to the general emergency phone.
-- HTML output (p, ul, li, strong, br). No markdown.
-- Emergency phone: ${EMERGENCY_PHONE}`;
+- NEVER quote prices or "service combinations" not literally returned by 'list_planes'/'list_servicios'.
+- NEVER say you'll generate an invoice or payment link — that's the site's purchase wizard, not Alma.
+- NEVER use 'handoff_whatsapp' for a purely informational query — use 'create_lead' instead.
+- NEVER use 'create_lead' for an urgency — use 'handoff_whatsapp' instead.
+- 'list_planes' / 'list_servicios' / 'lookup_coverage': at most once per session unless the user explicitly asks to refresh.
+- Last-resort textual emergency phone (only if 'handoff_whatsapp' fails technically): ${EMERGENCY_PHONE}`;
 
-/* ── Tool definitions (Gemini schema) ────────────────────────────────────── */
+/* ── Tool definitions (OpenAI function-calling schema) ───────────────────── */
 const TOOLS = [
   {
-    functionDeclarations: [
-      {
-        name: "lookup_coverage",
-        description:
-          "Verifica si una ciudad de Venezuela tiene un aliado funerario activo. DEBE llamarse antes de dar contacto de ningún aliado. Devuelve covered:true/false y, si hay cobertura, la lista de aliados disponibles (incluyendo su teléfono para el handoff).",
-        parameters: {
-          type: "OBJECT",
-          properties: {
-            city: {
-              type: "STRING",
-              description:
-                "Ciudad de Venezuela donde está la familia (ej: 'Caracas', 'Maracaibo'). El sistema hace match tolerante a mayúsculas.",
-            },
+    type: "function",
+    function: {
+      name: "lookup_coverage",
+      description:
+        "Verifica si una ciudad de Venezuela tiene un aliado funerario activo. Úsala SOLO en un caso de duelo activo (fallecimiento confirmado), antes de dar contacto de ningún aliado. Devuelve covered:true/false y, si hay cobertura, la lista de aliados disponibles con su teléfono.",
+      parameters: {
+        type: "object",
+        properties: {
+          city: {
+            type: "string",
+            description:
+              "Ciudad de Venezuela donde está la familia (ej: 'Caracas', 'Maracaibo'). El sistema hace match tolerante a mayúsculas.",
           },
-          required: ["city"],
         },
+        required: ["city"],
       },
-    ],
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_planes",
+      description:
+        "Devuelve el catálogo vigente de planes de previsión funeraria de LEGADO (nombre, descripción, precio mensual/anual) desde la API pública de Prevision-Funeraria. Úsala antes de responder cualquier pregunta sobre planes o precios de previsión — nunca inventes esos datos. Como máximo una vez por sesión salvo que el usuario pida verlo de nuevo.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_servicios",
+      description:
+        "Devuelve el catálogo vigente de servicios funerarios individuales (si hay publicados) y el número de WhatsApp de emergencia oficial vigente del tenant. Úsala antes de responder sobre servicios sueltos (no planes), o para confirmar el WhatsApp de emergencia antes de llamar a handoff_whatsapp.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "handoff_whatsapp",
+      description:
+        "Deriva la conversación a un humano de LEGADO por WhatsApp, pre-llenando el mensaje con el nombre y la necesidad de la persona. Úsala SOLO cuando: (a) hay una urgencia real y la persona quiere hablar con alguien ya, o (b) hay un fallecimiento activo pero lookup_coverage no encontró aliado en su ciudad/estado. NUNCA para consultas puramente informativas — para esas usa create_lead.",
+      parameters: {
+        type: "object",
+        properties: {
+          nombre: {
+            type: "string",
+            description: "Nombre de la persona (vacío si aún no lo dio).",
+          },
+          necesidad: {
+            type: "string",
+            description:
+              "Resumen breve, en una frase, de lo que necesita (ej: 'servicio funerario urgente para su madre en Coro').",
+          },
+        },
+        required: ["necesidad"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_lead",
+      description:
+        "Registra a la persona como prospecto (interesado, no cliente ni contrato) en el sistema de LEGADO, asociado a un plan o servicio específico. Úsala SOLO para consultas informativas donde la persona acepta dejar sus datos para que un asesor la contacte más adelante (no urgente). Requiere haber llamado antes a list_planes o list_servicios para conocer el id correcto. Nunca la uses para una urgencia — en ese caso usa handoff_whatsapp.",
+      parameters: {
+        type: "object",
+        properties: {
+          nombres:   { type: "string" },
+          apellidos: { type: "string" },
+          telefono:  { type: "string", description: "Teléfono o WhatsApp de contacto, con código de país si lo dio." },
+          email:     { type: "string", description: "Opcional." },
+          tipo:      { type: "string", enum: ["plan", "servicio"], description: "Sobre qué está interesada la persona." },
+          plan_id:     { type: "number", description: "id del plan (de list_planes) cuando tipo='plan'." },
+          servicio_id: { type: "number", description: "id del servicio (de list_servicios) cuando tipo='servicio'." },
+          mensaje: { type: "string", description: "Opcional, nota breve de contexto." },
+        },
+        required: ["nombres", "apellidos", "telefono", "tipo"],
+      },
+    },
   },
 ];
 
 /* ── HTTP helper ─────────────────────────────────────────────────────────── */
-async function callGemini(model, apiKey, payload) {
-  const url = `${GEMINI_BASE}/${encodeURIComponent(model)}:generateContent`;
+async function callOpenAI(model, apiKey, payload) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
   try {
-    const r = await fetch(url, {
+    const r = await fetch(OPENAI_BASE, {
       method:  "POST",
       headers: {
-        "Content-Type":   "application/json",
-        "x-goog-api-key": apiKey,
+        "Content-Type":  "application/json",
+        "Authorization": `Bearer ${apiKey}`,
       },
-      body:   JSON.stringify(payload),
+      body:   JSON.stringify({ model, ...payload }),
       signal: controller.signal,
     });
     const text = await r.text();
@@ -221,7 +317,7 @@ async function callGemini(model, apiKey, payload) {
     try { parsed = text ? JSON.parse(text) : null; } catch (_) { /* keep text */ }
     if (!r.ok) {
       const detail = typeof parsed === "object" ? JSON.stringify(parsed) : String(parsed);
-      throw new Error(`Gemini ${r.status}: ${detail}`);
+      throw new Error(`OpenAI ${r.status}: ${detail}`);
     }
     return parsed;
   } finally {
@@ -242,7 +338,7 @@ async function execLookupCoverage(args, env, db, emergencyPhone) {
         covered:         false,
         reason:          "city_unknown",
         emergency_phone: emergencyPhone,
-        message:         `No reconozco la ciudad "${city}". Si crees que es un error, indica el estado de Venezuela o usa el teléfono de emergencia.`,
+        message:         `No reconozco la ciudad "${city}". Si crees que es un error, indica el estado de Venezuela o deriva por handoff_whatsapp.`,
       };
     }
     /* Buscamos en dos niveles:
@@ -262,7 +358,7 @@ async function execLookupCoverage(args, env, db, emergencyPhone) {
         reason:          "no_active_partner",
         location:        { state: loc.state, city: loc.city },
         emergency_phone: emergencyPhone,
-        message:         `${loc.city}, ${loc.state} todavía no tiene un aliado funerario activo (ni a nivel ciudad ni a nivel estado). Deriva al teléfono de emergencia.`,
+        message:         `${loc.city}, ${loc.state} todavía no tiene un aliado funerario activo (ni a nivel ciudad ni a nivel estado). Recolecta nombre+necesidad y deriva por handoff_whatsapp.`,
       };
     }
     return {
@@ -279,33 +375,154 @@ async function execLookupCoverage(args, env, db, emergencyPhone) {
   } catch (e) {
     console.warn(`[alma] lookup_coverage error: ${e.message}`);
     /* Fail-CLOSED: si no podemos verificar cobertura, NO asumimos que existe.
-       Vender un servicio que no podemos cumplir es peor que un falso negativo
-       que deriva al teléfono. El bot debe pedir disculpas y dar EMERGENCY_PHONE. */
+       El bot debe pedir disculpas y derivar por handoff_whatsapp igual que en
+       un no_active_partner. */
     return {
       covered:         false,
       reason:          "verification_failed",
       emergency_phone: emergencyPhone,
-      message:         `No pude verificar la cobertura en este momento por un error técnico. Por favor, deriva al teléfono de emergencia ${emergencyPhone}. NO factures.`,
+      message:         `No pude verificar la cobertura en este momento por un error técnico. Recolecta nombre+necesidad y deriva por handoff_whatsapp. NO factures.`,
     };
   }
 }
 
-/* ── Conversión historial → contents de Gemini ───────────────────────────── */
-function historyToContents(history) {
+async function execListPlanes(env, lang) {
+  try {
+    const pf = createPF(env);
+    const idioma = lang.startsWith("en") ? "en" : undefined;
+    const resp = await pf.getPlanes(idioma);
+    const items = (Array.isArray(resp?.items) ? resp.items : []).map((p) => ({
+      id:                p.id,
+      slug:              p.slug,
+      nombre:            p.nombre,
+      descripcion:       p.descripcion,
+      descripcion_larga: p.descripcion_detallada || null,
+      moneda:            p.moneda,
+      precio_mensual: typeof p.precio_mensual_centavos === "number"
+        ? (p.precio_mensual_centavos / 100).toFixed(2) : null,
+      precio_anual: typeof p.precio_anual_centavos === "number"
+        ? (p.precio_anual_centavos / 100).toFixed(2) : null,
+    }));
+    return { items };
+  } catch (e) {
+    console.warn(`[alma] list_planes error: ${e.message}`);
+    return {
+      items: [],
+      error: "No se pudo consultar el catálogo de planes por un error técnico. No inventes precios ni coberturas — dile al usuario que hubo un problema y ofrece reintentar o dejar sus datos.",
+    };
+  }
+}
+
+async function execListServicios(env, lang) {
+  try {
+    const pf = createPF(env);
+    const idioma = lang.startsWith("en") ? "en" : undefined;
+    const resp = await pf.getServicios(idioma);
+    const items = (Array.isArray(resp?.items) ? resp.items : []).map((s) => ({
+      id:            s.id,
+      slug:          s.slug,
+      nombre:        s.nombre,
+      descripcion:   s.descripcion,
+      moneda:        s.moneda,
+      precio: typeof s.precio_centavos === "number"
+        ? (s.precio_centavos / 100).toFixed(2) : null,
+      es_emergencia: !!s.es_emergencia,
+    }));
+    return { items, whatsapp_emergencia: resp?.whatsapp_emergencia || null };
+  } catch (e) {
+    console.warn(`[alma] list_servicios error: ${e.message}`);
+    return {
+      items: [],
+      whatsapp_emergencia: null,
+      error: "No se pudo consultar el catálogo de servicios por un error técnico.",
+    };
+  }
+}
+
+/* Arma el mensaje pre-llenado del link de WhatsApp. Se construye en el
+   backend (no lo redacta el modelo) para no depender de que el LLM escape
+   bien la URL — el frontend solo hace encodeURIComponent sobre este texto. */
+function buildWhatsAppText(lang, nombre, necesidad) {
+  const quien = nombre && String(nombre).trim()
+    ? String(nombre).trim()
+    : (lang.startsWith("en") ? "a visitor" : "un visitante");
+  if (lang.startsWith("en")) {
+    return `Hi, I'm ${quien}. I was chatting with Alma (LEGADO's assistant) about: ${necesidad}. I'd like to talk to someone now.`;
+  }
+  return `Hola, soy ${quien}. Estuve conversando con Alma (asistente de LEGADO) sobre: ${necesidad}. Me gustaría hablar con alguien ahora.`;
+}
+
+async function execHandoffWhatsapp(args, env, lang) {
+  const nombre    = (args && args.nombre) ? String(args.nombre).trim() : "";
+  const necesidad = (args && args.necesidad) ? String(args.necesidad).trim() : "";
+  if (!necesidad) {
+    return { ok: false, error: "Falta 'necesidad' — pregúntale en una frase qué necesita antes de derivar." };
+  }
+  /* Confirmamos el WhatsApp vigente contra la API (el staff puede cambiarlo
+     desde el panel de Prevision-Funeraria) — el número fijo es solo fallback
+     si la API no responde. */
+  let phone = DEFAULT_WHATSAPP_EMERGENCIA;
+  try {
+    const pf = createPF(env);
+    const resp = await pf.getServicios();
+    if (resp && resp.whatsapp_emergencia) phone = resp.whatsapp_emergencia;
+  } catch (e) {
+    console.warn(`[alma] handoff_whatsapp: no se pudo confirmar whatsapp_emergencia, uso fallback: ${e.message}`);
+  }
+  const digits = String(phone).replace(/[^\d]/g, "");
+  const text = buildWhatsAppText(lang, nombre, necesidad);
+  return { ok: true, phone: digits, text };
+}
+
+async function execCreateLead(args, env) {
+  const a = args || {};
+  const tipo      = a.tipo === "servicio" ? "servicio" : "plan";
+  const nombres   = String(a.nombres || "").trim();
+  const apellidos = String(a.apellidos || "").trim();
+  const telefono  = String(a.telefono || "").trim();
+  if (!nombres || !apellidos || !telefono) {
+    return { ok: false, error: "Faltan nombres, apellidos o teléfono — pídeselos al usuario de forma natural (no como error técnico) antes de reintentar." };
+  }
+  const body = { tipo, nombres, apellidos, telefono };
+  if (a.email)   body.email   = String(a.email).trim();
+  if (a.mensaje) body.mensaje = String(a.mensaje).trim();
+  if (tipo === "plan") {
+    if (!a.plan_id) {
+      return { ok: false, error: "Falta plan_id — usa list_planes y confirma con el usuario cuál plan le interesa antes de registrar el prospecto." };
+    }
+    body.plan_id = Number(a.plan_id);
+  } else {
+    if (!a.servicio_id) {
+      return { ok: false, error: "Falta servicio_id — usa list_servicios y confirma con el usuario cuál servicio le interesa antes de registrar el prospecto." };
+    }
+    body.servicio_id = Number(a.servicio_id);
+  }
+  try {
+    const pf = createPF(env);
+    const resp = await pf.crearSolicitud(body);
+    return { ok: true, solicitud_id: resp?.id ?? resp?.solicitud_id ?? null, tipo, plan_id: body.plan_id ?? null, servicio_id: body.servicio_id ?? null };
+  } catch (e) {
+    console.warn(`[alma] create_lead error: ${e.message}`);
+    return { ok: false, error: `No se pudo registrar el prospecto por un error técnico (${e.message}). Discúlpate y ofrece reintentar u otro medio de contacto.` };
+  }
+}
+
+/* ── Conversión historial → messages de OpenAI ───────────────────────────── */
+function historyToMessages(history) {
   if (!Array.isArray(history)) return [];
   return history
     .filter((m) => m && m.content && (m.role === "user" || m.role === "assistant" || m.role === "model"))
     .map((m) => ({
-      role:  (m.role === "user") ? "user" : "model",
-      parts: [{ text: String(m.content) }],
+      role:    (m.role === "user") ? "user" : "assistant",
+      content: String(m.content),
     }));
 }
 
 /* ── Entry point ─────────────────────────────────────────────────────────── */
 export async function runAlma(input, env, executionCtx) {
-  const apiKey = (env.GEMINI_API_KEY || "").trim();
+  const apiKey = (env.OPENAI_API_KEY || "").trim();
   if (!apiKey) {
-    throw new Error("GEMINI_API_KEY no configurado en el Worker");
+    throw new Error("OPENAI_API_KEY no configurado en el Worker");
   }
   const lang  = (input.lang || "es").toLowerCase();
   const db    = input.db;   /* puede ser cliente real o noop */
@@ -321,12 +538,10 @@ export async function runAlma(input, env, executionCtx) {
     console.warn(`[alma] no se pudo leer agent_config: ${e.message}`);
   }
 
-  const model = (cfg.model && cfg.model.trim()) || env.GEMINI_MODEL || "gemini-2.5-flash";
-  /* Temperature default 0.3 — el agente sigue reglas estrictas (FASE 0,
-     primer turno sagrado, lookup_coverage obligatorio). A 0.7 el modelo
-     se desvía con frecuencia del prompt. 0.3 conserva calidez suficiente
-     para el tono empático pero respeta la estructura. El admin puede
-     subirlo desde agent_config si necesita más variedad. */
+  const model = (cfg.model && cfg.model.trim()) || env.OPENAI_MODEL || "gpt-5.6-luna";
+  if (/^gemini/i.test(model)) {
+    console.warn(`[alma] agent_config.model="${model}" parece un modelo de Gemini — Alma ahora llama a OpenAI, actualiza el valor desde el panel admin.`);
+  }
   const temperature = (() => {
     const t = parseFloat(cfg.temperature);
     return Number.isFinite(t) ? t : 0.3;
@@ -337,21 +552,19 @@ export async function runAlma(input, env, executionCtx) {
   const promptHardcoded = lang.startsWith("en") ? SYSTEM_PROMPT_EN : SYSTEM_PROMPT_ES;
   const promptKey       = lang.startsWith("en") ? "system_prompt_en" : "system_prompt_es";
   const promptFromDb    = (cfg[promptKey] || "").trim();
-  /* El prompt puede traer placeholders {{emergency_phone}} para que el
-     admin lo edite sin necesidad de hard-codear el teléfono.                */
   const sysPrompt = (promptFromDb || promptHardcoded).replace(
     /\{\{\s*emergency_phone\s*\}\}/g,
     emergencyPhone,
   );
-  /* Diagnóstico: nos dice si el bot está leyendo prompt de BD vs hardcoded
-     y si el FASE 0 está presente. Si en producción aparece source=db pero
-     has_fase0=false, hay un row stale en agent_config. */
   console.log(
-    `[alma] prompt_source=${promptFromDb ? "db" : "hardcoded"} len=${sysPrompt.length} has_fase0=${sysPrompt.includes("FASE 0")} temp=${temperature}`,
+    `[alma] prompt_source=${promptFromDb ? "db" : "hardcoded"} len=${sysPrompt.length} has_fase0=${sysPrompt.includes("FASE 0") || sysPrompt.includes("PHASE 0")} model=${model} temp=${temperature}`,
   );
 
-  const contents = historyToContents(input.history);
-  contents.push({ role: "user", parts: [{ text: String(input.message || "") }] });
+  const messages = [
+    { role: "system", content: sysPrompt },
+    ...historyToMessages(input.history),
+    { role: "user", content: String(input.message || "") },
+  ];
 
   const out = {
     output: "",
@@ -363,11 +576,10 @@ export async function runAlma(input, env, executionCtx) {
     const t0 = Date.now();
     let resp;
     try {
-      resp = await callGemini(model, apiKey, {
-        contents,
-        tools: TOOLS,
-        systemInstruction: { parts: [{ text: sysPrompt }] },
-        generationConfig:  { temperature },
+      resp = await callOpenAI(model, apiKey, {
+        messages,
+        tools:       TOOLS,
+        temperature,
       });
     } catch (e) {
       out.events.push({ role: "model", hop, latency_ms: Date.now() - t0, error: e.message });
@@ -375,50 +587,49 @@ export async function runAlma(input, env, executionCtx) {
     }
     const latency_ms = Date.now() - t0;
 
-    const candidate = resp.candidates && resp.candidates[0];
-    if (!candidate) {
-      const msg = `Gemini sin candidatos: ${JSON.stringify(resp)}`;
+    const choice = resp.choices && resp.choices[0];
+    if (!choice) {
+      const msg = `OpenAI sin choices: ${JSON.stringify(resp)}`;
       out.events.push({ role: "model", hop, latency_ms, error: msg });
       throw new Error(msg);
     }
-    const parts = (candidate.content && candidate.content.parts) || [];
-    const funcCalls = parts.filter((p) => p.functionCall).map((p) => p.functionCall);
-    const textParts = parts.filter((p) => p.text).map((p) => p.text);
+    const assistantMsg = choice.message || {};
+    const toolCalls = Array.isArray(assistantMsg.tool_calls) ? assistantMsg.tool_calls : [];
 
     /* Caso A: sin tool call → texto final al usuario. */
-    if (funcCalls.length === 0) {
-      out.output = textParts.join("\n").trim();
+    if (toolCalls.length === 0) {
+      out.output = String(assistantMsg.content || "").trim();
       out.events.push({ role: "model", hop, latency_ms, content: out.output });
-      console.log(`[alma] hop=${hop} done text_len=${out.output.length} handoff=${!!out.handoff}`);
+      console.log(`[alma] hop=${hop} done text_len=${out.output.length} handoff=${!!out.handoff} waHandoff=${!!out.waHandoff} lead=${!!out.lead}`);
       return out;
     }
 
     /* Caso B: hay tool call(s). Guardamos turno del modelo + ejecutamos. */
-    contents.push({ role: "model", parts });
+    messages.push(assistantMsg);
 
-    for (const fc of funcCalls) {
+    for (const tc of toolCalls) {
+      let args = {};
+      try { args = JSON.parse(tc.function?.arguments || "{}"); } catch (_) { /* args queda {} */ }
       out.events.push({
         role:       "model",
         hop,
         latency_ms,
-        tool_name:  fc.name,
-        tool_args:  fc.args || {},
-        content:    textParts.length ? textParts.join("\n") : null,
+        tool_name:  tc.function?.name,
+        tool_args:  args,
+        content:    assistantMsg.content || null,
       });
     }
 
-    const responseParts = [];
-    for (const fc of funcCalls) {
-      console.log(`[alma] hop=${hop} tool=${fc.name}`);
+    for (const tc of toolCalls) {
+      const name = tc.function?.name;
+      let args = {};
+      try { args = JSON.parse(tc.function?.arguments || "{}"); } catch (_) { /* args queda {} */ }
+      console.log(`[alma] hop=${hop} tool=${name}`);
       const tt0 = Date.now();
       let result, toolError = null;
       try {
-        if (fc.name === "lookup_coverage") {
-          result = await execLookupCoverage(fc.args || {}, env, db, emergencyPhone);
-          /* Guardamos la cobertura confirmada para que chat.js la persista
-             en chat_sessions.city/state. Si hay cobertura, el primer aliado
-             de partners[] (ver system prompt) es el que se usa para el
-             handoff — sin cotización ni factura, solo su contacto. */
+        if (name === "lookup_coverage") {
+          result = await execLookupCoverage(args, env, db, emergencyPhone);
           if (result.covered && result.location) {
             out.coverage = {
               covered: true,
@@ -438,8 +649,22 @@ export async function runAlma(input, env, executionCtx) {
               reason:  result.reason || "unknown",
             };
           }
+        } else if (name === "list_planes") {
+          result = await execListPlanes(env, lang);
+        } else if (name === "list_servicios") {
+          result = await execListServicios(env, lang);
+        } else if (name === "handoff_whatsapp") {
+          result = await execHandoffWhatsapp(args, env, lang);
+          if (result.ok) {
+            out.waHandoff = { phone: result.phone, text: result.text };
+          }
+        } else if (name === "create_lead") {
+          result = await execCreateLead(args, env);
+          if (result.ok) {
+            out.lead = { tipo: result.tipo, planId: result.plan_id, servicioId: result.servicio_id };
+          }
         } else {
-          result = { error: `Tool desconocida: ${fc.name}` };
+          result = { error: `Tool desconocida: ${name}` };
           toolError = result.error;
         }
       } catch (e) {
@@ -451,18 +676,17 @@ export async function runAlma(input, env, executionCtx) {
         role:        "tool",
         hop,
         latency_ms:  toolLat,
-        tool_name:   fc.name,
-        tool_args:   fc.args || {},
+        tool_name:   name,
+        tool_args:   args,
         tool_result: result,
         error:       toolError,
       });
-      responseParts.push({
-        functionResponse: { name: fc.name, response: result },
+      messages.push({
+        role:         "tool",
+        tool_call_id: tc.id,
+        content:      JSON.stringify(result),
       });
     }
-
-    /* En Gemini los functionResponse van como role:"user". */
-    contents.push({ role: "user", parts: responseParts });
   }
 
   const msg = `Tool use no convergió en ${MAX_TOOL_HOPS} hops`;

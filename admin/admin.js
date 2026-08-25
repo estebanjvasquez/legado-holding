@@ -392,7 +392,7 @@ const AgentCtrl = {
   },
   render() {
     /* Conocidos */
-    $("#cfg-model").value           = this.config.model?.value           || "gemini-2.5-flash";
+    $("#cfg-model").value           = this.config.model?.value           || "gpt-5.6-luna";
     $("#cfg-temperature").value     = this.config.temperature?.value     || "0.7";
     $("#cfg-emergency-phone").value = this.config.emergency_phone?.value || "";
     $("#cfg-prompt-es").value       = this.config.system_prompt_es?.value || "";

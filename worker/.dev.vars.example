@@ -2,3 +2,7 @@ PF_TOKEN=pega-aqui-tu-token-pf_-de-pruebas
 # Opcional en local, si quieres apuntar success_url/cancel_url a páginas
 # servidas localmente en vez del dominio de producción:
 # SITE_BASE_URL=http://127.0.0.1:5500
+
+# Necesario en local solo si vas a probar POST /chat (agente Alma):
+# OPENAI_API_KEY=sk-...
+# SUPABASE_SERVICE_ROLE_KEY=pega-aqui-tu-service-role-key

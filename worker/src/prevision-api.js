@@ -5,20 +5,22 @@
    ============================================================================= */
 
 export function createPF(env) {
-  if (!env.PF_TOKEN) {
-    throw new Error("PF_TOKEN no configurado en el Worker");
-  }
   const base = (env.PF_BASE || "https://prevision-funeraria.sisteg.workers.dev") +
     "/api/public/t/lh";
-  const baseHeaders = {
-    Authorization: `Bearer ${env.PF_TOKEN}`,
-    Accept: "application/json",
-  };
+  const token = env.PF_TOKEN;
 
-  async function req(method, path, body) {
-    const opts = { method, headers: { ...baseHeaders } };
+  /* `auth: true` marca los endpoints server-to-server (parentescos, compras).
+     El catálogo (planes/servicios) y los leads (solicitudes) son públicos —
+     mismo contrato que el navegador, sin token — así que no deben exigirlo. */
+  async function req(method, path, body, { auth = false } = {}) {
+    const headers = { Accept: "application/json" };
+    if (auth) {
+      if (!token) throw new Error("PF_TOKEN no configurado en el Worker");
+      headers.Authorization = `Bearer ${token}`;
+    }
+    const opts = { method, headers };
     if (body !== undefined) {
-      opts.headers["Content-Type"] = "application/json";
+      headers["Content-Type"] = "application/json";
       opts.body = JSON.stringify(body);
     }
     const r = await fetch(base + path, opts);
@@ -41,7 +43,13 @@ export function createPF(env) {
   }
 
   return {
-    getParentescos: () => req("GET", "/parentescos"),
-    crearCompra: (body) => req("POST", "/compras", body),
+    getParentescos: () => req("GET", "/parentescos", undefined, { auth: true }),
+    crearCompra:     (body) => req("POST", "/compras", body, { auth: true }),
+    /* Catálogo público — lo usa el agente Alma para informar sin inventar
+       precios/coberturas (docs/GUIA_INTERACCION_BOT_LEGADO.md sección 4.4). */
+    getPlanes:    (idioma) => req("GET", `/planes${idioma ? `?idioma=${idioma}` : ""}`),
+    getServicios: (idioma) => req("GET", `/servicios${idioma ? `?idioma=${idioma}` : ""}`),
+    /* Lead público (prospecto) — nunca es un contrato, ver docs/api-publica-wizard.md. */
+    crearSolicitud: (body) => req("POST", "/solicitudes", body),
   };
 }

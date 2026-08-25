@@ -25,18 +25,18 @@ propio que también sirve de proxy autenticado para el bot "Alma".
    │ prevision-funeraria         │  │  api.legadoholding.com     │
    │ .sisteg.workers.dev         │  │  Cloudflare Worker         │
    │ /api/public/t/lh/planes     │  │  (JS + secrets PF_TOKEN,   │
-   │ (catálogo de planes)        │  │   GEMINI_API_KEY, etc.)    │
+   │ (catálogo de planes)        │  │   OPENAI_API_KEY, etc.)    │
    └─────────────────────────────┘  └─────────────┬──────────────┘
                                                     │
                           ┌─────────────────────────┼─────────────────────┐
-                          │ Authorization: Bearer    │ Gemini (Alma)       │ IN_BASE (solo
+                          │ Authorization: Bearer    │ OpenAI (Alma)       │ IN_BASE (solo
                           │ PF_TOKEN                 │                     │ login admin)
                           ▼                          ▼                     ▼
           ┌────────────────────────────┐  ┌──────────────────┐  ┌─────────────────────┐
-          │ prevision-funeraria         │  │ Google Gemini     │  │ invoicing.legado-    │
+          │ prevision-funeraria         │  │ OpenAI API        │  │ invoicing.legado-    │
           │ .sisteg.workers.dev         │  │ + Supabase        │  │ holding.com          │
           │ /api/public/t/lh/compras,   │  │ (memoria de chat) │  │ Invoice Ninja v5      │
-          │ /parentescos                │  │                   │  │ (solo auth de staff) │
+          │ /parentescos, /solicitudes  │  │                   │  │ (solo auth de staff) │
           └────────────────────────────┘  └──────────────────┘  └─────────────────────┘
 ```
 
@@ -92,9 +92,9 @@ propio que también sirve de proxy autenticado para el bot "Alma".
 | # | Componente | Función | Tecnología |
 |---|---|---|---|
 | 1 | **Frontend estático** | Sitio público, wizard, render de planes | HTML + CSS + JS plano servido por Apache |
-| 2 | **Cloudflare Worker** (`api.legadoholding.com`) | Orquesta el checkout server-to-server, proxy autenticado de parentescos, y corre el agente "Alma" (Gemini) | JavaScript en V8 (Cloudflare Workers) |
-| 3 | **Prevision-Funeraria** (repo separado) | Multi-tenant: catálogo de planes/servicios, clientes, contratos, cobro con Stripe | Cloudflare Workers + D1 (`prevision-funeraria.sisteg.workers.dev`) |
-| 4 | **Google Gemini + Supabase** | Motor conversacional de Alma y persistencia de sesiones/turnos de chat | Gemini API + Supabase (Postgres) |
+| 2 | **Cloudflare Worker** (`api.legadoholding.com`) | Orquesta el checkout server-to-server, proxy autenticado de parentescos, y corre el agente "Alma" (OpenAI) | JavaScript en V8 (Cloudflare Workers) |
+| 3 | **Prevision-Funeraria** (repo separado) | Multi-tenant: catálogo de planes/servicios, clientes, contratos, cobro con Stripe, leads públicos (`/solicitudes`) | Cloudflare Workers + D1 (`prevision-funeraria.sisteg.workers.dev`) |
+| 4 | **OpenAI + Supabase** | Motor conversacional de Alma y persistencia de sesiones/turnos de chat | OpenAI API (`gpt-5.6-luna`) + Supabase (Postgres) |
 | 5 | **Invoice Ninja v5** | Solo autenticación de staff para el panel admin de este sitio (`worker/src/admin.js`) | Auto-hospedado en `invoicing.legadoholding.com` |
 | 6 | **Cloudflare DNS** | Administra `legadoholding.com` y bind del subdominio `api.` al Worker | Cloudflare |
 
@@ -126,7 +126,7 @@ solo muestra una pantalla de "gracias" al comprador.
 
 ### Por qué un Worker propio (y no llamar Prevision-Funeraria directo desde el navegador)
 
-- **Token seguro**: `PF_TOKEN` (server-to-server) y `GEMINI_API_KEY` viven
+- **Token seguro**: `PF_TOKEN` (server-to-server) y `OPENAI_API_KEY` viven
   como secrets cifrados en Cloudflare, jamás llegan al navegador. El catálogo
   de planes sí se llama directo desde el navegador (sin token, CORS abierto).
 - **Sin infraestructura**: 0 servidores que administrar. El plan gratuito de
@@ -166,7 +166,7 @@ legado-holding/
         ├── prevision-api.js         ← cliente HTTP de la API de Prevision-Funeraria
         ├── wizard-compra.js         ← orquestador del checkout (reemplaza pipeline.js)
         ├── chat.js                  ← endpoint /chat, delega en alma.js
-        ├── alma.js                  ← agente Gemini: handoff con el teléfono del aliado (ya no cotiza/factura)
+        ├── alma.js                  ← agente OpenAI: catálogo (planes/servicios), handoff por WhatsApp o registro de prospecto (ya no cotiza/factura)
         ├── supabase.js              ← persistencia de sesiones/turnos de chat
         ├── admin.js                 ← login del panel admin (todavía vía Invoice Ninja, IN_BASE)
         └── errors.js                ← ValidationError / isValidationError
@@ -191,7 +191,7 @@ Lo que **NO** se commitea (ver `.gitignore`):
 | Worker tooling | Wrangler 3+ | CLI oficial de Cloudflare |
 | Catálogo y checkout | API pública de Prevision-Funeraria (tenant `lh`) | Contrato en `docs/api-publica-wizard.md` |
 | Cobro con tarjeta | Stripe Checkout (orquestado por Prevision-Funeraria) | Cuenta de producción de LH pendiente (KYC); hoy en modo test |
-| Chat / IA | Google Gemini (`GEMINI_MODEL`) + Supabase (memoria de sesión) | Implementado en `worker/src/alma.js` |
+| Chat / IA | OpenAI (`OPENAI_MODEL`, default `gpt-5.6-luna`) + Supabase (memoria de sesión) | Implementado en `worker/src/alma.js` |
 | Facturación de staff | Invoice Ninja v5 (self-hosted) | Solo login del panel admin, vía `IN_BASE` |
 | DNS y CDN | Cloudflare | Zone: `legadoholding.com` |
 | Hosting frontend | Apache | Sirve los archivos estáticos del repo |
@@ -309,8 +309,8 @@ de planes deben mostrar precios reales (no los de respaldo).
   "env": "dev",
   "pfTokenLoaded": true,
   "pfBase": "https://prevision-funeraria.sisteg.workers.dev",
-  "geminiConfigured": true,
-  "geminiModel": "gemini-2.5-flash",
+  "openaiConfigured": true,
+  "openaiModel": "gpt-5.6-luna",
   "supabaseConfigured": true,
   "supabaseUrl": "https://naebpcyphdcopndqovie.supabase.co",
   "allowedOrigins": [
@@ -375,7 +375,7 @@ incluyendo los otros `estado` posibles (`pendiente`, `confirmada`), en
 | `SITE_BASE_URL` | `https://www.legadoholding.com` | Usada para armar `success_url`/`cancel_url` del checkout con Stripe |
 | `IN_BASE` | `https://invoicing.legadoholding.com/api/v1` | Solo para el login de staff del panel admin |
 | `ENVIRONMENT` | `dev` | Etiqueta de entorno; aparece en el health check |
-| `GEMINI_MODEL` | `gemini-2.5-flash` | Modelo que ejecuta el agente Alma |
+| `OPENAI_MODEL` | `gpt-5.6-luna` | Modelo que ejecuta el agente Alma |
 | `SUPABASE_URL` | (URL del proyecto) | Memoria de sesión y logs de turnos del chat |
 | `ALLOWED_ORIGINS` | (lista CSV) | Orígenes permitidos por CORS |
 
@@ -384,7 +384,7 @@ incluyendo los otros `estado` posibles (`pendiente`, `confirmada`), en
 | Secret | Función | Cómo se configura |
 |---|---|---|
 | `PF_TOKEN` | Token de API de Prevision-Funeraria (tenant `lh`) | `wrangler secret put PF_TOKEN` |
-| `GEMINI_API_KEY` | API key de Google Gemini para el agente Alma | `wrangler secret put GEMINI_API_KEY` |
+| `OPENAI_API_KEY` | API key de OpenAI para el agente Alma | `wrangler secret put OPENAI_API_KEY` |
 | `SUPABASE_SERVICE_ROLE_KEY` | Escritura en Supabase (chat_sessions/chat_turns) | `wrangler secret put SUPABASE_SERVICE_ROLE_KEY` — opcional, el chat sigue funcionando sin esto (no-op fallback) |
 
 > `IN_TOKEN` fue revocado: el checkout y Alma ya no lo usan. Solo el login
@@ -548,7 +548,7 @@ Desde `worker/`:
 ```powershell
 # Solo una vez por secret: subir a Cloudflare
 wrangler secret put PF_TOKEN
-wrangler secret put GEMINI_API_KEY
+wrangler secret put OPENAI_API_KEY
 wrangler secret put SUPABASE_SERVICE_ROLE_KEY   # opcional
 # (pega el valor cuando pida "Enter a secret value:")
 
@@ -680,7 +680,7 @@ Luego `wrangler deploy`. Sin espacios entre comas.
 
 ### Lo que NUNCA debe estar en el repo
 
-- El valor real de `PF_TOKEN`, `GEMINI_API_KEY` o `SUPABASE_SERVICE_ROLE_KEY`
+- El valor real de `PF_TOKEN`, `OPENAI_API_KEY` o `SUPABASE_SERVICE_ROLE_KEY`
   (en cualquier archivo).
 - Credenciales de Cloudflare (`wrangler login` las guarda en
   `%USERPROFILE%\.wrangler\`, fuera del repo).
@@ -691,7 +691,7 @@ Luego `wrangler deploy`. Sin espacios entre comas.
 
 1. **Inmediatamente**: regenerar el token en el panel admin de
    Prevision-Funeraria (para `PF_TOKEN`) o en el proveedor correspondiente
-   (Google Cloud para `GEMINI_API_KEY`, Supabase para `SUPABASE_SERVICE_ROLE_KEY`).
+   (OpenAI para `OPENAI_API_KEY`, Supabase para `SUPABASE_SERVICE_ROLE_KEY`).
 2. Actualizar el secret en Cloudflare: `wrangler secret put <NOMBRE>`.
 3. Actualizar `worker/.dev.vars` local.
 4. Limpiar el historial de PowerShell:

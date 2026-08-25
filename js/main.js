@@ -28,10 +28,11 @@
    CONFIG
    ─────────────────────────────────────────────────────────────────────────────
    El chat de emergencia habla con el Worker (api.legadoholding.com/chat), que
-   corre el agente Alma directamente (function calling sobre Gemini en
-   worker/src/alma.js). Alma ya no factura: identifica cobertura/aliado y hace
-   un handoff con su teléfono. En dev apunta al wrangler local; en prod al
-   subdominio api.
+   corre el agente Alma directamente (function calling sobre OpenAI en
+   worker/src/alma.js). Alma ya no factura: identifica cobertura/aliado,
+   consulta el catálogo de planes/servicios, y deriva por WhatsApp (urgencia)
+   o registra un prospecto (consulta informativa). En dev apunta al wrangler
+   local; en prod al subdominio api.
    ============================================================================= */
 const CHAT_WEBHOOK_URL =
   (typeof window !== "undefined" && window.LEGADO_CONFIG?.CHAT_API_URL) ||
@@ -1067,6 +1068,26 @@ function appendHandoffButton(partnerName, partnerPhone) {
   msgs.scrollTop = msgs.scrollHeight;
 }
 
+/* Botón de WhatsApp para urgencias sin aliado por ciudad (o sin fallecimiento
+   confirmado) — Alma recolectó nombre+necesidad y arma el mensaje pre-llenado
+   en el backend (worker/src/alma.js: handoff_whatsapp). */
+function appendWhatsAppHandoffButton(phone, text) {
+  if (!phone) return;
+  const msgs = $("#chat-messages");
+  const wrap = document.createElement("div");
+  wrap.className = "chat-bubble-wrap bot";
+  const url = `https://api.whatsapp.com/send?phone=${encodeURIComponent(phone)}${
+    text ? `&text=${encodeURIComponent(text)}` : ""
+  }`;
+  const label = currentLang === "es" ? "Continuar por WhatsApp" : "Continue on WhatsApp";
+  wrap.innerHTML = `
+    <a class="chat-pay-btn" href="${url}" target="_blank" rel="noopener">
+      <span>${label}</span>
+    </a>`;
+  msgs.appendChild(wrap);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
 function showTypingIndicator() {
   const msgs = $("#chat-messages");
   const wrap = document.createElement("div");
@@ -1127,6 +1148,9 @@ async function sendChatMessage() {
        ni factura (ver worker/src/alma.js). */
     if (data.handoff && data.partnerPhone) {
       appendHandoffButton(data.partnerName, data.partnerPhone);
+    }
+    if (data.waHandoffPhone) {
+      appendWhatsAppHandoffButton(data.waHandoffPhone, data.waHandoffText);
     }
   } catch (e) {
     console.error("Chat error:", e);
