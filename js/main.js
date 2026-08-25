@@ -263,15 +263,19 @@ const LANG = {
   emergency: ["EMERGENCIA", "EMERGENCY"],
 
   /* ── Chatbot ───────────────────────────────────────────────────────────── */
-  chat_title: ["Asistente LEGADO", "LEGADO Assistant"],
-  chat_emergency: ["Asistencia de Emergencia", "Emergency Assistance"],
+  /* El bot siempre debe presentarse como "Alma" (docs/GUIA_INTERACCION_BOT_LEGADO.md).
+     El saludo NO debe presuponer duelo/fallecimiento — eso lo clasifica Alma
+     misma en el primer turno real (FASE 0 en worker/src/alma.js); esta burbuja
+     estática solo debe ofrecer ayuda sin asumir la necesidad de la persona. */
+  chat_title: ["Alma — Asistente LEGADO", "Alma — LEGADO Assistant"],
+  chat_emergency: ["Alma — Asistencia inmediata", "Alma — Immediate assistance"],
   chat_greeting: [
-    "¡Hola! Soy el asistente de LEGADO. ¿En qué puedo ayudarte con tu plan?",
-    "Hi! I'm the LEGADO assistant. How can I help you with your plan?",
+    "¡Hola! Soy Alma, el asistente de LEGADO. ¿En qué puedo ayudarte con tu plan?",
+    "Hi! I'm Alma, LEGADO's assistant. How can I help you with your plan?",
   ],
   chat_greeting_emergency: [
-    "Lamento mucho que estés pasando por este momento. Estoy aquí para ayudarte. ¿Puedes contarme qué sucedió?",
-    "I'm so sorry you're going through this. I'm here to help. Can you tell me what happened?",
+    "Hola, soy Alma, tu asistente de LEGADO. Estoy aquí para orientarte y acompañarte, estés donde estés. Cuéntame qué está pasando y vemos juntos cómo ayudarte.",
+    "Hi, I'm Alma, your LEGADO assistant. I'm here to guide and support you, wherever you are. Tell me what's going on and we'll figure out how to help, together.",
   ],
   chat_placeholder: ["Escribe tu pregunta...", "Type your question..."],
   chat_ph_emergency: [
