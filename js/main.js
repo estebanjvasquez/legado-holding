@@ -703,16 +703,17 @@ function toggleLang() {
   applyLanguage();
   if (wizardOpen) renderWizardContent();
 
-  /* Actualiza saludo del chat si está abierto */
+  /* Actualiza saludo del chat si está abierto y el usuario todavía no
+     escribió nada (chatMessages solo tiene el saludo inicial). */
   const overlay = $("#chatbot-overlay");
-  if (overlay && !overlay.classList.contains("hidden")) {
+  const onlyGreeting =
+    chatMessages.length === 1 && chatMessages[0].role === "assistant";
+  if (overlay && !overlay.classList.contains("hidden") && onlyGreeting) {
+    const greeting =
+      chatMode === "emergency" ? t("chat_greeting_emergency") : t("chat_greeting");
+    chatMessages[0].content = greeting;
     const greetBubble = $("#chat-messages .chat-greeting .chat-bubble");
-    if (greetBubble && chatMessages.length === 0) {
-      greetBubble.textContent =
-        chatMode === "emergency"
-          ? t("chat_greeting_emergency")
-          : t("chat_greeting");
-    }
+    if (greetBubble) greetBubble.textContent = greeting;
   }
 }
 
@@ -923,7 +924,6 @@ function renderTestimonials() {
    ============================================================================= */
 function openChat(mode) {
   chatMode = mode;
-  chatMessages = [];
   chatSessionId = generateSessionId();
 
   const overlay = $("#chatbot-overlay");
@@ -939,10 +939,16 @@ function openChat(mode) {
   $("#chat-send-btn").className =
     `chat-send-btn ${mode === "emergency" ? "emergency" : "normal"}`;
 
+  const greeting = mode === "emergency" ? t("chat_greeting_emergency") : t("chat_greeting");
+  /* El saludo va también a chatMessages (no solo al DOM): es lo que arma
+     `history` en sendChatMessage(). Sin esto, Alma no sabe que ya se
+     presentó y se vuelve a presentar en su primera respuesta real. */
+  chatMessages = [{ role: "assistant", content: greeting }];
+
   $("#chat-messages").innerHTML = `
     <div class="chat-bubble-wrap bot chat-greeting">
       <div class="chat-bubble bot${mode === "emergency" ? " emergency" : ""}">
-        ${mode === "emergency" ? t("chat_greeting_emergency") : t("chat_greeting")}
+        ${greeting}
       </div>
     </div>`;
 
