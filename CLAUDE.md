@@ -25,11 +25,19 @@ prospecto (`create_lead` → `POST /solicitudes`) si el usuario acepta dejar sus
 El único punto de entrada al chat sigue siendo el botón flotante de emergencia — Alma
 clasifica internamente, no hay un segundo botón "modo normal". **2026-08-25 (tarde):**
 el LLM de Alma cambió de Google Gemini a OpenAI (`gpt-5.6-luna`, configurable via
-`OPENAI_MODEL`/`agent_config.model`) — pedido explícito del usuario; no reconozco ese
-identificador de modelo de mi propio conocimiento (corte enero 2026), así que si el
-Worker empieza a fallar en `/chat` con un error de modelo inválido de OpenAI, lo
-primero a revisar es que `gpt-5.6-luna` sea el nombre correcto vigente en la cuenta de
-OpenAI del usuario. `worker/src/invoiceninja.js` y `worker/src/emergency.js` fueron
+`OPENAI_MODEL`/`agent_config.model`) — pedido explícito del usuario. No reconocía ese
+identificador de mi propio conocimiento (corte enero 2026); el usuario confirmó que es
+correcto (documentación de OpenAI) y quedó verificado en vivo tras el deploy: saludo
+neutro, consulta informativa (`list_planes` con datos reales) y urgencia sin
+fallecimiento (`handoff_whatsapp`) responden bien en `api.legadoholding.com/chat`. Dos
+gotchas que costó descubrir en producción (ver commits `19023de`, `ae79b3c`): (1)
+`agent_config.model` en Supabase había quedado en `"gemini-2.5-flash"` de la era
+anterior y tenía prioridad sobre el default nuevo — `worker/src/alma.js` ahora ignora
+un `agent_config.model` con pinta de Gemini en vez de usarlo tal cual; (2) `gpt-5.6-luna`
+es un modelo "reasoning" que en `/v1/chat/completions` rechaza (400) function tools
+junto a su `reasoning_effort` por defecto — el código fuerza `reasoning_effort: "none"`
+en cada llamada porque Alma depende de tool-calling en casi todos los turnos.
+`worker/src/invoiceninja.js` y `worker/src/emergency.js` fueron
 eliminados. La única parte de este repo que sigue hablando con Invoice Ninja es el
 login del panel admin (`worker/src/admin.js`, via `env.IN_BASE`) — deuda pendiente, no
 bloqueante.
