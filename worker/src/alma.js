@@ -586,6 +586,12 @@ export async function runAlma(input, env, executionCtx) {
         messages,
         tools:       TOOLS,
         temperature,
+        /* gpt-5.6-luna es un modelo "reasoning": /v1/chat/completions
+           rechaza function tools junto a su reasoning_effort por defecto
+           (400 "Function tools ... are not supported ... unless
+           reasoning_effort is 'none'"). Alma necesita tool-calling
+           determinista en cada turno, así que forzamos 'none'. */
+        reasoning_effort: "none",
       });
     } catch (e) {
       out.events.push({ role: "model", hop, latency_ms: Date.now() - t0, error: e.message });
