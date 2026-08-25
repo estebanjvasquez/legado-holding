@@ -9,12 +9,11 @@
      4. Llama runAlma con el historial reconstruido.
      5. Persiste todos los events del agente (cada hop, tools, latencias) en
         background con waitUntil — no bloquea la respuesta al usuario.
-     6. Si la conversación terminó en factura, actualiza chat_sessions con
-        invoice + datos del cliente.
+     6. Si hubo cobertura/handoff, actualiza chat_sessions.metadata (JSON).
 
-   El contrato de salida hacia el frontend es el MISMO que antes:
-     { output, finalize?, invoiceNumber?, invitationLink?, total?,
-       isNewClient?, error? }
+   Alma ya no factura (ver worker/src/alma.js) — el contrato de salida hacia
+   el frontend es:
+     { output, handoff?, partnerName?, partnerPhone?, error? }
    ============================================================================= */
 
 import { runAlma } from "./alma.js";
@@ -126,43 +125,25 @@ export async function handleChat(body, env, executionCtx) {
     executionCtx,
   );
 
-  /* 4. Persistir todos los events del agente + (si aplica) actualizar
-        chat_sessions con factura y datos del cliente.                          */
+  /* 4. Persistir todos los events del agente + (si aplica) cobertura/handoff
+        como metadata de la sesión. Alma ya no factura, así que no hay más
+        columnas de invoice/customer/deceased que actualizar aquí — solo
+        metadata (JSON) con lo que se resolvió en esta sesión.               */
   const persistPromise = (async () => {
     await persistEvents(db, sessionId, result.events, result.model);
-    if (result.finalize) {
-      const c = result.customer || {};
-      const d = result.deceased || {};
-      await db
-        .updateSession(sessionId, {
-          finalized:          true,
-          invoice_id:         result.invoiceId      || null,
-          invoice_number:     result.invoiceNumber  || null,
-          invoice_total:      result.total          ? Number(result.total) : null,
-          invitation_link:    result.invitationLink || null,
-          customer_email:     c.email     || null,
-          customer_name:      c.name      || null,
-          customer_phone:     c.phone     || null,
-          customer_id_number: c.id_number || null,
-          customer_address:   c.address   || null,
-          product_keys:       result.productKeys || null,
-          notes:              result.notes        || null,
-          deceased_name:      d.name      || null,
-          deceased_relation:  d.relation  || null,
-          deceased_religion:  d.religion  || null,
-          deceased_age:       d.age       || null,
-          deceased_birth:     d.birth     || null,
-        })
-        .catch((e) => console.warn(`[chat] updateSession failed: ${e.message}`));
-    } else if (result.coverage) {
-      /* Aunque no haya finalize, persistimos la cobertura confirmada como
-         metadata de la sesión — útil para analytics y para evitar repreguntas. */
-      const meta = result.coverage.covered
+    if (result.coverage || result.handoff) {
+      const meta = result.coverage?.covered
         ? { coverage: "covered", coverage_city: result.coverage.city, coverage_state: result.coverage.state }
-        : { coverage: "not_covered", coverage_reason: result.coverage.reason };
+        : result.coverage
+          ? { coverage: "not_covered", coverage_reason: result.coverage.reason }
+          : {};
+      if (result.handoff) {
+        meta.handoff_partner_name  = result.handoff.partnerName  || null;
+        meta.handoff_partner_phone = result.handoff.partnerPhone || null;
+      }
       await db
         .updateSession(sessionId, { metadata: meta })
-        .catch((e) => console.warn(`[chat] updateSession(coverage) failed: ${e.message}`));
+        .catch((e) => console.warn(`[chat] updateSession(metadata) failed: ${e.message}`));
     }
   })();
   if (executionCtx?.waitUntil) {
@@ -171,19 +152,11 @@ export async function handleChat(body, env, executionCtx) {
     await persistPromise;
   }
 
-  if (result.finalize) {
-    console.log(
-      `[chat] finalize ok session=${sessionId} invoice=${result.invoiceNumber}`,
-    );
-  }
-
   /* 5. Devolver al frontend el contrato (sin `events` para no inflar response). */
   return {
-    output:         result.output,
-    finalize:       result.finalize || undefined,
-    invoiceNumber:  result.invoiceNumber || undefined,
-    invitationLink: result.invitationLink || undefined,
-    total:          result.total || undefined,
-    isNewClient:    result.isNewClient || undefined,
+    output:       result.output,
+    handoff:      !!result.handoff || undefined,
+    partnerName:  result.handoff?.partnerName  || undefined,
+    partnerPhone: result.handoff?.partnerPhone || undefined,
   };
 }

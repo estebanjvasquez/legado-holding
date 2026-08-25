@@ -2,22 +2,22 @@
    Agente Alma — Gemini con function calling.
 
    Entrada (de chat.js):  { sessionId, message, history, lang, db }
-   Salida (a chat.js):    { output, finalize?, invoiceNumber?, invitationLink?,
-                            total?, isNewClient?, customer?, productKeys?,
-                            notes?, deceased?, coverage?, events:[...] }
+   Salida (a chat.js):    { output, handoff?, coverage?, events:[...] }
 
    Tools que el modelo puede invocar:
-     - lookup_coverage(city)           → verifica si hay aliado activo en la
-                                          ciudad. Si no hay cobertura, el bot
-                                          debe derivar al teléfono y NO facturar.
-     - list_emergency_products()       → catálogo 'urgencias' de Invoice Ninja.
-     - create_invoice(customer, ...)   → emite factura y la envía por email.
+     - lookup_coverage(city) → verifica si hay aliado activo en la ciudad. Si
+       no hay cobertura, el bot debe derivar al teléfono de emergencia.
+
+   Alma ya NO cotiza ni factura: una vez identificado el aliado de la ciudad,
+   hace un handoff cálido con su teléfono/WhatsApp. Esto reemplaza el flujo
+   anterior (list_emergency_products/create_invoice contra Invoice Ninja) —
+   la API pública de Prevision-Funeraria no modela un marketplace de aliados
+   regionales con catálogos propios, y la guía de tono del bot
+   (docs/GUIA_INTERACCION_BOT_LEGADO.md sección 8) ya pedía derivar a un
+   asesor humano para cotizar/pagar en vez de que el bot lo hiciera solo.
 
    `events` se devuelve para que chat.js los escriba en Supabase (chat_turns).
    ============================================================================= */
-
-import { createIN } from "./invoiceninja.js";
-import { emergencyCheckout } from "./emergency.js";
 
 const GEMINI_BASE  = "https://generativelanguage.googleapis.com/v1beta/models";
 const MAX_TOOL_HOPS = 8;
@@ -62,7 +62,7 @@ REGLA #1 — EL PRIMER TURNO ES SAGRADO (SOLO SI ES CASO A)
 Si y solo si clasificaste el contacto como (A) DUELO ACTIVO, en tu primer mensaje NUNCA jamás:
 - Menciones precios, dólares, totales o costos.
 - Listes opciones de servicios o combinaciones.
-- Llames la tool 'list_emergency_products' ni 'lookup_coverage'.
+- Llames la tool 'lookup_coverage'.
 - Pidas datos del contratante ni del fallecido más allá de lo que el usuario ya ofreció.
 
 En el primer mensaje de duelo SOLO haces tres cosas:
@@ -113,7 +113,7 @@ B. CONTEXTO Y COBERTURA
    - Si covered=true → identifica EL ALIADO ACTIVO con esta regla:
      · partners[] viene ordenado: primero los aliados con scope='city' (aliado directo de esa ciudad), luego los de scope='state' (cobertura estatal).
      · TOMA EL PRIMERO. Ese es el aliado que coordina esta emergencia.
-     · Guarda mentalmente su 'brand' code (ej: "fzulia", "fcaracas") — lo usarás en list_emergency_products Y create_invoice.
+     · Guarda mentalmente su teléfono — lo usarás en el paso D para el handoff.
      · Comunica al usuario con calidez: "Coordinaremos con [nombre del aliado], nuestra funeraria aliada en [ciudad]". Eso da transparencia y confianza.
    - Continúa al siguiente paso.
 
@@ -125,34 +125,18 @@ C. DATOS DEL FALLECIDO (sólo si hay cobertura)
      · si la familia tiene preferencia religiosa o de rito.
    - No pidas todo a la vez. Conversa. Si el usuario ya mencionó alguno, NO lo vuelvas a pedir.
 
-D. PROPONER SERVICIOS
-   - Llama 'list_emergency_products' UNA vez, pasando partner_brand=<brand del aliado elegido en paso B>. Sin esto verás precios mezclados de aliados que no aplican a esta ciudad.
-   - Si la respuesta tiene products=[] (vacío) significa que el aliado no tiene servicios cargados en Invoice Ninja. Discúlpate, deriva al teléfono y NO factures.
-   - NUNCA inventes productos ni precios.
-   - Propón una combinación coherente con los datos que tienes (ej.: si el usuario habla de cremación, prioriza cremación). Muestra precios reales y total.
-   - Si el fallecido está en una ciudad distinta a la del aliado o la familia menciona repatriar/trasladar, SIEMPRE menciona el servicio de traslado nacional del aliado seleccionado (si existe en su catálogo) como opción explícita. No asumas que el usuario sabe que existe.
-   - Espera el OK del usuario o sus ajustes.
-
-E. DATOS DEL CONTRATANTE
-   - Pide los datos del CONTRATANTE (no del fallecido): nombre completo, email (OBLIGATORIO), teléfono, cédula, dirección.
-   - Si ya los dio antes, NO los repitas.
-
-F. RESUMEN Y CONFIRMACIÓN
-   - Muestra un resumen claro: servicios + precios + total + datos del contratante + datos del fallecido + ciudad.
-   - Pide confirmación EXPLÍCITA: "¿Confirmas para generar la factura?"
-
-G. FACTURAR
-   - SOLO después de la confirmación explícita: llama 'create_invoice' con todo (incluyendo deceased_name/relation/religion/age si se conocen Y partner_brand=<mismo brand que usaste en list_emergency_products>).
-   - Si la tool devuelve success:true, comunica al usuario que la factura fue enviada a su email y aparecerá un botón de pago seguro. NO inventes números de factura.
-   - Si devuelve success:false, discúlpate y entrega el teléfono de emergencia.
+D. COORDINAR CON EL ALIADO (handoff, no facturas ni cotizas)
+   - Tu trabajo termina en poner a la familia en contacto con el aliado, no en vender ni cobrar. NUNCA cotices servicios, precios ni combinaciones — eso lo hace el aliado directamente con la familia.
+   - Cuando el usuario esté listo para avanzar (ya lo acompañaste, ya conoces al fallecido lo suficiente), entrega con calidez el teléfono/WhatsApp del aliado que devolvió 'lookup_coverage' para esa ciudad: "Voy a ponerte en contacto con [nombre del aliado] al [teléfono] — ellos coordinan directamente los arreglos en [ciudad] y te van a explicar las opciones y costos con calma."
+   - Si el usuario prefiere que LEGADO lo llame en vez de escribirle él al aliado, pídele su nombre y un teléfono/WhatsApp de contacto para que un asesor humano le escriba, y confírmale que alguien se comunicará pronto.
+   - No hace falta pedir datos del contratante más allá del contacto (nombre + teléfono) si el usuario elige que lo llamen — no estás armando una factura.
 
 ══════════════════════════════════════════
 REGLAS DURAS
 ══════════════════════════════════════════
-- SIN cobertura confirmada → NO facturar. Derivar a teléfono.
-- SIN email del contratante → no se puede emitir factura.
-- Productos solo desde 'list_emergency_products' (con partner_brand del aliado elegido). Nunca inventes precios ni mezcles servicios de aliados distintos.
-- El partner_brand que pasas a list_emergency_products y a create_invoice DEBE SER EL MISMO en una misma sesión. No cambies de aliado a mitad de conversación a menos que el usuario diga explícitamente que la familia se mudó a otra ciudad.
+- NUNCA cotices precios ni "combinaciones de servicios" — no tienes catálogo ni autoridad para eso; esa conversación es del aliado o de un asesor humano.
+- NUNCA digas que vas a generar una factura, un link de pago o un cobro. Alma no factura.
+- SIN cobertura confirmada → no des contacto de ningún aliado. Deriva al teléfono de emergencia general.
 - Si el usuario pregunta por planes preventivos (no emergencia), explica brevemente que ese servicio se contrata en la sección de planes del sitio y vuelve al cuidado emocional.
 - Formato de salida: HTML simple permitido (p, ul, li, strong, br). El markdown NO se renderiza.
 - Teléfono de emergencia para derivar: ${EMERGENCY_PHONE}`;
@@ -178,18 +162,14 @@ Before each reply, re-read the full history and extract every detail the user ha
 PROCESS
 ══════════════════════════════════════════
 A. ACCOMPANY. Hold the grief. Do not advance until the user is ready.
-B. CONTEXT + COVERAGE. As soon as you know the city, call 'lookup_coverage'. If covered=false, apologize, give the emergency phone, and do NOT continue to billing. If covered=true, partners[] is ordered with city-direct partners first, then state-coverage partners. PICK THE FIRST as the active partner. Remember its 'brand' code. Tell the user "We'll coordinate with [partner name], our funeral partner in [city]".
+B. CONTEXT + COVERAGE. As soon as you know the city, call 'lookup_coverage'. If covered=false, apologize and give the emergency phone. If covered=true, partners[] is ordered with city-direct partners first, then state-coverage partners. PICK THE FIRST as the active partner. Tell the user "We'll coordinate with [partner name], our funeral partner in [city]".
 C. DECEASED. Gently learn about the person: name, relation, age, religion.
-D. SERVICES. Call 'list_emergency_products' once with partner_brand=<chosen partner's brand>. Without this you'll see mixed prices from partners that don't apply. If products=[] returns empty, apologize and derive to phone. Never invent prices. If the family may need cross-city transfer, surface the partner's national transfer service.
-E. CONTRACT HOLDER. Collect name, email (REQUIRED), phone, ID, address — don't repeat what you have.
-F. SUMMARY + EXPLICIT CONFIRMATION.
-G. INVOICE. Only after confirmation, call 'create_invoice' with partner_brand=<same as above>.
+D. HANDOFF (no quoting, no invoicing). Your job ends at connecting the family with the partner, not selling. NEVER quote prices or service combinations — that's the partner's or a human advisor's conversation. When the user is ready, warmly share the partner's phone/WhatsApp from 'lookup_coverage': "I'll connect you with [partner name] at [phone] — they coordinate arrangements directly in [city] and will walk you through options and costs." If the user would rather have LEGADO call them, collect just a name and phone/WhatsApp so a human advisor can reach out.
 
 HARD RULES
-- No coverage → no invoice; derive to phone.
-- No email → no invoice.
-- Products only from 'list_emergency_products' (with partner_brand). Never mix services from different partners.
-- partner_brand passed to list_emergency_products and to create_invoice MUST be the same within a session.
+- NEVER quote prices or "service combinations" — you have no catalog or authority to do that.
+- NEVER say you'll generate an invoice or payment link. Alma does not invoice.
+- No coverage confirmed → don't give out any partner contact; derive to the general emergency phone.
 - HTML output (p, ul, li, strong, br). No markdown.
 - Emergency phone: ${EMERGENCY_PHONE}`;
 
@@ -200,7 +180,7 @@ const TOOLS = [
       {
         name: "lookup_coverage",
         description:
-          "Verifica si una ciudad de Venezuela tiene un aliado funerario activo. DEBE llamarse antes de proponer servicios o facturar. Devuelve covered:true/false y, si hay cobertura, la lista de aliados disponibles.",
+          "Verifica si una ciudad de Venezuela tiene un aliado funerario activo. DEBE llamarse antes de dar contacto de ningún aliado. Devuelve covered:true/false y, si hay cobertura, la lista de aliados disponibles (incluyendo su teléfono para el handoff).",
         parameters: {
           type: "OBJECT",
           properties: {
@@ -211,58 +191,6 @@ const TOOLS = [
             },
           },
           required: ["city"],
-        },
-      },
-      {
-        name: "list_emergency_products",
-        description:
-          "Devuelve el catálogo de servicios funerarios de urgencia del aliado seleccionado. SIEMPRE pasar partner_brand del aliado que devolvió lookup_coverage para mostrar SOLO los servicios y precios de ese aliado. Cada ciudad tiene su propio aliado con sus propios precios.",
-        parameters: {
-          type: "OBJECT",
-          properties: {
-            partner_brand: {
-              type: "STRING",
-              description:
-                "Brand code del aliado seleccionado, exactamente como lo devolvió lookup_coverage en partners[].brand (ej: 'fzulia', 'fcaracas'). Si se omite o queda vacío, retorna todo el catálogo sin filtrar (sólo fallback de emergencia).",
-            },
-          },
-        },
-      },
-      {
-        name: "create_invoice",
-        description:
-          "Crea el cliente en Invoice Ninja si no existe, genera la factura con los servicios indicados y la envía por email. SOLO llámala después de que el usuario haya confirmado explícitamente Y de que lookup_coverage haya devuelto covered:true.",
-        parameters: {
-          type: "OBJECT",
-          properties: {
-            customer: {
-              type: "OBJECT",
-              description: "Datos del contratante (no del fallecido).",
-              properties: {
-                name:      { type: "STRING", description: "Nombre completo del contratante" },
-                email:     { type: "STRING", description: "Email para enviar la factura (obligatorio)" },
-                phone:     { type: "STRING", description: "Teléfono de contacto" },
-                id_number: { type: "STRING", description: "Cédula o identificación fiscal" },
-                address:   { type: "STRING", description: "Dirección física" },
-              },
-              required: ["name", "email"],
-            },
-            product_keys: {
-              type: "ARRAY",
-              items: { type: "STRING" },
-              description:
-                "Array con los product_key exactos devueltos por list_emergency_products. Mínimo 1.",
-            },
-            deceased_name:     { type: "STRING", description: "Nombre del fallecido si se conoce." },
-            deceased_relation: { type: "STRING", description: "Relación con el contratante (madre, padre, hermano, etc.)." },
-            deceased_religion: { type: "STRING", description: "Religión o rito preferido si se conoce." },
-            deceased_age:      { type: "INTEGER", description: "Edad del fallecido al momento del fallecimiento." },
-            deceased_birth:    { type: "STRING", description: "Fecha de nacimiento del fallecido en formato YYYY-MM-DD si se conoce." },
-            city:              { type: "STRING", description: "Ciudad donde está la familia (debe coincidir con lookup_coverage)." },
-            partner_brand:     { type: "STRING", description: "Brand code del aliado que ejecuta el servicio (mismo que pasaste a list_emergency_products). Necesario para validar que los product_keys pertenecen a ese aliado y no a otro." },
-            notes:             { type: "STRING", description: "Cualquier nota adicional para la factura." },
-          },
-          required: ["customer", "product_keys"],
         },
       },
     ],
@@ -339,6 +267,7 @@ async function execLookupCoverage(args, env, db, emergencyPhone) {
       partners: partners.map((p) => ({
         name:     p.name,
         brand:    p.brand,
+        phone:    p.phone || null,   // usado para el handoff, no hay cotización/factura
         services: p.services || [],
         scope:    p.scope,   // 'city' = directo en la ciudad; 'state' = cubre todo el estado
       })),
@@ -354,78 +283,6 @@ async function execLookupCoverage(args, env, db, emergencyPhone) {
       emergency_phone: emergencyPhone,
       message:         `No pude verificar la cobertura en este momento por un error técnico. Por favor, deriva al teléfono de emergencia ${emergencyPhone}. NO factures.`,
     };
-  }
-}
-
-async function execListProducts(env, partnerBrand) {
-  const IN = createIN(env);
-  const resp = await IN.listProducts();
-  const brand = (partnerBrand || "").trim();
-  const all = (resp.data || []).filter(
-    (p) => !p.is_deleted && p.custom_value1 === "urgencias",
-  );
-  /* El brand del aliado vive en custom_value4 (campo etiquetado 'aliados'
-     en Invoice Ninja). custom_value3 está reservado para clasificación:
-     'urgencias-aliados' vs 'esencial-zulia' / 'vanguardia-zulia' / etc.
-     (planFamily de los planes preventivos del wizard legadoweb). */
-  const getBrand = (p) => (p.custom_value4 || "").trim();
-  const filtered = brand ? all.filter((p) => getBrand(p) === brand) : all;
-  if (!brand) {
-    console.warn(`[alma] list_emergency_products sin partner_brand — devolviendo ${all.length} items sin filtrar`);
-  } else if (filtered.length === 0) {
-    console.warn(`[alma] list_emergency_products: brand="${brand}" no matchea ningún producto. Verifica custom_value4 (campo 'aliados') en IN.`);
-  }
-  return {
-    partner_brand: brand || null,
-    products: filtered.map((p) => ({
-      product_key: p.product_key,
-      price:       Number(p.price) || 0,
-      description: (p.notes || "").trim(),
-      brand:       getBrand(p),
-    })),
-  };
-}
-
-async function execCreateInvoice(args, env, executionCtx) {
-  try {
-    const customer = args.customer || {};
-    const items    = Array.isArray(args.product_keys) ? args.product_keys : [];
-    const partnerBrand = (args.partner_brand || "").trim();
-    if (!customer.email) {
-      return { success: false, error: "Email del cliente faltante" };
-    }
-    if (items.length === 0) {
-      return { success: false, error: "No se indicó ningún servicio" };
-    }
-    /* Construir el bloque de notas a partir de la info del fallecido y
-       cualquier nota libre del agente. */
-    const noteLines = [];
-    if (args.deceased_name)     noteLines.push(`Fallecido: ${args.deceased_name}`);
-    if (args.deceased_relation) noteLines.push(`Relación con contratante: ${args.deceased_relation}`);
-    if (args.deceased_age)      noteLines.push(`Edad: ${args.deceased_age}`);
-    if (args.deceased_birth)    noteLines.push(`Fecha de nacimiento: ${args.deceased_birth}`);
-    if (args.deceased_religion) noteLines.push(`Rito/Religión: ${args.deceased_religion}`);
-    if (args.city)              noteLines.push(`Ciudad: ${args.city}`);
-    if (partnerBrand)           noteLines.push(`Aliado: ${partnerBrand}`);
-    if (args.notes)             noteLines.push(`Notas: ${args.notes}`);
-    const notes = noteLines.join("\n");
-
-    const result = await emergencyCheckout(
-      { customer, items, notes, partnerBrand },
-      env,
-      executionCtx,
-    );
-    return {
-      success:        true,
-      invoiceId:      result.invoiceId,
-      invoiceNumber:  result.invoiceNumber,
-      invitationLink: result.invitationLink,
-      total:          result.invoiceTotal,
-      isNewClient:    result.isNewClient,
-    };
-  } catch (e) {
-    console.error(`[alma] create_invoice failed: ${e.message}`);
-    return { success: false, error: e.message };
   }
 }
 
@@ -493,10 +350,9 @@ export async function runAlma(input, env, executionCtx) {
   contents.push({ role: "user", parts: [{ text: String(input.message || "") }] });
 
   const out = {
-    output:   "",
-    finalize: false,
+    output: "",
     model,
-    events:   [],
+    events: [],
   };
 
   for (let hop = 0; hop < MAX_TOOL_HOPS; hop++) {
@@ -529,7 +385,7 @@ export async function runAlma(input, env, executionCtx) {
     if (funcCalls.length === 0) {
       out.output = textParts.join("\n").trim();
       out.events.push({ role: "model", hop, latency_ms, content: out.output });
-      console.log(`[alma] hop=${hop} done text_len=${out.output.length} finalize=${out.finalize}`);
+      console.log(`[alma] hop=${hop} done text_len=${out.output.length} handoff=${!!out.handoff}`);
       return out;
     }
 
@@ -556,40 +412,26 @@ export async function runAlma(input, env, executionCtx) {
         if (fc.name === "lookup_coverage") {
           result = await execLookupCoverage(fc.args || {}, env, db, emergencyPhone);
           /* Guardamos la cobertura confirmada para que chat.js la persista
-             en chat_sessions.city/state.                                    */
+             en chat_sessions.city/state. Si hay cobertura, el primer aliado
+             de partners[] (ver system prompt) es el que se usa para el
+             handoff — sin cotización ni factura, solo su contacto. */
           if (result.covered && result.location) {
             out.coverage = {
               covered: true,
               city:    result.location.city,
               state:   result.location.state,
             };
+            const partner = (result.partners || [])[0];
+            if (partner) {
+              out.handoff = {
+                partnerName:  partner.name,
+                partnerPhone: partner.phone || null,
+              };
+            }
           } else if (!result.covered) {
             out.coverage = {
               covered: false,
               reason:  result.reason || "unknown",
-            };
-          }
-        } else if (fc.name === "list_emergency_products") {
-          result = await execListProducts(env, fc.args && fc.args.partner_brand);
-        } else if (fc.name === "create_invoice") {
-          result = await execCreateInvoice(fc.args || {}, env, executionCtx);
-          if (result.success) {
-            out.finalize       = true;
-            out.invoiceId      = result.invoiceId;
-            out.invoiceNumber  = result.invoiceNumber;
-            out.invitationLink = result.invitationLink;
-            out.total          = result.total;
-            out.isNewClient    = result.isNewClient;
-            out.customer       = fc.args && fc.args.customer ? fc.args.customer : null;
-            out.productKeys    = fc.args && Array.isArray(fc.args.product_keys) ? fc.args.product_keys : null;
-            out.notes          = fc.args && fc.args.notes || null;
-            /* Datos del fallecido para persistencia. */
-            out.deceased = {
-              name:     (fc.args && fc.args.deceased_name)     || null,
-              relation: (fc.args && fc.args.deceased_relation) || null,
-              religion: (fc.args && fc.args.deceased_religion) || null,
-              age:      (fc.args && fc.args.deceased_age)      || null,
-              birth:    (fc.args && fc.args.deceased_birth)    || null,
             };
           }
         } else {

@@ -8,13 +8,21 @@ servir tanto a Legado Holding como a Funeraria del Zulia
 (`estebanjvasquez/Propuesta-Funerzul`) desde una sola interfaz de administración, con
 los mismos usuarios de staff atendiendo ambas empresas.
 
-Ese sistema se integra con **este** InvoiceNinja (clientes, productos, facturación,
-cobro vía Stripe) en vez de duplicar sus datos — su cliente de API v5 en
-`worker/src/invoiceninja.js` (auth `X-API-TOKEN`, patrón de polling en
-`worker/src/pipeline.js`) es la referencia que ese proyecto porta y reutiliza. El plan
-completo vive en `docs/PLAN.md` de ese repo, no aquí.
+**Actualizado 2026-08-25:** el wizard de planes de previsión y el bot Alma de este
+repo ya NO usan Invoice Ninja — migraron a la API pública de Prevision-Funeraria
+(`docs/api-publica-wizard.md`, tenant `lh`). Cliente HTTP en `worker/src/prevision-api.js`,
+checkout en `worker/src/wizard-compra.js` (reemplaza al viejo `pipeline.js`, ya
+eliminado). Alma (`worker/src/alma.js`) ya no cotiza ni factura: hace un handoff con
+el teléfono del aliado tras confirmar cobertura. `worker/src/invoiceninja.js` y
+`worker/src/emergency.js` fueron eliminados. La única parte de este repo que sigue
+hablando con Invoice Ninja es el login del panel admin (`worker/src/admin.js`, via
+`env.IN_BASE`) — deuda pendiente, no bloqueante.
+
+Los planes "Selecto" (`esencial-selecto`/`vanguardia-selecto`) siguen sin checkout
+digital: cobran una cuota inicial que el modelo `planes` de la API nueva todavía no
+soporta. Su CTA en el sitio manda a contacto en vez de abrir el wizard.
 
 **No modificar este repositorio para tareas del proyecto de Previsión** salvo que se
-pida explícitamente — es un sistema en producción con ingresos reales (venta y
-facturación de planes de previsión ya activa). El wizard público y el flujo de
-facturación actuales quedan intactos mientras el sistema nuevo se construye y valida.
+pida explícitamente. El sistema todavía está en revisión (sin usuarios finales en
+producción, según confirmación del usuario) — pero cualquier cambio a wizard/bot debe
+seguir el contrato documentado en `docs/api-publica-wizard.md`.

@@ -1,16 +1,18 @@
 /* =============================================================================
    LEGADO — Checkout Worker
-   Reemplazo de n8n LEGADO_PostPayment_v7 y del proxy List_Products.
-     GET  /                    → health check (verifica secret y vars cargados)
-     GET  /products            → lista de productos 'legadoweb' (proxy a IN)
-     GET  /emergency-products  → lista de productos 'urgencias' para Alma 2
-     POST /                    → ejecuta el pipeline de checkout legadoweb
-     POST /chat                → proxy al agente Alma 2 + handoff a IN
+   Reemplazo de n8n LEGADO_PostPayment_v7. El catálogo de planes (`/planes`) lo
+   sirve directo Prevision-Funeraria al navegador (CORS abierto); este Worker
+   solo hace de servidor-a-servidor para lo que exige token (`/parentescos`,
+   `/compras`) y para el chat de Alma.
+     GET  /                    → health check (verifica secrets y vars cargados)
+     GET  /wizard/parentescos  → catálogo de parentescos (proxy autenticado a PF)
+     POST /                    → ejecuta el pipeline de checkout del wizard
+     POST /chat                → proxy al agente Alma (handoff, sin facturación)
      OPTIONS                   → CORS preflight
    ============================================================================= */
 
-import { createIN } from "./invoiceninja.js";
-import { processCheckout } from "./pipeline.js";
+import { createPF } from "./prevision-api.js";
+import { processWizardCheckout } from "./wizard-compra.js";
 import { handleChat } from "./chat.js";
 import { handleAdmin } from "./admin.js";
 import { isValidationError } from "./errors.js";
@@ -40,19 +42,15 @@ export default {
     }
 
     if (request.method === "GET") {
-      if (url.pathname === "/products") {
-        return await handleProducts(env, json, "legadoweb");
-      }
-      if (url.pathname === "/emergency-products") {
-        return await handleProducts(env, json, "urgencias");
+      if (url.pathname === "/wizard/parentescos") {
+        return await handleParentescos(env, json);
       }
       return json({
         ok: true,
         service:            "legado-checkout",
         env:                env.ENVIRONMENT,
-        tokenLoaded:        !!env.IN_TOKEN,
-        inBase:             env.IN_BASE,
-        emailMode:          env.EMAIL_MODE || "explicit",
+        pfTokenLoaded:      !!env.PF_TOKEN,
+        pfBase:             env.PF_BASE,
         geminiConfigured:   !!env.GEMINI_API_KEY,
         geminiModel:        env.GEMINI_MODEL || "gemini-2.5-flash",
         supabaseConfigured: !!(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY),
@@ -90,7 +88,7 @@ export default {
     }
 
     try {
-      const result = await processCheckout(body, env, executionCtx);
+      const result = await processWizardCheckout(body, env);
       return json(result, result.success ? 200 : 400);
     } catch (e) {
       const isValidation = isValidationError(e);
@@ -106,17 +104,15 @@ export default {
   },
 };
 
-async function handleProducts(env, json, brand) {
+/* /parentescos exige token server-to-server (nunca en el navegador) — el
+   wizard lo llama vía este proxy para poblar el <select> de familiares. */
+async function handleParentescos(env, json) {
   try {
-    const IN = createIN(env);
-    const resp = await IN.listProducts();
-    const products = (resp.data || []).filter(
-      (p) => !p.is_deleted && p.custom_value1 === brand,
-    );
-    console.log(`Products served: ${products.length} ${brand} items`);
-    return json({ data: products });
+    const PF = createPF(env);
+    const resp = await PF.getParentescos();
+    return json(resp);
   } catch (e) {
-    console.error("Products error:", e.message);
+    console.error("Parentescos error:", e.message);
     return json({ success: false, message: e.message }, 500);
   }
 }
