@@ -12,15 +12,26 @@ routes = [
 
 
 # Variables públicas (no son secretos). Editar aquí cualquier valor que NO
-# requiera estar cifrado. El IN_TOKEN se inyecta con `wrangler secret put`.
+# requiera estar cifrado.
 [vars]
+# IN_BASE se mantiene SOLO para el login del panel admin (worker/src/admin.js
+# sigue autenticando staff contra Invoice Ninja) — el checkout y el bot Alma
+# ya no usan Invoice Ninja ni el secret IN_TOKEN (revocado). Ver el plan de
+# migración: docs/api-publica-wizard.md.
 IN_BASE = "https://invoicing.legadoholding.com/api/v1"
 ENVIRONMENT = "dev"
-# EMAIL_MODE controla el envío del correo al cliente:
-#   "explicit" → Worker llama POST /invoices/bulk action:email (default)
-#   "auto"     → Worker NO llama; confía en "Email invoices automatically" de IN
-#   "none"     → No se envía email (útil para pruebas sin spamear)
-EMAIL_MODE = "explicit"
+
+# API pública de Prevision-Funeraria (reemplaza a Invoice Ninja para el
+# wizard de planes). El token se inyecta con `wrangler secret put PF_TOKEN`.
+PF_BASE = "https://prevision-funeraria.sisteg.workers.dev"
+
+# Base pública del sitio — se usa para armar success_url/cancel_url del
+# checkout con tarjeta (Stripe Checkout) al llamar POST /compras. Este mismo
+# wrangler.toml es el que se despliega a producción (route api.legadoholding.com),
+# así que el valor por defecto debe ser el dominio real; para probar en local
+# contra `gracias.html`/`cancelado.html` servidos en localhost, sobreescribir
+# SITE_BASE_URL en worker/.dev.vars.
+SITE_BASE_URL = "https://www.legadoholding.com"
 
 # Lista CSV de orígenes (esquema + host + puerto) autorizados a hacer
 # requests con CORS. El Worker hace eco del Origin entrante solo si está

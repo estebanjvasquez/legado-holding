@@ -12,6 +12,7 @@ worker/.wrangler/
 
 # Claude Code local settings (contiene comandos pre-aprobados con tokens inline)
 .claude/settings.local.json
+.claude/settings.json
 
 # Wrangler auto-config generado si se hace `wrangler deploy` desde el cwd
 # equivocado. Si aparece en el root, es artefacto y debe borrarse.

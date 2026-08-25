@@ -55,9 +55,16 @@
                 WIZARD_WEBHOOK_URL: __isDev
                     ? "http://localhost:8787"
                     : "https://api.legadoholding.com",
-                PLANS_API_URL: __isDev
-                    ? "http://localhost:8787/products"
-                    : "https://api.legadoholding.com/products",
+                // Catálogo público de Prevision-Funeraria — sin token, CORS
+                // abierto para legadoholding.com. Se llama directo desde el
+                // navegador, no hace falta pasar por nuestro Worker.
+                PLANS_API_URL:
+                    "https://prevision-funeraria.sisteg.workers.dev/api/public/t/lh/planes",
+                // /parentescos exige token server-to-server, así que sí pasa
+                // por nuestro Worker (ver worker/src/index.js).
+                PARENTESCOS_API_URL: __isDev
+                    ? "http://localhost:8787/wizard/parentescos"
+                    : "https://api.legadoholding.com/wizard/parentescos",
                 CHAT_API_URL: __isDev
                     ? "http://localhost:8787/chat"
                     : "https://api.legadoholding.com/chat",

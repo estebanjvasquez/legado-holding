@@ -29,8 +29,9 @@
    ─────────────────────────────────────────────────────────────────────────────
    El chat de emergencia habla con el Worker (api.legadoholding.com/chat), que
    corre el agente Alma directamente (function calling sobre Gemini en
-   worker/src/alma.js) y al final emite la factura en Invoice Ninja. En dev
-   apunta al wrangler local; en prod al subdominio api.
+   worker/src/alma.js). Alma ya no factura: identifica cobertura/aliado y hace
+   un handoff con su teléfono. En dev apunta al wrangler local; en prod al
+   subdominio api.
    ============================================================================= */
 const CHAT_WEBHOOK_URL =
   (typeof window !== "undefined" && window.LEGADO_CONFIG?.CHAT_API_URL) ||
@@ -40,11 +41,18 @@ const WIZARD_WEBHOOK_URL =
   (typeof window !== "undefined" && window.LEGADO_CONFIG?.WIZARD_WEBHOOK_URL) ||
   "https://api.legadoholding.com";
 
-/* Catálogo de planes — proxy server-side (token de Invoice Ninja queda oculto).
-   Siempre apunta al Worker (GET /products). */
+/* Catálogo de planes — API pública de Prevision-Funeraria, directo desde el
+   navegador (sin token, CORS abierto para legadoholding.com). */
 const PLANS_API_URL =
   (typeof window !== "undefined" && window.LEGADO_CONFIG?.PLANS_API_URL) ||
-  "https://api.legadoholding.com/products";
+  "https://prevision-funeraria.sisteg.workers.dev/api/public/t/lh/planes";
+
+/* Catálogo de parentescos — exige token server-to-server, pasa por nuestro
+   Worker (worker/src/index.js → GET /wizard/parentescos). Se usa para poblar
+   el <select> de familiares del wizard y sus reglas de edad/cédula. */
+const PARENTESCOS_API_URL =
+  (typeof window !== "undefined" && window.LEGADO_CONFIG?.PARENTESCOS_API_URL) ||
+  "https://api.legadoholding.com/wizard/parentescos";
 
 /* =============================================================================
    i18n / LANG — Diccionario bilingüe ES / EN
@@ -132,6 +140,7 @@ const LANG = {
   plan_yr: ["/año", "/yr"],
   plan_or: ["o", "or"],
   plan_buy: ["Comprar", "Buy Now"],
+  plan_contact_advisor: ["Hablar con un asesor", "Talk to an advisor"],
   plan_details: ["Saber más", "Learn more"],
   plan_details_title: ["Detalles del plan", "Plan details"],
   plan_details_empty: [
@@ -303,7 +312,6 @@ const LANG = {
   ],
   wiz_member: ["Familiar", "Family member"],
   wiz_relation: ["Parentesco", "Relationship"],
-  wiz_relation_ph: ["Ej: Madre", "E.g.: Mother"],
   wiz_age_err_short: ["Máximo 65 años", "Max 65 years"],
   wiz_add_family: ["Agregar familiar", "Add family member"],
   wiz_select_payment: [
@@ -523,9 +531,9 @@ const PLAN_SUBTITLE = {
 };
 
 /* =============================================================================
-   PLANES — carga dinámica desde Invoice Ninja
-   Filtra custom_value1 === "legadoweb", agrupa por familia (mensual + anual),
-   y actualiza PLANS / PLAN_GROUPS / HIGHLIGHTED antes de re-renderizar.
+   PLANES — carga dinámica desde la API pública de Prevision-Funeraria
+   (ver loadPlansFromAPI). Solo actualiza precios de los slugs migrados hoy
+   (WIZARD_ENABLED_SLUGS); PLAN_GROUPS/HIGHLIGHTED se quedan estáticos.
    ============================================================================= */
 
 function formatPrice(num) {
@@ -534,146 +542,56 @@ function formatPrice(num) {
   return "$" + s.replace(".", ",");
 }
 
-function extractMaxAge(notes) {
-  if (/max\s*80|80\s*a[ñn]os?/i.test(notes)) return 80;
-  const m = /edad\s*m[aá]x[a-z]*\s*(?:de\s*contrat[a-z]*)?\s*(\d+)/i.exec(notes);
-  if (m) return parseInt(m[1], 10);
-  return 65;
-}
-
-function getPlanFamily(productKey) {
-  const upper = productKey.toUpperCase();
-  if (upper.includes("ESENCIAL") && (upper.includes("SELECTO") || upper.includes("SELEC"))) return "esencial-selecto";
-  if (upper.includes("VANGUARDIA") && (upper.includes("SELECTO") || upper.includes("SELEC"))) return "vanguardia-selecto";
-  if (upper.includes("ESENCIAL"))   return "esencial-zulia";
-  if (upper.includes("VANGUARDIA")) return "vanguardia-zulia";
-  return productKey.toLowerCase()
-    .replace(/^plan\s+/i, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
+/* Planes que ya migraron a la API pública de Prevision-Funeraria y por lo
+   tanto tienen checkout digital (wizard). "esencial-selecto"/"vanguardia-selecto"
+   cobran una cuota inicial (Unico) que el modelo `planes` de esa API todavía no
+   soporta — se quedan con los datos de respaldo hardcodeados y su CTA cambia a
+   "Hablar con un asesor" en vez de abrir el wizard (ver bindPlanCardEvents). */
+const WIZARD_ENABLED_SLUGS = new Set(["esencial-zulia", "vanguardia-zulia"]);
 
 async function loadPlansFromAPI() {
   try {
     const resp = await fetch(PLANS_API_URL);
     if (!resp.ok) throw new Error("HTTP " + resp.status);
     const raw = await resp.json();
+    const items = Array.isArray(raw) ? raw : (raw.items || []);
 
-    /* El Worker puede devolver un array directo o { data: [...] } — normalizar ambos */
-    const list = Array.isArray(raw) ? raw : (raw.data || []);
-    const products = list.filter(
-      (p) => !p.is_deleted && p.custom_value1 === "legadoweb",
-    );
-    if (products.length === 0) return;
-
-    /* Agrupar productos por familia de plan.
-       Prioridad: custom_value3 (slug explícito) > inferir del product_key.
-       isMonthly: acepta "mensual" (legacy) y "monthly" (nuevo). */
-    /* Tabla de alias: normaliza slugs alternativos que pueden venir de Invoice Ninja
-       hacia el slug canónico que usa el renderizador.
-       Ejemplo: "esencial-ven" (mal configurado) → "esencial-selecto" */
-    const SLUG_ALIASES = {
-      "esencial-ven":    "esencial-selecto",
-      "vanguardia-ven":  "vanguardia-selecto",
-    };
-
-    const grouped = {};
-    products.forEach((p) => {
-      const rawFamily = (p.custom_value3 && p.custom_value3.trim()) || getPlanFamily(p.product_key);
-      const family = SLUG_ALIASES[rawFamily] || rawFamily;
-      if (!grouped[family]) grouped[family] = {};
-      const cv2 = (p.custom_value2 || "").toLowerCase();
-      const isMonthly = cv2 === "mensual" || cv2 === "monthly";
-      /* "Unico" = cuota inicial obligatoria (se paga siempre, independiente
-         de si la suscripción es mensual o anual) */
-      const isUnico   = cv2 === "unico";
-      if (isMonthly) {
-        grouped[family].monthly = p;
-      } else if (isUnico) {
-        grouped[family].initial = p;   // ← cuota inicial, NO anual
-      } else {
-        grouped[family].annual = p;
-      }
-    });
-
-    /* Construir el objeto PLANS desde los grupos */
     const newPlans = {};
-    Object.entries(grouped).forEach(([slug, { monthly, annual, initial }]) => {
-      if (!monthly && !annual && !initial) return;
-      const anchor        = monthly || annual || initial;
-      const monthlyPrice  = monthly ? monthly.price : null;
-      const annualPrice   = annual  ? annual.price  : null;
-      /* initialPrice: cuota única obligatoria (custom_value2 = 'Unico') */
-      const initialPrice  = initial ? initial.price : null;
+    items.forEach((p) => {
+      if (!WIZARD_ENABLED_SLUGS.has(p.slug)) return; // Selecto: fuera de la migración de hoy
+      const monthlyCents = Number(p.precio_mensual_centavos);
+      const annualCents  = Number(p.precio_anual_centavos);
+      const monthlyPrice = Number.isFinite(monthlyCents) ? monthlyCents / 100 : null;
+      const annualPrice  = Number.isFinite(annualCents)  ? annualCents  / 100 : null;
+      const tarifas = Array.isArray(p.tarifas) ? p.tarifas : [];
+      const maxAge = tarifas.length
+        ? Math.max(...tarifas.map((t) => Number(t.edad_max) || 0))
+        : 65;
 
-      newPlans[slug] = {
-        monthly:     monthlyPrice  !== null ? formatPrice(monthlyPrice)  : null,
-        annual:      annualPrice   !== null ? formatPrice(annualPrice)   : null,
-        mo_save:     monthlyPrice  !== null ? formatPrice(monthlyPrice * 2) : null,
-        /* 'initial' solo se define si existe — renderPlans usa (plan.initial !== undefined)
-           para activar el bloque de precios Selecto */
-        ...(initialPrice !== null && { initial: formatPrice(initialPrice) }),
-        maxAge:      extractMaxAge(anchor.notes),
-        notes:       (anchor.notes || "").trim(),
-        id_monthly:  monthly ? monthly.id : null,
-        id_annual:   annual  ? annual.id  : null,
-        id_initial:  initial ? initial.id : null,
+      newPlans[p.slug] = {
+        id:          p.id,
+        monthly:     monthlyPrice !== null ? formatPrice(monthlyPrice) : null,
+        annual:      annualPrice  !== null ? formatPrice(annualPrice)  : null,
+        mo_save:     monthlyPrice !== null ? formatPrice(monthlyPrice * 2) : null,
+        maxAge:      maxAge || 65,
+        notes:       (p.descripcion_detallada || p.descripcion || "").trim(),
       };
     });
 
     if (Object.keys(newPlans).length === 0) return;
 
-    /* ── Merge con fallback ─────────────────────────────────────────────────
-       Si la API no devuelve algún plan que está en PLAN_GROUPS original
-       (ej.: vanguardia-selecto faltante), conservamos el precio de respaldo
-       para que la tarjeta siga visible. Así la API solo ACTUALIZA precios,
-       nunca ELIMINA tarjetas. */
-    const ORIGINAL_SLUGS = PLAN_GROUPS.flatMap((g) => g.plans);
-    const FALLBACK_PLANS_SNAPSHOT = { ...PLANS }; // copia de los datos de respaldo
-    ORIGINAL_SLUGS.forEach((slug) => {
-      if (!newPlans[slug] && FALLBACK_PLANS_SNAPSHOT[slug]) {
-        newPlans[slug] = FALLBACK_PLANS_SNAPSHOT[slug];
-        console.warn(`Plan "${slug}" no devuelto por la API — usando datos de respaldo.`);
+    /* Merge: solo pisa los 2 slugs migrados; esencial-selecto/vanguardia-selecto
+       y cualquier otro dato de respaldo quedan intactos. */
+    WIZARD_ENABLED_SLUGS.forEach((slug) => {
+      if (newPlans[slug]) {
+        PLANS[slug] = newPlans[slug];
+      } else {
+        console.warn(`Plan "${slug}" no devuelto por la API de Prevision-Funeraria — usando datos de respaldo (sin checkout real).`);
       }
     });
 
-    PLANS = newPlans;
-
-    /* Reconstruir PLAN_GROUPS: usamos la estructura original como referencia
-       canónica de grupos/planes, solo reemplazando precios desde la API.
-       Esto garantiza siempre 4 tarjetas aunque la API devuelva datos parciales. */
-    const FAMILY_REGION = {
-      "esencial-zulia":    "region_zulia",
-      "vanguardia-zulia":  "region_zulia",
-      /* "esencial-ven" y "vanguardia-ven" ya se normalizan a "-selecto" antes de llegar aquí */
-      "esencial-selecto":  "region_selecto",
-      "vanguardia-selecto":"region_selecto",
-    };
-    /* region_ven eliminado: era un alias de region_selecto que causaba
-       el grupo huérfano con una sola tarjeta */
-    const REGION_ORDER = ["region_zulia", "region_selecto"];
-    const SLUG_ORDER   = [
-      "esencial-zulia", "vanguardia-zulia",
-      "esencial-selecto", "vanguardia-selecto",
-    ];
-    const regionMap = {};
-    Object.keys(newPlans).forEach((slug) => {
-      const r = FAMILY_REGION[slug] || "region_otros";
-      if (!regionMap[r]) regionMap[r] = [];
-      regionMap[r].push(slug);
-    });
-    PLAN_GROUPS = REGION_ORDER
-      .filter((r) => regionMap[r])
-      .map((r) => ({
-        region_key: r,
-        plans: regionMap[r].sort((a, b) => SLUG_ORDER.indexOf(a) - SLUG_ORDER.indexOf(b)),
-      }));
-
-    /* Los planes "vanguardia-*" siempre se muestran resaltados */
-    HIGHLIGHTED = new Set(Object.keys(newPlans).filter((id) => id.startsWith("vanguardia")));
-
     renderPlans();
-    console.log("Planes actualizados desde API ✓", Object.keys(newPlans));
+    console.log("Planes Zulia actualizados desde Prevision-Funeraria ✓", Object.keys(newPlans));
   } catch (e) {
     console.warn("Plan API no disponible, usando datos de respaldo:", e.message);
   }
@@ -703,6 +621,7 @@ let wizardBuyer = {
   zip: "",
 };
 let wizardFamily = [];
+let wizardParentescos = [];
 let revealObserver = null;
 
 /* =============================================================================
@@ -921,7 +840,11 @@ function renderPlans() {
         <ul class="plan-features">
           ${features.map((f) => `<li>${checkIcon()}${f}</li>`).join("")}
         </ul>
-        <button class="btn-gold plan-btn-primary" data-plan="${planId}">${t("plan_buy")}</button>
+        ${
+          WIZARD_ENABLED_SLUGS.has(planId)
+            ? `<button class="btn-gold plan-btn-primary" data-plan="${planId}">${t("plan_buy")}</button>`
+            : `<a class="btn-gold plan-btn-primary" href="#contacto">${t("plan_contact_advisor")}</a>`
+        }
         <button class="plan-btn-secondary" data-plan-details="${planId}">${t("plan_details")}</button>
       `;
       grid.appendChild(card);
@@ -1076,17 +999,20 @@ function appendChatBubble(role, content) {
   msgs.scrollTop = msgs.scrollHeight;
 }
 
-/* Botón "Pagar ahora" que aparece tras finalize → factura en Invoice Ninja.
-   El invitation_link abre el portal de pago de IN en pestaña nueva. */
-function appendPayButton(invitationLink, invoiceNumber, total) {
+/* Botón de contacto con el aliado tras el handoff de Alma — Alma ya no
+   factura (ver worker/src/alma.js), solo conecta a la familia con el aliado
+   funerario de su ciudad por WhatsApp. */
+function appendHandoffButton(partnerName, partnerPhone) {
+  if (!partnerPhone) return;
   const msgs = $("#chat-messages");
   const wrap = document.createElement("div");
   wrap.className = "chat-bubble-wrap bot";
-  const safe = String(invitationLink).replace(/"/g, "&quot;");
+  const digits = String(partnerPhone).replace(/[^\d]/g, "");
+  const label = currentLang === "es" ? "Contactar por WhatsApp" : "Contact via WhatsApp";
   wrap.innerHTML = `
-    <a class="chat-pay-btn" href="${safe}" target="_blank" rel="noopener">
-      <span>Pagar ahora${total ? " · $" + escapeHTML(String(total)) + " USD" : ""}</span>
-      <small>${invoiceNumber ? "Factura " + escapeHTML(String(invoiceNumber)) : ""}</small>
+    <a class="chat-pay-btn" href="https://wa.me/${digits}" target="_blank" rel="noopener">
+      <span>${label}</span>
+      <small>${partnerName ? escapeHTML(String(partnerName)) + " · " : ""}${escapeHTML(String(partnerPhone))}</small>
     </a>`;
   msgs.appendChild(wrap);
   msgs.scrollTop = msgs.scrollHeight;
@@ -1147,13 +1073,11 @@ async function sendChatMessage() {
     chatMessages.push({ role: "assistant", content: reply });
     appendChatBubble("assistant", reply);
 
-    /* Si Alma 2 cerró el flujo y el Worker emitió la factura, mostramos
-       botón de pago. Si la facturación falló (error en data.error), pasamos
-       el mensaje del Worker como burbuja de error sin tumbar la conversación. */
-    if (data.finalize && data.invitationLink) {
-      appendPayButton(data.invitationLink, data.invoiceNumber, data.total);
-    } else if (data.finalize && data.error) {
-      appendChatBubble("assistant", data.error);
+    /* Si Alma identificó al aliado de la ciudad, mostramos un botón directo
+       de WhatsApp para que la familia coordine con ellos — Alma ya no cotiza
+       ni factura (ver worker/src/alma.js). */
+    if (data.handoff && data.partnerPhone) {
+      appendHandoffButton(data.partnerName, data.partnerPhone);
     }
   } catch (e) {
     console.error("Chat error:", e);
@@ -1224,6 +1148,24 @@ function openWizard(planId) {
   wizardFamily = [];
   $("#wizard-overlay").classList.remove("hidden");
   renderWizardContent();
+  loadParentescos();
+}
+
+/* Catálogo de parentescos — server-to-server vía nuestro Worker (el token
+   nunca llega al navegador). Se carga una vez por apertura del wizard y
+   alimenta el <select> del paso "Familia" (renderStep1) más sus reglas de
+   edad/cédula (validateMemberAge). */
+async function loadParentescos() {
+  if (wizardParentescos.length > 0) return;
+  try {
+    const resp = await fetch(PARENTESCOS_API_URL);
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const data = await resp.json();
+    wizardParentescos = Array.isArray(data.items) ? data.items : [];
+    if (wizardOpen && wizardStep === 1) renderWizardStep();
+  } catch (e) {
+    console.warn("Parentescos no disponibles:", e.message);
+  }
 }
 
 function closeWizard() {
@@ -1422,26 +1364,51 @@ function renderStep0() {
     </div>`;
 }
 
+/* Encuentra el parentesco elegido para un familiar por id (número, viene del
+   <select> poblado desde wizardParentescos). */
+function findParentesco(id) {
+  return wizardParentescos.find((p) => String(p.id) === String(id)) || null;
+}
+
+/* Valida edad de un familiar contra el parentesco elegido — reemplaza el
+   viejo tope fijo por plan (validateAge/maxAge) porque la API valida contra
+   el rango edad_min/edad_max del parentesco, no del plan. */
+function validateMemberAge(birthDate, parentesco) {
+  if (!birthDate || !parentesco) return true;
+  const birth = new Date(birthDate);
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  const min = Number.isFinite(parentesco.edad_min) ? parentesco.edad_min : 0;
+  const max = Number.isFinite(parentesco.edad_max) ? parentesco.edad_max : 120;
+  return age >= min && age <= max;
+}
+
 function renderStep1() {
-  const maxAge = PLANS[wizardSelectedPlan]?.maxAge || 65;
   const minDate = (() => {
     const d = new Date();
-    d.setFullYear(d.getFullYear() - maxAge);
+    d.setFullYear(d.getFullYear() - 120);
     return d.toISOString().split("T")[0];
   })();
-  const maxDate = (() => {
-    const d = new Date();
-    d.setFullYear(d.getFullYear() - 18);
-    return d.toISOString().split("T")[0];
-  })();
-  const ageErrMsg =
-    currentLang === "es"
-      ? "Máximo " + maxAge + " años"
-      : "Max " + maxAge + " years";
+  const maxDate = new Date().toISOString().split("T")[0];
+
+  const parentescoOptions = (selectedId) =>
+    `<option value="">${currentLang === "es" ? "Selecciona..." : "Select..."}</option>` +
+    wizardParentescos
+      .map(
+        (p) =>
+          `<option value="${p.id}"${String(selectedId) === String(p.id) ? " selected" : ""}>${escapeHTML(p.nombre)}</option>`,
+      )
+      .join("");
 
   const cards = wizardFamily
-    .map(
-      (m, i) => `
+    .map((m, i) => {
+      const parentesco = findParentesco(m.parentescoId);
+      const ageOk = validateMemberAge(m.birthDate, parentesco);
+      const cedulaRequired = parentesco && parentesco.permite_sin_cedula === false;
+      const cedulaMissing = cedulaRequired && !m.cedula;
+      return `
     <div class="family-card">
       <div class="family-card-header">
         <span class="family-card-title">${t("wiz_member")} ${i + 1}</span>
@@ -1454,19 +1421,20 @@ function renderStep1() {
           <input class="form-input fm-input" data-idx="${i}" data-field="name" type="text" value="${escapeHTML(m.name)}"></div>
         <div class="form-group"><label class="form-label">${t("wiz_lname")}</label>
           <input class="form-input fm-input" data-idx="${i}" data-field="lastName" type="text" value="${escapeHTML(m.lastName)}"></div>
-        <div class="form-group"><label class="form-label">${t("wiz_cedula")}</label>
-          <input class="form-input fm-input" data-idx="${i}" data-field="cedula" type="text" value="${escapeHTML(m.cedula)}"></div>
         <div class="form-group"><label class="form-label">${t("wiz_relation")}</label>
-          <input class="form-input fm-input" data-idx="${i}" data-field="relationship" type="text" value="${escapeHTML(m.relationship)}" placeholder="${t("wiz_relation_ph")}"></div>
-        <div class="form-group"><label class="form-label">${t("wiz_phone")}</label>
-          <input class="form-input fm-input" data-idx="${i}" data-field="phone" type="tel" value="${escapeHTML(m.phone)}"></div>
+          <select class="form-input fm-input" data-idx="${i}" data-field="parentescoId">${parentescoOptions(m.parentescoId)}</select>
+        </div>
+        <div class="form-group"><label class="form-label">${t("wiz_cedula")}</label>
+          <input class="form-input fm-input" data-idx="${i}" data-field="cedula" type="text" value="${escapeHTML(m.cedula)}">
+          ${cedulaMissing ? `<div class="form-error">${currentLang === "es" ? "Cédula obligatoria para este parentesco" : "ID number required for this relationship"}</div>` : ""}
+        </div>
         <div class="form-group"><label class="form-label">${t("wiz_birth")}</label>
           <input class="form-input fm-input" data-idx="${i}" data-field="birthDate" type="date" value="${m.birthDate}" min="${minDate}" max="${maxDate}">
-          ${m.birthDate && !validateAge(m.birthDate, maxAge) ? `<div class="form-error">${ageErrMsg}</div>` : ""}
+          ${m.birthDate && parentesco && !ageOk ? `<div class="form-error">${currentLang === "es" ? `Edad fuera de rango (${parentesco.edad_min}-${parentesco.edad_max} años)` : `Age out of range (${parentesco.edad_min}-${parentesco.edad_max} years)`}</div>` : ""}
         </div>
       </div>
-    </div>`,
-    )
+    </div>`;
+    })
     .join("");
 
   return `
@@ -1609,7 +1577,6 @@ function bindWizardStepEvents() {
     );
   }
   if (wizardStep === 1) {
-    const maxAge = PLANS[wizardSelectedPlan]?.maxAge || 65;
     $$(".family-remove-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
         wizardFamily.splice(parseInt(btn.dataset.remove), 1);
@@ -1618,9 +1585,11 @@ function bindWizardStepEvents() {
       });
     });
     $$(".fm-input").forEach((input) => {
-      input.addEventListener("input", () => {
+      const evt = input.tagName === "SELECT" ? "change" : "input";
+      input.addEventListener(evt, () => {
         wizardFamily[parseInt(input.dataset.idx)][input.dataset.field] =
           input.value;
+        if (input.dataset.field === "parentescoId") renderWizardStep();
         updateWizardFooter();
       });
     });
@@ -1632,7 +1601,7 @@ function bindWizardStepEvents() {
           cedula: "",
           phone: "",
           birthDate: "",
-          relationship: "",
+          parentescoId: "",
         });
         renderWizardStep();
         updateWizardFooter();
@@ -1677,7 +1646,16 @@ function canWizardNext() {
       validateAge(b.birthDate, maxAge)
     );
   }
-  if (wizardStep === 1) return true;
+  if (wizardStep === 1) {
+    return wizardFamily.every((m) => {
+      if (!m.name || !m.lastName || !m.parentescoId || !m.birthDate) return false;
+      const parentesco = findParentesco(m.parentescoId);
+      if (!parentesco) return false;
+      if (!validateMemberAge(m.birthDate, parentesco)) return false;
+      if (parentesco.permite_sin_cedula === false && !m.cedula) return false;
+      return true;
+    });
+  }
   if (wizardStep === 2) return !!(wizardSelectedPlan && wizardPaymentType);
   if (wizardStep === 3) return wizardAcceptedTerms;
   return true;
@@ -1726,6 +1704,7 @@ async function submitWizard() {
   const payload = {
     intent:      "create_payment_intent",
     plan:        wizardSelectedPlan,
+    planId:      PLANS[wizardSelectedPlan]?.id,
     paymentType: wizardPaymentType,
     buyer:       wizardBuyer,
     family:      wizardFamily,
@@ -1741,10 +1720,20 @@ async function submitWizard() {
       body: JSON.stringify(payload),
     });
 
-    if (!resp.ok) throw new Error("HTTP " + resp.status);
-    await resp.json().catch(() => null);
+    const data = await resp.json().catch(() => null);
+    if (!resp.ok) throw new Error((data && (data.message || data.mensaje)) || "HTTP " + resp.status);
 
     setWizardProcessing(false);
+
+    /* La compra se paga con Stripe Checkout (link_de_cobro) — el navegador
+       redirige ahí; el contrato solo queda activo tras el webhook firmado de
+       Stripe, no por esta respuesta. Ver docs/api-publica-wizard.md. */
+    if (data && data.estado === "pendiente_pago" && data.linkDeCobro) {
+      window.location.href = data.linkDeCobro;
+      return;
+    }
+    /* "pendiente" no debería ocurrir para LH con forma_pago:"tarjeta", pero
+       queda como fallback defensivo (ej.: si el tenant cambia de método). */
     showWizardSuccessScreen(wizardBuyer.email);
   } catch (e) {
     console.error("Webhook error:", e);
