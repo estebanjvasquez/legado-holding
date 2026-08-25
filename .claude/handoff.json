@@ -1,276 +1,142 @@
 {
-  "schema_version": "1.0",
-  "generated_for": "Conversación nueva que retoma el proyecto Legado Holding",
+  "schema_version": "2.0",
+  "generated_for": "Conversación nueva que retoma el proyecto Legado Holding tras la migración Invoice Ninja → Prevision-Funeraria",
+  "last_updated": "2026-08-25",
   "project": {
     "name": "legado-holding",
-    "description": "Sitio bilingüe (ES/EN) de previsión funeraria para venezolanos en USA. Stack estático + Cloudflare Worker + Invoice Ninja v5.",
+    "description": "Sitio bilingüe (ES/EN) de previsión funeraria para venezolanos en USA. Stack estático + Cloudflare Worker. Billing YA NO usa Invoice Ninja: el wizard y el bot Alma consumen la API pública del sistema Prevision-Funeraria (repo separado).",
     "repo": "https://github.com/estebanjvasquez/legado-holding",
     "primary_lang": "es",
     "site_lang": "es+en",
     "domains": {
       "public": "legadoholding.com",
-      "deploy_path": "legadoholding.com/prueba",
+      "deploy_path": "legadoholding.com (raíz — desde 2026-08-25, antes era /v2)",
       "api": "api.legadoholding.com",
-      "workers_dev_backup": "legado-checkout-dev.<subdomain>.workers.dev",
-      "invoice_ninja": "invoicing.legadoholding.com"
+      "prevision_funeraria_api": "https://prevision-funeraria.sisteg.workers.dev/api/public/t/lh",
+      "invoice_ninja": "invoicing.legadoholding.com (solo login de staff del admin panel, ver abajo)"
+    },
+    "related_repo": {
+      "name": "estebanjvasquez/Prevision-Funeraria",
+      "role": "Sistema multiempresa (Cloudflare Workers + D1) que sirve billing/planes/afiliados a Legado Holding y Funeraria del Zulia. legado-holding es un consumidor de su API pública documentada en docs/api-publica-wizard.md — NO modificar ese repo desde acá.",
+      "notion": "Todo el tracking de ese proyecto (incluyendo hitos de integración con Legado Holding) vive en Notion bajo 'Previsión Funeraria — Proyecto y documentación', con 'Registro de Proyecto — <fecha>' por sesión."
     },
     "git": {
       "default_branch": "main",
-      "working_branch": "Sin_n8n",
-      "last_commit_sha": "4ee4cbf",
-      "last_commit_msg": "fix: corregir frequency_id de recurring invoices a valores reales de IN v5"
+      "deploys_to_root": true,
+      "rollback_tag": "pre-prevision-funeraria-rollback (apunta al commit justo antes de la migración, por si hay que revertir)",
+      "last_commits_this_migration": [
+        "055458e feat: migrar wizard de planes y bot Alma de Invoice Ninja a Prevision-Funeraria",
+        "deab982 chore: desplegar main a la raíz de legadoholding.com en vez de /v2",
+        "58fcc04 merge: promover migración a Prevision-Funeraria a main (root de legadoholding.com)",
+        "ce1aa40 fix: incluir gracias.html/cancelado.html en el deploy de cPanel",
+        "0063d70 fix(bot): saludo de Alma sin presuponer duelo + quitar rojo del modo emergencia",
+        "c33ed86 fix: cache-busting en css/js para forzar refresh de Cloudflare edge cache",
+        "465f799 fix(bot): evita que Alma se presente dos veces (saludo estático + IA)",
+        "625c503 fix(bot): ícono de marca en el header del chat en vez del triángulo de alerta"
+      ]
     }
   },
   "architecture": {
     "frontend": {
       "stack": "HTML5 + CSS3 + vanilla JS ES2017+",
       "no_bundler": true,
-      "no_node_runtime": true,
       "served_by": "Apache via cPanel",
-      "deploy_mechanism": ".cpanel.yml on git push to cPanel-tracked branch"
+      "deploy_mechanism": ".cpanel.yml on git push a main (DEPLOYPATH=/home/legadoholding/public_html, la raíz)",
+      "cache_busting_convention": "Cloudflare cachea js/css en el edge (~4h). CADA cambio a css/main.css o js/main.js necesita bump del query param ?v=N en index.html (líneas ~48, 1180, 1181) para forzar refresh. Verificar con un query string único (?zzz=<timestamp random>) si hay duda de si el cache sigue sirviendo contenido viejo."
     },
     "worker": {
       "name": "legado-checkout-dev",
       "runtime": "Cloudflare Workers (V8 isolate)",
-      "language": "JS ES modules",
-      "deploy_cmd": "wrangler deploy",
-      "tail_cmd": "wrangler tail"
+      "deploy_cmd": "cd worker && wrangler deploy",
+      "note_wrangler_dev_broken": "wrangler dev falla localmente en esta máquina Windows (crash nativo del binario workerd, std::terminate()). Workaround usado: importar los módulos del Worker directo en Node (son ES modules planos, solo usan fetch) desde un script de scratchpad."
     },
     "billing": {
-      "system": "Invoice Ninja v5 self-hosted",
-      "host": "Contabo VPS",
-      "api_base": "https://invoicing.legadoholding.com/api/v1",
-      "auth_header": "X-API-TOKEN"
+      "system": "Prevision-Funeraria (API pública, tenant lh)",
+      "spec": "docs/api-publica-wizard.md (en este repo)",
+      "auth": "worker/src/prevision-api.js usa Authorization: Bearer PF_TOKEN (secret del Worker) para /parentescos y /compras. GET /planes es público, se llama directo desde el browser sin pasar por el Worker."
+    },
+    "admin_panel_auth": {
+      "status": "SIGUE usando Invoice Ninja (worker/src/admin.js, env.IN_BASE) — deuda pendiente, no bloqueante, fuera de alcance de la migración de billing.",
+      "detail": "loginToIN/isInTokenValid autentican staff contra invoicing.legadoholding.com con sus credenciales personales. No usa el secret IN_TOKEN que ya fue revocado del checkout — es un flujo de login separado."
     }
   },
   "file_tree": {
     "frontend": [
-      { "path": "index.html", "role": "single page; LEGADO_CONFIG dev/prod switch at lines ~41-55" },
-      { "path": "css/main.css", "role": "all styles" },
-      { "path": "js/main.js", "role": "i18n LANG, plans, wizard 4 steps, chat placeholder" },
-      { "path": "js/wizard-generic.js", "role": "wizard helpers" },
-      { "path": "images/", "role": "logos, photos" },
-      { "path": "terminos-condiciones.txt", "role": "legal text" }
+      { "path": "index.html", "role": "single page; LEGADO_CONFIG dev/prod switch; PLANS_API_URL apunta directo a Prevision-Funeraria; PARENTESCOS_API_URL apunta al proxy del Worker" },
+      { "path": "css/main.css", "role": "estilos; branding navy/gold, sin rojo en modo emergencia" },
+      { "path": "js/main.js", "role": "i18n LANG, wizard 4 pasos (parentesco-driven), chat Alma, cache-bust ?v=3" },
+      { "path": "gracias.html", "role": "página estática, success_url de Stripe Checkout" },
+      { "path": "cancelado.html", "role": "página estática, cancel_url de Stripe Checkout" },
+      { "path": "images/IconoLegado.png", "role": "ícono de marca (círculos concéntricos), usado en el header del chat de Alma via almaIconHTML()" }
     ],
     "worker": [
-      { "path": "worker/wrangler.toml", "role": "config: name, routes, [vars]" },
-      { "path": "worker/package.json", "role": "scripts: dev, deploy, tail" },
-      { "path": "worker/src/index.js", "role": "router: GET/health, GET/products, POST/checkout, OPTIONS" },
-      { "path": "worker/src/invoiceninja.js", "role": "IN HTTP client factory createIN(env)" },
-      { "path": "worker/src/pipeline.js", "role": "processCheckout(body, env, executionCtx)" },
-      { "path": "worker/.dev.vars.example", "role": "template for local IN_TOKEN" }
+      { "path": "worker/wrangler.toml", "role": "config: PF_BASE, SITE_BASE_URL en [vars]; secret PF_TOKEN" },
+      { "path": "worker/src/index.js", "role": "router: health check, GET /wizard/parentescos, POST / (checkout)" },
+      { "path": "worker/src/prevision-api.js", "role": "cliente HTTP hacia Prevision-Funeraria (getParentescos, crearCompra)" },
+      { "path": "worker/src/wizard-compra.js", "role": "processWizardCheckout(body, env) — reemplaza al viejo pipeline.js" },
+      { "path": "worker/src/alma.js", "role": "bot: lookup_coverage + handoff (teléfono de aliado), ya NO cotiza/factura" },
+      { "path": "worker/src/chat.js", "role": "persiste handoff en chat_sessions.metadata" },
+      { "path": "worker/src/admin.js", "role": "login staff vía IN_BASE (sin cambios, fuera de alcance)" }
     ],
-    "infra": [
-      { "path": ".cpanel.yml", "role": "cPanel deploy: copies static assets to /home/legadoholding/public_html/prueba" },
-      { "path": ".gitignore", "role": "ignores worker/.dev.vars, .wrangler/, node_modules/" },
-      { "path": "README.md", "role": "849-line documentation" }
+    "docs": [
+      { "path": "docs/api-publica-wizard.md", "role": "contrato de la API de Prevision-Funeraria consumida por este repo" },
+      { "path": "docs/GUIA_INTERACCION_BOT_LEGADO.md", "role": "tono/branding del bot Alma — fuente del saludo actual" },
+      { "path": "docs/GUIA_ESPECIFICACIONES_WEB_LEGADO.md", "role": "specs de UI del sitio" }
     ]
   },
-  "worker_config": {
-    "vars": {
-      "IN_BASE": "https://invoicing.legadoholding.com/api/v1",
-      "ENVIRONMENT": "dev",
-      "EMAIL_MODE": "explicit",
-      "ALLOWED_ORIGINS": [
-        "https://legadoholding.com",
-        "https://www.legadoholding.com",
-        "http://localhost:5500",
-        "http://127.0.0.1:5500",
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-        "http://localhost:8080",
-        "http://127.0.0.1:8080"
-      ]
-    },
-    "secrets": [
-      {
-        "name": "IN_TOKEN",
-        "type": "secret_text",
-        "set_cmd": "wrangler secret put IN_TOKEN",
-        "note": "Ha desaparecido varias veces; re-subir si Health Check muestra tokenLoaded:false"
-      }
-    ],
-    "routes": [
-      { "pattern": "api.legadoholding.com/*", "zone": "legadoholding.com" }
-    ],
-    "email_modes": {
-      "explicit": "Worker llama POST /invoices/bulk action:email (recomendado)",
-      "auto": "Worker no llama; depende de 'Email invoices automatically' en IN",
-      "none": "no envía email (para pruebas)"
-    }
-  },
-  "endpoints": [
-    {
-      "method": "GET",
-      "path": "/",
-      "response": {
-        "ok": true,
-        "service": "legado-checkout",
-        "env": "dev",
-        "tokenLoaded": "bool",
-        "inBase": "url",
-        "emailMode": "explicit",
-        "allowedOrigins": "array"
-      }
-    },
-    {
-      "method": "GET",
-      "path": "/products",
-      "response": { "data": "[productos legadoweb filtrados]" }
-    },
-    {
-      "method": "POST",
-      "path": "/",
-      "request": {
-        "intent": "create_payment_intent",
-        "plan": "esencial-zulia | vanguardia-zulia | esencial-selecto | vanguardia-selecto",
-        "paymentType": "monthly | annual",
-        "buyer": {
-          "name": "",
-          "lastName": "",
-          "email": "",
-          "cedula": "",
-          "phone": "",
-          "birthDate": "YYYY-MM-DD",
-          "zip": ""
-        },
-        "family": "[{ name, lastName, cedula, birthDate, relation }]",
-        "timestamp": "ISO8601"
-      },
-      "response_success": {
-        "success": true,
-        "message": "",
-        "plan": "",
-        "modalidad": "",
-        "invoiceNumber": "",
-        "invitationLink": "",
-        "total": ""
-      },
-      "response_error": { "success": false, "message": "" }
-    }
+  "eliminados_en_la_migracion": [
+    "worker/src/invoiceninja.js",
+    "worker/src/pipeline.js",
+    "worker/src/emergency.js",
+    "tools de alma.js: list_emergency_products, create_invoice"
   ],
-  "invoice_ninja_conventions": {
-    "product_filtering": "GET /products?per_page=100 then filter where is_deleted=false AND custom_value1='legadoweb'",
-    "custom_value_1": "legadoweb (marca productos del sitio)",
-    "custom_value_2": "Monthly | Annualy | Unico",
-    "custom_value_3": "plan family slug",
-    "slug_mapping_frontend_to_in": {
-      "esencial-selecto": "esencial-ven",
-      "vanguardia-selecto": "vanguardia-ven"
-    },
-    "frequency_id_correct_values": {
-      "5": "Monthly (1 mes calendario)",
-      "10": "Annually (1 año)"
-    },
-    "frequency_id_wrong_values_avoid": {
-      "4": "Four weeks (28 días, no es mensual)",
-      "9": "Six months (no es anual)"
-    },
-    "selecto_plan_strategy": "Primer ciclo: Unico + Monthly. Luego PUT /recurring_invoices/{id} con line_items solo Monthly."
-  },
-  "frontend_config": {
-    "legado_config_location": "index.html lines ~41-55",
-    "dev_detection": "__isDev = ['localhost','127.0.0.1',''].includes(location.hostname)",
-    "ga4_property": "G-6NQKC8DHDV (inlined en index.html)"
-  },
   "completed_work": [
-    "Migración n8n LEGADO_PostPayment_v7 → Worker en JS",
-    "Eliminación carpeta n8n/ + 17 docs obsoletas + 3 scripts de testing",
-    "CORS endurecido (echo condicional según ALLOWED_ORIGINS)",
-    "Deploy Worker en api.legadoholding.com vía routes binding",
-    "Deploy frontend vía .cpanel.yml a /home/legadoholding/public_html/prueba",
-    "Optimización pipeline: 20s → 11.8s (-41%)",
-    "Fix frequency_id (bug heredado de n8n): monthly 4→5, annual 9→10",
-    "Inline GA4 snippet (eliminado js/gtag.js)",
-    "README.md completo de 849 líneas con TOC y 12 secciones"
+    "Migración completa wizard+Alma de Invoice Ninja a Prevision-Funeraria (tenant lh), solo planes esencial-zulia/vanguardia-zulia (Selecto queda fuera, ver gap #2 abajo)",
+    "Alma rediseñada: ya no cotiza ni factura, hace handoff con teléfono del aliado tras confirmar cobertura",
+    "Wizard paso 'Familia' ahora usa parentescos reales de la API (select) en vez de texto libre, con validación de edad/cédula por parentesco",
+    "Reconfigurado .cpanel.yml: main despliega a la raíz de legadoholding.com (antes /v2), con tag de rollback pre-prevision-funeraria-rollback",
+    "Worker de producción (api.legadoholding.com) desplegado con el código nuevo",
+    "Fix gracias.html/cancelado.html 404 (faltaban en la lista de copia de .cpanel.yml)",
+    "Bot: saludo de emergencia reescrito según docs/GUIA_INTERACCION_BOT_LEGADO.md (ya no presupone duelo), colores rojo/destructive reemplazados por navy/gold del branding",
+    "Bot: ícono del header del chat cambiado de triángulo de alerta a images/IconoLegado.png",
+    "Fix doble-presentación de Alma: chatMessages ahora se inicializa con el saludo estático incluido, para que el historial enviado al backend ya lo tenga — verificado correcto en aislamiento (frontend origin + backend/Gemini vía curl directo a /chat)"
   ],
-  "incidents_log": [
-    {
-      "issue": "Token IN expuesto en .claude/settings.local.json y en wrangler secret",
-      "root_cause": "wrangler secret put se invocó con el token como NOMBRE en vez de valor",
-      "fix": "Rotar token en IN admin; borrar secret malo; re-subir IN_TOKEN correctamente; limpiar settings.local.json"
-    },
-    {
-      "issue": "IN_TOKEN desaparece del Worker ocasionalmente",
-      "root_cause_hypothesis": "wrangler delete | switch de cuenta CF | rename del Worker | proceso externo",
-      "fix": "wrangler secret put IN_TOKEN cada vez; verificar wrangler secret list"
-    },
-    {
-      "issue": "HTTP 522 desde IN",
-      "root_cause": "VPS Contabo o servicios apache/mysql/php caídos",
-      "fix": "SSH al VPS, systemctl restart de servicios caídos"
-    },
-    {
-      "issue": "CORS bloqueando origin http://127.0.0.1:8080",
-      "root_cause": "Puerto 8080 no estaba en ALLOWED_ORIGINS",
-      "fix": "Agregar http://localhost:8080 y http://127.0.0.1:8080 a wrangler.toml + wrangler deploy"
-    }
+  "known_gaps_in_prevision_funeraria_api": [
+    "1. Sin modelo para el marketplace de aliados regionales de Alma (N aliados con catálogo propio por ciudad) — no es un bug a corregir, es la razón del rediseño a handoff",
+    "2. Sin campo de cuota inicial en 'planes' — bloquea migrar esencial-selecto/vanguardia-selecto (cobran cuota única + mensualidad, ese modelo no existe en la API nueva). CTA de esos 2 planes manda a contacto en vez de abrir el wizard.",
+    "3. tarifas[] (precio por banda de edad) es capacidad nueva que el wizard no explotaba antes — confirmar con negocio si el tenant lh debe usar una sola banda 0-100 para mantener precio plano"
   ],
+  "open_thread_needs_followup": {
+    "id": "double-greeting-bug-user-still-sees-it",
+    "status": "backend y frontend verificados correctos en aislamiento, pero el usuario reportó (2026-08-25, después del fix + deploy) que Alma TODAVÍA se presenta dos veces en su navegador",
+    "evidence_fix_is_correct": [
+      "Fetch con query string único (bypass cache) de js/main.js en producción confirma que 'chatMessages = [{ role: \"assistant\", content: greeting }]' SÍ está en el código servido",
+      "curl directo a https://api.legadoholding.com/chat con sessionId sintético + history conteniendo el saludo + mensaje de usuario devolvió respuesta SIN reintroducción — prueba que el backend/prompt de Gemini funciona bien cuando recibe el history correcto",
+      "grep en todo el repo (js/, admin/) no encontró ningún segundo openChat/chat_greeting/chatMessages duplicado que explique un path alterno"
+    ],
+    "leading_hypothesis": "el navegador del usuario tenía una pestaña/sesión abierta desde ANTES del deploy del fix (JS ya cargado en memoria no se reemplaza sin recargar), o Cloudflare seguía sirviendo un ?v=N cacheado con contenido viejo por una carrera con la propagación del deploy",
+    "next_step": "pedirle al usuario que pruebe en ventana de incógnito/privada (descarta JS viejo en memoria) y confirme en DevTools → Network que carga js/main.js?v=3 — si falla incluso así, investigar más a fondo",
+    "not_yet_confirmed_resolved_by_user": true
+  },
   "known_limitations": [
-    "Sin idempotencia: doble-click puede crear 2 clientes/facturas",
-    "Polling fijo 12×400ms; si IN cron es lento puede fallar",
-    "Subscription template no se auto-crea (IN devuelve 500); subscription_id es null salvo creación manual",
-    "Chat webhook actual es placeholder no funcional",
-    "lead_abandoned POST se envía pero Worker responde 400 sin loguear (no hay CRM)",
-    "Sin tests automatizados"
+    "admin.js sigue autenticando staff contra Invoice Ninja (deuda pendiente, no bloqueante)",
+    "Planes Selecto sin checkout digital (gap #2 de la API)",
+    "Sin atribución/tracking de vendedor (?ref=, UTMs) — fuera de alcance",
+    "README.md y algunas partes de docs/ pueden seguir describiendo la arquitectura vieja basada en Invoice Ninja — no reescritas por estar fuera de lo pedido"
   ],
   "commands_cheatsheet": {
-    "dev_local": "cd worker && wrangler dev",
-    "deploy": "cd worker && wrangler deploy",
-    "tail_logs": "cd worker && wrangler tail",
-    "set_secret": "cd worker && wrangler secret put IN_TOKEN",
-    "list_secrets": "cd worker && wrangler secret list",
-    "health_check": "Invoke-RestMethod -Uri 'https://api.legadoholding.com' -Method GET",
-    "products_check": "Invoke-RestMethod -Uri 'https://api.legadoholding.com/products' -Method GET",
-    "static_server_local": "python -m http.server 8080  |  npx serve -p 8000  |  Live Server VS Code (5500)"
+    "deploy_worker": "cd worker && wrangler deploy",
+    "deploy_frontend": "git push origin main (dispara .cpanel.yml automáticamente) — el usuario debe confirmar que el deploy de cPanel se disparó, no siempre es instantáneo",
+    "set_secret": "cd worker && wrangler secret put PF_TOKEN",
+    "health_check": "Invoke-RestMethod -Uri 'https://api.legadoholding.com' -Method GET  (debe reportar pfTokenLoaded:true)",
+    "cache_bust_after_css_js_change": "bump ?v=N en index.html líneas ~48/1180/1181, commit, push",
+    "verify_true_cache_miss": "curl -sI 'https://www.legadoholding.com/js/main.js?zzz=<timestamp único>' | grep cf-cache-status  → debe decir MISS con contenido nuevo"
   },
   "user_preferences": {
     "language": "Spanish",
     "tone": "Terse, action-oriented",
-    "decision_style": "Confirms with 'si' or 'ok'; expects explicit options before destructive actions",
-    "platform": "Windows 11, PowerShell 5.1 (sin -SkipHttpErrorCheck), bash disponible vía Claude Code",
-    "git_workflow": "commit + ff-merge to main + push origin main Sin_n8n",
+    "decision_style": "Confirms with 'si'/'yes' or 'ok'; espera opciones explícitas antes de acciones destructivas o de deploy a producción",
+    "platform": "Windows 11, PowerShell/Git Bash disponibles vía Claude Code",
     "git_user": "ESTEBAN VASQUEZ <estebanjvasquez@gmail.com>"
-  },
-  "open_tasks": [
-    {
-      "id": "chatbot-emergency",
-      "name": "Chatbot de emergencia",
-      "status": "alignment_phase",
-      "description": "Bot conversacional con IA para clientes con emergencia funeraria activa. Determina servicios necesarios, muestra resumen, permite confirmación, crea cliente si nuevo, emite factura única.",
-      "constraints": [
-        "Productos a contratar son DISTINTOS a legadoweb (catálogo aparte)",
-        "Si cliente nuevo: crear como en wizard. Si existe: emitir factura directo",
-        "Conectar con flow n8n llamado 'Alma 2'"
-      ],
-      "blocking_questions": {
-        "A_alma2": "¿Qué es Alma 2? Existe? Qué hace?",
-        "B_agent_location": "Worker (B1, recomendado) | n8n (B2) | Híbrido (B3)?",
-        "C_ai_model": "Claude Haiku 4.5 (recomendado) | GPT-4o-mini | otro?",
-        "D_emergency_services": "Catálogo en IN con qué custom_value*?",
-        "E_min_client_fields": "Qué datos pedir en emergencia (vs wizard que pide 7)?",
-        "F_acceptance": "Mecanismo: botón en chat | email confirmación | otro?"
-      },
-      "proposed_phases": [
-        "Fase 1: POST /chat en Worker con IA integrada",
-        "Fase 2: agente con tools (searchServices, summarizeQuote, confirmAndInvoice)",
-        "Fase 3: integración con widget chat del frontend",
-        "Fase 4: integración con Alma 2 (rol TBD)"
-      ],
-      "first_recommended_step": "Responder preguntas A-F para destrabar el diseño"
-    },
-    {
-      "id": "migrate-old-subscriptions",
-      "name": "Migrar suscripciones con frequency_id viejo",
-      "status": "deferred",
-      "description": "Suscripciones creadas antes del fix tienen frequency_id 4 (4-weeks) o 9 (6-months). Actualizar manualmente en IN admin o con script PUT /recurring_invoices/{id}."
-    },
-    {
-      "id": "decommission-old-n8n",
-      "name": "Desactivar n8n viejo en Contabo",
-      "status": "deferred",
-      "description": "Workflow LEGADO_PostPayment_v7 sigue activo en VPS Contabo pero sin tráfico. Apagar desde la UI de n8n cuando convenga."
-    }
-  ],
-  "rehydration_prompt_template": "Soy Esteban Vasquez. Estoy retomando el proyecto legado-holding. Mi último checkpoint quedó en el JSON adjunto. Hay un task abierto: 'Chatbot de emergencia' bloqueado por preguntas A-F. Por favor confirma que entiendes el estado y procede."
+  }
 }

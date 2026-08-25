@@ -22,7 +22,18 @@ Los planes "Selecto" (`esencial-selecto`/`vanguardia-selecto`) siguen sin checko
 digital: cobran una cuota inicial que el modelo `planes` de la API nueva todavía no
 soporta. Su CTA en el sitio manda a contacto en vez de abrir el wizard.
 
+La migración ya está en producción: `main` despliega ahora a la **raíz** de
+legadoholding.com (antes desplegaba a `/v2`; ver tag `pre-prevision-funeraria-rollback`
+para revertir si hace falta), y el Worker de `api.legadoholding.com` corre el código
+nuevo.
+
 **No modificar este repositorio para tareas del proyecto de Previsión** salvo que se
 pida explícitamente. El sistema todavía está en revisión (sin usuarios finales en
 producción, según confirmación del usuario) — pero cualquier cambio a wizard/bot debe
 seguir el contrato documentado en `docs/api-publica-wizard.md`.
+
+**Estado detallado y trabajo pendiente:** ver `.claude/handoff.json` — incluye el árbol
+de archivos actualizado, gaps conocidos de la API nueva, y un hilo abierto sin cerrar
+(`open_thread_needs_followup`: reporte del usuario de que el bot Alma sigue
+presentándose dos veces pese a que el fix está verificado correcto en backend y
+frontend — pendiente de confirmar con el usuario en incógnito).
