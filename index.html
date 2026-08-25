@@ -4,14 +4,24 @@
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-        <!-- Google tag (gtag.js) -->
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-6NQKC8DHDV"></script>
+        <!-- Google tag (gtag.js) — carga diferida hasta que el usuario acepte
+             el banner de cookies (ver #cookie-consent-banner más abajo y
+             initCookieConsent() en js/main.js). No es esencial para el
+             funcionamiento del sitio, así que no se dispara por defecto. -->
         <script>
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-
-            gtag('config', 'G-6NQKC8DHDV');
+            window.LEGADO_GA_ID = "G-6NQKC8DHDV";
+            function loadGoogleAnalytics() {
+                if (window.__gaLoaded) return;
+                window.__gaLoaded = true;
+                const s = document.createElement("script");
+                s.async = true;
+                s.src = "https://www.googletagmanager.com/gtag/js?id=" + window.LEGADO_GA_ID;
+                document.head.appendChild(s);
+                gtag('js', new Date());
+                gtag('config', window.LEGADO_GA_ID);
+            }
         </script>
 
         <!-- ═══ SEO — edita title y description para buscadores ═══ -->
@@ -37,6 +47,48 @@
         <meta property="og:type" content="website" />
         <meta property="og:image" content="images/hero-family.jpg" />
 
+        <!-- Datos estructurados (JSON-LD). Solo Organization y Service porque
+             el sitio no tiene dirección física verificable ni sección de FAQ
+             visible todavía (LocalBusiness y FAQPage requieren contenido
+             visible en la página que los respalde). -->
+        <script type="application/ld+json">
+            {
+                "@context": "https://schema.org",
+                "@graph": [
+                    {
+                        "@type": "Organization",
+                        "name": "Legado Holding",
+                        "url": "https://legadoholding.com",
+                        "logo": "https://legadoholding.com/images/LogoLegado.png",
+                        "description": "Grupo de empresas con más de 80 años de trayectoria en Venezuela, ofreciendo previsión funeraria 100% digital para venezolanos en Estados Unidos.",
+                        "email": "info@legadoholding.com",
+                        "sameAs": [
+                            "https://instagram.com/funerariazulia",
+                            "https://instagram.com/crematoriodelzulia",
+                            "https://funerariadelzulia.com"
+                        ]
+                    },
+                    {
+                        "@type": "Service",
+                        "serviceType": "Previsión funeraria",
+                        "provider": {
+                            "@type": "Organization",
+                            "name": "Legado Holding"
+                        },
+                        "areaServed": {
+                            "@type": "Country",
+                            "name": "Venezuela"
+                        },
+                        "audience": {
+                            "@type": "Audience",
+                            "audienceType": "Venezolanos residentes en Estados Unidos"
+                        },
+                        "description": "Planes de previsión funeraria 100% digitales, contratados desde Estados Unidos, para familiares en Venezuela."
+                    }
+                ]
+            }
+        </script>
+
         <!-- Favicon -->
         <link rel="icon" type="image/png" href="images/LogoLegado.png" />
 
@@ -45,7 +97,7 @@
              en el edge, independiente de si cPanel ya desplegó el archivo nuevo en
              origin. Sube este número cada vez que cambies css/main.css o js/main.js
              para forzar que el navegador y el edge pidan la versión nueva. -->
-        <link rel="stylesheet" href="css/main.css?v=2" />
+        <link rel="stylesheet" href="css/main.css?v=3" />
 
         <!-- ═══ CONFIGURACIÓN GLOBAL — Webhooks y API Keys ═══ -->
         <script>
@@ -288,7 +340,7 @@
 
                     <!-- Botón CTA principal -->
                     <div class="hero-cta-wrap">
-                        <button class="btn-gold hero-cta" data-open-wizard>
+                        <button class="btn-on-navy hero-cta" data-open-wizard>
                             <span data-i18n="hero_cta"
                                 >PROTEGE TU LEGADO AQUÍ</span
                             >
@@ -797,9 +849,10 @@
                         anual. Titular + 6 familiares hasta 65 años.
                     </p>
                     <div class="cta-buttons">
-                        <!-- Botón principal -->
+                        <!-- Botón principal (btn-on-navy: esta sección tiene fondo
+                             navy oscuro, un botón navy no tendría contraste) -->
                         <button
-                            class="btn-gold"
+                            class="btn-on-navy"
                             data-open-wizard
                             style="padding: 1rem 2.25rem; font-size: 1.05rem"
                         >
@@ -974,13 +1027,23 @@
                     <div>
                         <h4 class="footer-section-title">Legal</h4>
                         <div class="footer-links">
-                            <a href="#" data-i18n="footer_terms"
+                            <a
+                                href="terminos-condiciones.txt"
+                                target="_blank"
+                                rel="noopener"
+                                data-i18n="footer_terms"
                                 >Términos y condiciones</a
                             >
-                            <a href="#" data-i18n="footer_privacy"
+                            <a
+                                href="politica-privacidad.txt"
+                                target="_blank"
+                                rel="noopener"
+                                data-i18n="footer_privacy"
                                 >Política de privacidad</a
                             >
-                            <a href="#" data-i18n="footer_support">Soporte</a>
+                            <a href="#contacto" data-i18n="footer_support"
+                                >Soporte</a
+                            >
                         </div>
                     </div>
                 </div>
@@ -1166,6 +1229,44 @@
         </div>
 
         <!-- ════════════════════════════════════════════════════════════
+     BANNER DE CONSENTIMIENTO DE COOKIES
+     Bloquea Google Analytics hasta que el usuario acepte.
+     Lógica: initCookieConsent() en js/main.js
+     ════════════════════════════════════════════════════════════ -->
+        <div id="cookie-consent-banner" class="cookie-consent hidden">
+            <p class="cookie-consent-text">
+                <span data-i18n="cookie_text"
+                    >Usamos cookies para analítica (Google Analytics) y así
+                    mejorar tu experiencia. No son necesarias para usar el
+                    sitio.</span
+                >
+                <a
+                    href="politica-privacidad.txt"
+                    target="_blank"
+                    rel="noopener"
+                    data-i18n="cookie_link"
+                    >Ver política de privacidad</a
+                >
+            </p>
+            <div class="cookie-consent-actions">
+                <button
+                    id="cookie-reject-btn"
+                    class="btn-outline cookie-btn"
+                    data-i18n="cookie_reject"
+                >
+                    Rechazar
+                </button>
+                <button
+                    id="cookie-accept-btn"
+                    class="btn-gold cookie-btn"
+                    data-i18n="cookie_accept"
+                >
+                    Aceptar
+                </button>
+            </div>
+        </div>
+
+        <!-- ════════════════════════════════════════════════════════════
      TOAST CONTAINER (notificaciones flotantes)
      ════════════════════════════════════════════════════════════ -->
         <div id="toast-container" class="toast-container"></div>
@@ -1177,7 +1278,7 @@
              Vendoreado en js/vendor para evitar dependencia de CDN externo. -->
         <script src="js/vendor/purify.min.js"></script>
         <!-- ?v= cache-busting, ver comentario junto a css/main.css arriba -->
-        <script src="js/main.js?v=3"></script>
+        <script src="js/main.js?v=4"></script>
         <script src="js/wizard-generic.js?v=1"></script>
     </body>
 </html>

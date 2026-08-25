@@ -222,8 +222,8 @@ const LANG = {
     "When my father passed, Legado took care of everything. I was here unable to travel, but I knew my family was supported.",
   ],
   test3_text: [
-    "El proceso fue súper fácil. En minutos tenía todo configurado desde mi teléfono. Ahora mis abuelos están protegidos.",
-    "The process was super easy. In minutes I had everything set up from my phone. Now my grandparents are protected.",
+    "El proceso fue súper fácil. Configuré todo desde mi teléfono sin complicaciones. Ahora mis abuelos están protegidos.",
+    "The process was super easy. I set everything up from my phone without any hassle. Now my grandparents are protected.",
   ],
 
   /* ── Contacto ──────────────────────────────────────────────────────────── */
@@ -258,6 +258,15 @@ const LANG = {
   footer_privacy: ["Política de privacidad", "Privacy policy"],
   footer_support: ["Soporte", "Support"],
   footer_rights: ["Todos los derechos reservados.", "All rights reserved."],
+
+  /* ── Banner de cookies ─────────────────────────────────────────────────── */
+  cookie_text: [
+    "Usamos cookies para analítica (Google Analytics) y así mejorar tu experiencia. No son necesarias para usar el sitio.",
+    "We use cookies for analytics (Google Analytics) to improve your experience. They are not necessary to use the site.",
+  ],
+  cookie_link: ["Ver política de privacidad", "View privacy policy"],
+  cookie_accept: ["Aceptar", "Accept"],
+  cookie_reject: ["Rechazar", "Reject"],
 
   /* ── Emergencia ────────────────────────────────────────────────────────── */
   emergency: ["EMERGENCIA", "EMERGENCY"],
@@ -715,6 +724,35 @@ function toggleLang() {
     const greetBubble = $("#chat-messages .chat-greeting .chat-bubble");
     if (greetBubble) greetBubble.textContent = greeting;
   }
+}
+
+/* =============================================================================
+   COOKIE CONSENT — bloquea Google Analytics hasta que el usuario decida.
+   Guarda la decisión en localStorage bajo "legado_cookie_consent".
+   ============================================================================= */
+function initCookieConsent() {
+  const KEY = "legado_cookie_consent";
+  const banner = $("#cookie-consent-banner");
+  if (!banner) return;
+
+  const stored = localStorage.getItem(KEY);
+  if (stored === "accepted") {
+    if (typeof loadGoogleAnalytics === "function") loadGoogleAnalytics();
+    return;
+  }
+  if (stored === "rejected") return;
+
+  banner.classList.remove("hidden");
+
+  $("#cookie-accept-btn")?.addEventListener("click", () => {
+    localStorage.setItem(KEY, "accepted");
+    banner.classList.add("hidden");
+    if (typeof loadGoogleAnalytics === "function") loadGoogleAnalytics();
+  });
+  $("#cookie-reject-btn")?.addEventListener("click", () => {
+    localStorage.setItem(KEY, "rejected");
+    banner.classList.add("hidden");
+  });
 }
 
 /* =============================================================================
@@ -1900,6 +1938,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initChat();
   initWizard();
   initReveal();
+  initCookieConsent();
 
   console.log("LEGADO v4 initialized ✓");
 });

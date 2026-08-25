@@ -40,7 +40,7 @@
    1. FUENTES Y VARIABLES
    Para cambiar colores globales edita las variables --accent, --primary, etc.
    ============================================================================= */
-@import url("https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;1,14..32,400&display=swap");
 
 :root {
     /* Paleta base */
@@ -48,49 +48,51 @@
     --foreground: #0f1623;
     --card: #ffffff;
     --card-foreground: #0f1623;
-    --primary: #0f2444; /* Navy oscuro */
+    --primary: #263c5b; /* Navy de marca — guía §3.1 */
     --primary-foreground: #ffffff;
     --secondary: #f4f5f7; /* Gris claro para fondos alternos */
     --muted: #f4f5f7;
     --muted-foreground: #6b7280;
-    --accent: #c9a84c; /* Dorado de marca */
+    --accent: #c9a84c; /* Dorado — solo uso decorativo, no CTAs (guía §3.2) */
     --accent-foreground: #0f1623;
     --destructive: #ef4444;
     --destructive-foreground: #ffffff;
     --border: #e5e7eb;
     --input: #e5e7eb;
-    --ring: #c9a84c;
+    --ring: #263c5b;
     --radius: 0.75rem;
 
     /* Tokens de marca */
-    --navy: #0f2444;
-    --navy-light: #1a3a6a;
+    --navy: #263c5b;
+    --navy-light: #3a5581;
     --gold: #c9a84c;
     --gold-light: #dfc27a;
     --gold-dark: #a8862f;
 
     /* Gradientes */
     --gradient-gold: linear-gradient(135deg, #c9a84c, #dfc27a);
-    --gradient-navy: linear-gradient(180deg, #0f2444 0%, #081525 100%);
+    --gradient-navy: linear-gradient(180deg, #263c5b 0%, #16273c 100%);
     /* Hero: gradiente profundo navy para el overlay sobre la foto */
     --gradient-hero: linear-gradient(
         135deg,
-        hsl(220 50% 10%) 0%,
-        hsl(220 45% 18%) 50%,
-        hsl(220 35% 26%) 100%
+        hsl(213 40% 15%) 0%,
+        hsl(213 38% 24%) 50%,
+        hsl(213 35% 32%) 100%
     );
     /* Fondo cálido para la sección Protege */
     --gradient-warm: linear-gradient(180deg, #faf8f5 0%, #f0ede6 100%);
 
     /* Sombras */
     --shadow-gold: 0 8px 32px -8px rgba(201, 168, 76, 0.35);
+    --shadow-navy: 0 8px 32px -8px rgba(38, 60, 91, 0.35);
     --shadow-card: 0 4px 24px -4px rgba(15, 22, 35, 0.08);
     --shadow-elevated: 0 12px 40px -12px rgba(15, 22, 35, 0.14);
     --shadow-strong: 0 20px 60px -12px rgba(15, 22, 35, 0.22);
 
-    /* Tipografías */
-    --font-heading: "DM Serif Display", Georgia, serif;
-    --font-body: "DM Sans", system-ui, sans-serif;
+    /* Tipografías — Inter para toda la interfaz (guía §3.4). Sin serif editorial
+       aprobada todavía, así que headings también usan Inter. */
+    --font-heading: "Inter", Arial, sans-serif;
+    --font-body: "Inter", Arial, sans-serif;
 }
 
 /* =============================================================================
@@ -340,13 +342,13 @@ select {
 
 /* CTA del nav */
 .btn-nav-cta {
-    background: var(--gradient-gold);
-    color: var(--primary);
+    background: var(--primary);
+    color: var(--primary-foreground);
     font-weight: 600;
     font-size: 0.875rem;
     padding: 0.55rem 1.25rem;
     border-radius: calc(var(--radius) - 0.1rem);
-    box-shadow: var(--shadow-gold);
+    box-shadow: var(--shadow-navy);
     transition:
         opacity 0.2s,
         transform 0.2s;
@@ -395,11 +397,11 @@ select {
    6. BOTONES GLOBALES
    ============================================================================= */
 .btn-gold {
-    background: var(--gradient-gold);
-    color: var(--primary);
+    background: var(--primary);
+    color: var(--primary-foreground);
     font-weight: 700;
     border-radius: var(--radius);
-    box-shadow: var(--shadow-gold);
+    box-shadow: var(--shadow-navy);
     transition:
         opacity 0.2s,
         transform 0.2s;
@@ -412,6 +414,33 @@ select {
     transform: scale(1.02);
 }
 .btn-gold:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Variante para botones primarios sobre fondos oscuros (hero, CTA final):
+   ahí un botón navy se funde con el fondo navy. Blanco sobre navy es la
+   combinación de mayor contraste dentro de la paleta aprobada (guía §3.1),
+   y el texto navy sobre blanco cumple WCAG AA con margen amplio. */
+.btn-on-navy {
+    background: #ffffff;
+    color: var(--primary);
+    font-weight: 700;
+    border-radius: var(--radius);
+    box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.35);
+    transition:
+        opacity 0.2s,
+        transform 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.btn-on-navy:hover {
+    opacity: 0.9;
+    transform: scale(1.02);
+}
+.btn-on-navy:disabled {
     opacity: 0.45;
     cursor: not-allowed;
     transform: none;
@@ -1416,8 +1445,15 @@ footer {
     bottom: 1.5rem;
     right: 1.5rem;
     z-index: 990;
+    /* Mismo dorado que ".text-gradient-gold" (ej. "no poder estar presente" en
+       el hero) — a pedido explícito, distinto del resto de botones primarios
+       (navy). Texto navy para legibilidad sobre el dorado. */
     background: var(--gradient-gold);
     color: var(--primary);
+    /* Anillo blanco fijo: es un botón flotante que pasa sobre fondos navy,
+       fotos y secciones claras; el anillo + la sombra neutra lo separan
+       visualmente sin importar qué haya detrás. */
+    border: 2px solid #ffffff;
     border-radius: 999px;
     padding: 0.875rem 1.25rem;
     font-weight: 600;
@@ -1425,7 +1461,7 @@ footer {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    box-shadow: 0 8px 24px rgba(201, 168, 76, 0.35);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
     transition: transform 0.2s;
     animation: bounceIn 0.5s 1.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
 }
@@ -1629,12 +1665,12 @@ footer {
     transition: opacity 0.2s;
 }
 .chat-send-btn.normal {
-    background: var(--gradient-gold);
-    color: var(--primary);
+    background: var(--primary);
+    color: var(--primary-foreground);
 }
 .chat-send-btn.emergency {
-    background: var(--gradient-gold);
-    color: var(--primary);
+    background: var(--primary);
+    color: var(--primary-foreground);
 }
 .chat-send-btn:disabled {
     opacity: 0.4;
@@ -1697,19 +1733,19 @@ footer {
     gap: 2px;
     padding: 0.7rem 1.1rem;
     border-radius: var(--radius);
-    background: var(--gradient-gold);
-    color: var(--primary);
+    background: var(--primary);
+    color: var(--primary-foreground);
     font-weight: 700;
     font-size: 0.95rem;
     text-decoration: none;
-    box-shadow: 0 2px 6px rgba(201, 168, 76, 0.35);
+    box-shadow: 0 2px 6px rgba(38, 60, 91, 0.35);
     transition:
         transform 0.15s,
         box-shadow 0.15s;
 }
 .chat-pay-btn:hover {
     transform: translateY(-1px);
-    box-shadow: 0 4px 10px rgba(201, 168, 76, 0.45);
+    box-shadow: 0 4px 10px rgba(38, 60, 91, 0.45);
 }
 .chat-pay-btn small {
     font-weight: 500;
@@ -2162,10 +2198,10 @@ footer {
     font-size: 0.875rem;
     font-weight: 600;
     padding: 0.625rem 1.5rem;
-    background: var(--gradient-gold);
-    color: var(--primary);
+    background: var(--primary);
+    color: var(--primary-foreground);
     border-radius: var(--radius);
-    box-shadow: var(--shadow-gold);
+    box-shadow: var(--shadow-navy);
     transition:
         opacity 0.2s,
         transform 0.2s;
@@ -2294,6 +2330,54 @@ footer {
     color: var(--accent);
     white-space: nowrap;
     flex-shrink: 0;
+}
+
+/* =============================================================================
+   20b. BANNER DE CONSENTIMIENTO DE COOKIES
+   PARA CAMBIAR TEXTOS: cookie_* en js/main.js
+   ============================================================================= */
+.cookie-consent {
+    position: fixed;
+    left: 1rem;
+    right: 1rem;
+    bottom: 1rem;
+    z-index: 1050;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-strong);
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    max-width: 880px;
+    margin: 0 auto;
+}
+.cookie-consent.hidden {
+    display: none;
+}
+.cookie-consent-text {
+    font-size: 0.85rem;
+    color: var(--muted-foreground);
+    line-height: 1.6;
+    flex: 1 1 320px;
+}
+.cookie-consent-text a {
+    color: var(--primary);
+    font-weight: 600;
+    text-decoration: underline;
+}
+.cookie-consent-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-shrink: 0;
+}
+.cookie-btn {
+    padding: 0.625rem 1.25rem;
+    font-size: 0.85rem;
+    white-space: nowrap;
 }
 
 /* =============================================================================

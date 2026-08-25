@@ -1,0 +1,143 @@
+POLÍTICA DE PRIVACIDAD / PRIVACY POLICY
+══════════════════════════════════════════════════════════════════════════════
+
+TÍTULO: Política de Privacidad de LEGADO HOLDING / LEGADO HOLDING Privacy Policy
+
+IDIOMA / LANGUAGE: Esta política está disponible en español e inglés. This policy is available in Spanish and English.
+
+ÚLTIMA ACTUALIZACIÓN / LAST UPDATED: 2026-08-25
+
+══════════════════════════════════════════════════════════════════════════════
+
+1. QUÉ DATOS RECOPILAMOS / WHAT DATA WE COLLECT
+══════════════════════════════════════════════════════════════════════════════
+
+ES: Cuando contratas un plan o nos contactas, recopilamos:
+
+• Datos del Cliente (titular): nombre, correo electrónico, teléfono y datos de pago.
+• Datos de los familiares designados: nombre, parentesco y datos necesarios para
+  identificar al beneficiario del servicio en Venezuela.
+• Datos de navegación: páginas visitadas y eventos de interacción con el sitio,
+  recopilados mediante Google Analytics (ver sección 4, Cookies).
+• Conversaciones con el asistente virtual "Alma", si decides usar el chat.
+
+Los datos de pago (tarjeta de crédito/débito) son procesados directamente por
+Stripe y por la plataforma de Previsión Funeraria que administra los planes;
+LEGADO HOLDING no almacena el número completo de tu tarjeta en sus propios
+sistemas.
+
+EN: When you purchase a plan or contact us, we collect:
+
+• Customer (policyholder) data: name, email, phone number, and payment details.
+• Designated family member data: name, relationship, and information needed to
+  identify the service beneficiary in Venezuela.
+• Browsing data: pages visited and interaction events on the site, collected
+  via Google Analytics (see section 4, Cookies).
+• Conversations with the "Alma" virtual assistant, if you choose to use the chat.
+
+Payment data (credit/debit card) is processed directly by Stripe and by the
+Prevision Funeraria platform that administers the plans; LEGADO HOLDING does
+not store your full card number in its own systems.
+
+══════════════════════════════════════════════════════════════════════════════
+
+2. PARA QUÉ USAMOS TUS DATOS / HOW WE USE YOUR DATA
+══════════════════════════════════════════════════════════════════════════════
+
+ES:
+2.1 Para gestionar tu contrato de previsión funeraria y coordinar el servicio
+    con las funerarias aliadas en Venezuela cuando sea necesario.
+2.2 Para procesar tus pagos y enviarte confirmaciones y recibos.
+2.3 Para responder tus consultas de soporte y contacto.
+2.4 Para entender el uso del sitio y mejorar la experiencia (analítica).
+
+EN:
+2.1 To manage your funeral pre-planning contract and coordinate the service
+    with partner funeral homes in Venezuela when needed.
+2.2 To process your payments and send you confirmations and receipts.
+2.3 To respond to your support and contact inquiries.
+2.4 To understand site usage and improve the experience (analytics).
+
+══════════════════════════════════════════════════════════════════════════════
+
+3. CON QUIÉN COMPARTIMOS TUS DATOS / WHO WE SHARE YOUR DATA WITH
+══════════════════════════════════════════════════════════════════════════════
+
+ES: No vendemos tus datos personales. Los compartimos únicamente con:
+
+• Stripe, para procesar pagos con tarjeta.
+• La plataforma de Previsión Funeraria (Cloudflare Workers/D1) que administra
+  los planes y contratos.
+• Funerarias aliadas en Venezuela (p. ej. Funeraria del Zulia), solo lo
+  necesario para prestar el servicio contratado al familiar designado.
+• Proveedores de analítica (Google Analytics), de forma agregada y anónima
+  cuando es posible.
+
+EN: We do not sell your personal data. We share it only with:
+
+• Stripe, to process card payments.
+• The Prevision Funeraria platform (Cloudflare Workers/D1) that administers
+  plans and contracts.
+• Partner funeral homes in Venezuela (e.g. Funeraria del Zulia), only what is
+  necessary to deliver the contracted service to the designated family member.
+• Analytics providers (Google Analytics), aggregated and anonymized where
+  possible.
+
+══════════════════════════════════════════════════════════════════════════════
+
+4. COOKIES Y ANALÍTICA / COOKIES AND ANALYTICS
+══════════════════════════════════════════════════════════════════════════════
+
+ES: Usamos Google Analytics (GA4) para entender cómo se usa el sitio. Estas
+cookies no son esenciales para el funcionamiento del sitio y solo se activan
+después de que aceptas el banner de cookies que aparece en tu primera visita.
+Puedes cambiar tu decisión en cualquier momento borrando las cookies del sitio
+desde la configuración de tu navegador.
+
+EN: We use Google Analytics (GA4) to understand how the site is used. These
+cookies are not essential to the site's operation and are only activated after
+you accept the cookie banner shown on your first visit. You can change your
+decision at any time by clearing the site's cookies from your browser settings.
+
+══════════════════════════════════════════════════════════════════════════════
+
+5. TUS DERECHOS / YOUR RIGHTS
+══════════════════════════════════════════════════════════════════════════════
+
+ES: Puedes solicitar acceso, corrección o eliminación de tus datos personales,
+o retirar tu consentimiento para el uso de analítica, escribiendo a
+soporte@legadoholding.com. Responderemos en un plazo razonable.
+
+EN: You can request access to, correction of, or deletion of your personal
+data, or withdraw your consent for analytics use, by writing to
+soporte@legadoholding.com. We will respond within a reasonable timeframe.
+
+══════════════════════════════════════════════════════════════════════════════
+
+6. RETENCIÓN DE DATOS / DATA RETENTION
+══════════════════════════════════════════════════════════════════════════════
+
+ES: Conservamos los datos del contrato mientras el plan esté activo y durante
+el tiempo adicional requerido por obligaciones legales o contables. Los datos
+de navegación se conservan según la configuración por defecto de Google
+Analytics.
+
+EN: We retain contract data for as long as the plan is active and for any
+additional time required by legal or accounting obligations. Browsing data is
+retained according to Google Analytics' default settings.
+
+══════════════════════════════════════════════════════════════════════════════
+
+7. CAMBIOS A ESTA POLÍTICA / CHANGES TO THIS POLICY
+══════════════════════════════════════════════════════════════════════════════
+
+ES: Podemos actualizar esta política. Publicaremos cualquier cambio en esta
+misma página con una nueva fecha de "última actualización".
+
+EN: We may update this policy. Any changes will be posted on this same page
+with a new "last updated" date.
+
+══════════════════════════════════════════════════════════════════════════════
+
+EMPRESA / COMPANY: LEGADO HOLDING
+CONTACTO DE PRIVACIDAD / PRIVACY CONTACT: soporte@legadoholding.com

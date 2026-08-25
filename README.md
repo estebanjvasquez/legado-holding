@@ -1,9 +1,15 @@
 # LEGADO Holding — Sitio web y plataforma de checkout
 
+> **Actualizado 2026-08-25.** Este repo migró de Invoice Ninja a la API pública
+> de **Prevision-Funeraria** (repo separado `estebanjvasquez/Prevision-Funeraria`,
+> tenant `lh`). Ver `CLAUDE.md` y `docs/api-publica-wizard.md` para el contrato
+> completo. El login del panel admin (`worker/src/admin.js`) es la única parte
+> que sigue hablando con Invoice Ninja — deuda pendiente, no bloqueante.
+
 Sitio bilingüe (ES/EN) de previsión funeraria para venezolanos en EE. UU., con
-catálogo de planes, wizard de afiliación de 4 pasos, generación de factura
-recurrente y envío de correo de cobro — todo conectado a Invoice Ninja a
-través de un Cloudflare Worker propio.
+catálogo de planes, wizard de afiliación, y checkout con tarjeta (Stripe
+Checkout, vía Prevision-Funeraria) — orquestado por un Cloudflare Worker
+propio que también sirve de proxy autenticado para el bot "Alma".
 
 ```
                 ┌────────────────────────────┐
@@ -11,21 +17,27 @@ través de un Cloudflare Worker propio.
                 │   (Apache + HTML/CSS/JS)   │
                 └─────────────┬──────────────┘
                               │
-                              │  fetch JSON (HTTPS)
-                              ▼
-                ┌────────────────────────────┐
-                │  api.legadoholding.com     │
-                │  Cloudflare Worker         │
-                │  (JS + secret IN_TOKEN)    │
-                └─────────────┬──────────────┘
-                              │
-                              │  X-API-TOKEN
-                              ▼
-                ┌────────────────────────────┐
-                │ invoicing.legadoholding.com│
-                │ Invoice Ninja v5           │
-                │ (clientes, facturas, mail) │
-                └────────────────────────────┘
+                ┌─────────────┴──────────────┐
+                │ fetch directo (CORS, sin    │  fetch JSON (HTTPS)
+                │ token) al catálogo público  │  a api.legadoholding.com
+                ▼                             ▼
+   ┌─────────────────────────────┐  ┌────────────────────────────┐
+   │ prevision-funeraria         │  │  api.legadoholding.com     │
+   │ .sisteg.workers.dev         │  │  Cloudflare Worker         │
+   │ /api/public/t/lh/planes     │  │  (JS + secrets PF_TOKEN,   │
+   │ (catálogo de planes)        │  │   GEMINI_API_KEY, etc.)    │
+   └─────────────────────────────┘  └─────────────┬──────────────┘
+                                                    │
+                          ┌─────────────────────────┼─────────────────────┐
+                          │ Authorization: Bearer    │ Gemini (Alma)       │ IN_BASE (solo
+                          │ PF_TOKEN                 │                     │ login admin)
+                          ▼                          ▼                     ▼
+          ┌────────────────────────────┐  ┌──────────────────┐  ┌─────────────────────┐
+          │ prevision-funeraria         │  │ Google Gemini     │  │ invoicing.legado-    │
+          │ .sisteg.workers.dev         │  │ + Supabase        │  │ holding.com          │
+          │ /api/public/t/lh/compras,   │  │ (memoria de chat) │  │ Invoice Ninja v5      │
+          │ /parentescos                │  │                   │  │ (solo auth de staff) │
+          └────────────────────────────┘  └──────────────────┘  └─────────────────────┘
 ```
 
 > Sitio estático puro: sin Node.js, sin bundler, sin framework. Lo único
@@ -62,13 +74,14 @@ través de un Cloudflare Worker propio.
 
 | Dato | Valor |
 |---|---|
-| Dominio público | `legadoholding.com` |
+| Dominio público | `legadoholding.com` (despliega a la raíz; `/v2` quedó atrás, tag `pre-prevision-funeraria-rollback` para revertir) |
 | Subdominio del Worker | `api.legadoholding.com` |
 | Worker (nombre interno) | `legado-checkout-dev` |
-| Invoice Ninja | `invoicing.legadoholding.com` |
+| API de catálogo/checkout | Prevision-Funeraria, `https://prevision-funeraria.sisteg.workers.dev`, tenant `lh` |
+| Invoice Ninja | `invoicing.legadoholding.com` — solo login de staff del panel admin |
 | Idiomas | Español / Inglés (toggle en la barra de navegación) |
-| Pagos | Enlace de factura de Invoice Ninja (cliente paga desde el portal) |
-| Suscripción | Mensual o anual (Zulia) / mensual con cuota inicial (Selecto) |
+| Pagos | Stripe Checkout (vía Prevision-Funeraria); cuenta de producción de LH pendiente — hoy corre en modo test |
+| Suscripción | Mensual o anual (planes Zulia). Planes "Selecto" no tienen checkout digital (cuota inicial no soportada por la API); su CTA manda a contacto |
 
 ---
 
@@ -79,47 +92,43 @@ través de un Cloudflare Worker propio.
 | # | Componente | Función | Tecnología |
 |---|---|---|---|
 | 1 | **Frontend estático** | Sitio público, wizard, render de planes | HTML + CSS + JS plano servido por Apache |
-| 2 | **Cloudflare Worker** | Endpoint server-side que oculta el token de Invoice Ninja y orquesta el checkout | JavaScript en V8 (Cloudflare Workers) |
-| 3 | **Invoice Ninja v5** | Sistema de facturación: clientes, productos, suscripciones, plantillas de email | Auto-hospedado en `invoicing.legadoholding.com` |
-| 4 | **Cloudflare DNS** | Administra `legadoholding.com` y bind del subdominio `api.` al Worker | Cloudflare |
+| 2 | **Cloudflare Worker** (`api.legadoholding.com`) | Orquesta el checkout server-to-server, proxy autenticado de parentescos, y corre el agente "Alma" (Gemini) | JavaScript en V8 (Cloudflare Workers) |
+| 3 | **Prevision-Funeraria** (repo separado) | Multi-tenant: catálogo de planes/servicios, clientes, contratos, cobro con Stripe | Cloudflare Workers + D1 (`prevision-funeraria.sisteg.workers.dev`) |
+| 4 | **Google Gemini + Supabase** | Motor conversacional de Alma y persistencia de sesiones/turnos de chat | Gemini API + Supabase (Postgres) |
+| 5 | **Invoice Ninja v5** | Solo autenticación de staff para el panel admin de este sitio (`worker/src/admin.js`) | Auto-hospedado en `invoicing.legadoholding.com` |
+| 6 | **Cloudflare DNS** | Administra `legadoholding.com` y bind del subdominio `api.` al Worker | Cloudflare |
 
 ### Flujo completo de una compra
 
 ```
-Usuario              Frontend            Worker             Invoice Ninja
-  │                    │                   │                    │
-  │ click "Comprar"    │                   │                    │
-  │───────────────────▶│                   │                    │
-  │                    │ GET /products     │                    │
-  │                    │──────────────────▶│ GET /products      │
-  │                    │                   │───────────────────▶│
-  │                    │                   │◀─── productos ─────│
-  │                    │◀── catálogo ──────│                    │
-  │                    │ (renderiza planes)│                    │
-  │ completa wizard    │                   │                    │
-  │───────────────────▶│                   │                    │
-  │                    │ POST / (checkout) │                    │
-  │                    │──────────────────▶│ search/create      │
-  │                    │                   │  cliente           │
-  │                    │                   │───────────────────▶│
-  │                    │                   │ recurring invoice  │
-  │                    │                   │  + send_now        │
-  │                    │                   │───────────────────▶│
-  │                    │                   │ /invoices/bulk     │
-  │                    │                   │  action:email      │
-  │                    │                   │───────────────────▶│
-  │                    │◀── invoice + link│                    │
-  │ pantalla éxito ◀───│                   │                    │
-  │                    │                   │     Invoice Ninja  │
-  │◀──────── email con enlace de pago ─────────────────────────│
-  │                                                              │
-  │ click → portal IN → paga                                     │
+Usuario         Frontend (wizard)      Worker (api.legadoholding.com)     Prevision-Funeraria        Stripe
+  │                    │                          │                             │                     │
+  │                    │  GET planes (CORS,       │                             │                     │
+  │                    │  sin token, directo) ────┼────────────────────────────▶│                     │
+  │                    │◀──────────────── catálogo ┼─────────────────────────────│                     │
+  │ ve planes          │                          │                             │                     │
+  │───────────────────▶│                          │                             │                     │
+  │ completa wizard     │ POST / (checkout)        │                             │                     │
+  │───────────────────▶│─────────────────────────▶│ POST /compras (Bearer       │                     │
+  │                    │                          │ PF_TOKEN, success/cancel_url)─────────────────────▶│                     │
+  │                    │                          │◀──── link_de_cobro ─────────│                     │
+  │                    │◀── link_de_cobro ─────────│                             │                     │
+  │  redirige a Stripe  │                          │                             │                     │
+  │─────────────────────────────────────────────────────────────────────────────────────────────────▶│
+  │  paga en Stripe Checkout                                                                            │
+  │◀──────────────────────────────────── redirige a success_url del sitio ─────────────────────────────│
+  │                    │                          │        (Stripe → webhook firmado → contrato activo) │
 ```
 
-### Por qué un Worker (y no n8n, no PHP, no servidor propio)
+El Worker de este repo **no** decide si el pago quedó aprobado — eso lo
+resuelve el webhook de Stripe dentro de Prevision-Funeraria. `success_url`
+solo muestra una pantalla de "gracias" al comprador.
 
-- **Token seguro**: el `X-API-TOKEN` de Invoice Ninja vive como secret cifrado
-  en Cloudflare, jamás llega al navegador.
+### Por qué un Worker propio (y no llamar Prevision-Funeraria directo desde el navegador)
+
+- **Token seguro**: `PF_TOKEN` (server-to-server) y `GEMINI_API_KEY` viven
+  como secrets cifrados en Cloudflare, jamás llegan al navegador. El catálogo
+  de planes sí se llama directo desde el navegador (sin token, CORS abierto).
 - **Sin infraestructura**: 0 servidores que administrar. El plan gratuito de
   Workers cubre 100k req/día.
 - **Latencia baja**: edge computing global; cada request se atiende desde el
@@ -134,30 +143,40 @@ Usuario              Frontend            Worker             Invoice Ninja
 ```
 legado-holding/
 ├── README.md                       ← este archivo
+├── CLAUDE.md                       ← contexto para asistentes IA (estado de la migración)
 ├── .gitignore                      ← excluye worker/.dev.vars, .wrangler/, node_modules
-├── index.html                      ← página única, contiene LEGADO_CONFIG
-├── terminos-condiciones.txt        ← texto legal mostrado en el wizard
+├── index.html                      ← página única, contiene LEGADO_CONFIG y JSON-LD
+├── terminos-condiciones.txt        ← texto legal (footer + wizard)
+├── politica-privacidad.txt         ← política de privacidad (footer)
+├── docs/
+│   └── api-publica-wizard.md       ← contrato de la API de Prevision-Funeraria consumida aquí
 ├── css/
 │   └── main.css                    ← estilos de toda la página
 ├── images/                         ← fotos, logo, fondos
 ├── js/
-│   ├── main.js                     ← TODO el JS del sitio (i18n, planes, wizard, chat)
-│   ├── gtag.js                     ← inicialización de Google Analytics
-│   └── wizard-generic.js           ← helpers del wizard
+│   ├── main.js                     ← TODO el JS del sitio (i18n, planes, wizard, chat, cookies)
+│   ├── vendor/purify.min.js        ← DOMPurify vendoreado, sanitiza el HTML del bot Alma
+│   └── wizard-generic.js           ← delega la apertura del wizard sin plan preseleccionado
 └── worker/                         ← Cloudflare Worker (backend ligero)
     ├── package.json                ← scripts npm (dev / deploy / tail)
-    ├── wrangler.toml               ← config del Worker (rutas, vars públicas)
-    ├── .dev.vars.example           ← plantilla; copiar a .dev.vars (gitignored)
+    ├── wrangler.toml                ← config del Worker (rutas, vars públicas)
+    ├── .dev.vars.example            ← plantilla; copiar a .dev.vars (gitignored)
     └── src/
-        ├── index.js                ← router HTTP, CORS, health
-        ├── invoiceninja.js         ← cliente HTTP de IN (todos los endpoints)
-        └── pipeline.js             ← orquestador del checkout (normalize → cliente → factura → email)
+        ├── index.js                 ← router HTTP, CORS, health
+        ├── prevision-api.js         ← cliente HTTP de la API de Prevision-Funeraria
+        ├── wizard-compra.js         ← orquestador del checkout (reemplaza pipeline.js)
+        ├── chat.js                  ← endpoint /chat, delega en alma.js
+        ├── alma.js                  ← agente Gemini: handoff con el teléfono del aliado (ya no cotiza/factura)
+        ├── supabase.js              ← persistencia de sesiones/turnos de chat
+        ├── admin.js                 ← login del panel admin (todavía vía Invoice Ninja, IN_BASE)
+        └── errors.js                ← ValidationError / isValidationError
 ```
 
 Lo que **NO** se commitea (ver `.gitignore`):
-- `worker/.dev.vars` → token de IN para desarrollo local
+- `worker/.dev.vars` → secrets para desarrollo local (`PF_TOKEN`, etc.)
 - `worker/.wrangler/` → caché de wrangler
 - `worker/node_modules/` → si en algún momento se añaden dependencias
+- `legado-holding/` → clon anidado accidental; si reaparece, es un artefacto y debe borrarse
 
 ---
 
@@ -167,11 +186,13 @@ Lo que **NO** se commitea (ver `.gitignore`):
 |---|---|---|
 | Frontend | HTML5 + CSS3 + JavaScript ES2017+ vanilla | Sin build step, sin transpilación |
 | i18n | Diccionario en `js/main.js` (`LANG`) | ES/EN, atributos `data-i18n` |
-| Analytics | Google Analytics 4 (gtag.js) | Configurar ID en `js/gtag.js` |
+| Analytics | Google Analytics 4 (gtag.js inyectado dinámicamente) | Solo se carga tras aceptar el banner de cookies — ver `loadGoogleAnalytics()` en `index.html` e `initCookieConsent()` en `js/main.js` |
 | Worker | Cloudflare Workers (V8 isolates) | Runtime tipo Service Worker, no Node |
 | Worker tooling | Wrangler 3+ | CLI oficial de Cloudflare |
-| Facturación | Invoice Ninja v5 (self-hosted) | REST API en `/api/v1` |
-| Email | Plantillas nativas de Invoice Ninja | Configuradas en *Settings → Email Settings* |
+| Catálogo y checkout | API pública de Prevision-Funeraria (tenant `lh`) | Contrato en `docs/api-publica-wizard.md` |
+| Cobro con tarjeta | Stripe Checkout (orquestado por Prevision-Funeraria) | Cuenta de producción de LH pendiente (KYC); hoy en modo test |
+| Chat / IA | Google Gemini (`GEMINI_MODEL`) + Supabase (memoria de sesión) | Implementado en `worker/src/alma.js` |
+| Facturación de staff | Invoice Ninja v5 (self-hosted) | Solo login del panel admin, vía `IN_BASE` |
 | DNS y CDN | Cloudflare | Zone: `legadoholding.com` |
 | Hosting frontend | Apache | Sirve los archivos estáticos del repo |
 | Hosting Worker | Cloudflare edge | Despliegue con `wrangler deploy` |
@@ -193,7 +214,8 @@ Lo que **NO** se commitea (ver `.gitignore`):
    - **VS Code Live Server** — click derecho sobre `index.html` → "Open with Live Server" (puerto 5500).
    - **Python 3** — desde la raíz del repo: `python -m http.server 8000`.
    - **npx serve** — desde la raíz: `npx serve -p 8000`.
-4. **Token de Invoice Ninja**. Genéralo en *Settings → Account Management → API Tokens* del panel admin de IN.
+4. **Token de Prevision-Funeraria (`PF_TOKEN`)**. Genéralo en el panel admin
+   de Prevision-Funeraria, tenant `lh` → *Empresa → API de integración*.
 
 ### 5.2 Configurar el token local
 
@@ -205,7 +227,7 @@ Copy-Item .dev.vars.example .dev.vars
 notepad .dev.vars
 ```
 
-Pega el token después de `IN_TOKEN=`, sin comillas, sin espacios. Guarda.
+Pega el token después de `PF_TOKEN=`, sin comillas, sin espacios. Guarda.
 
 > El archivo `.dev.vars` está en `.gitignore` y **no se sube al repo**.
 > Es solo para tu máquina.
@@ -247,14 +269,17 @@ En la consola del navegador (F12):
 
 ```js
 window.LEGADO_CONFIG
-// debe imprimir { WIZARD_WEBHOOK_URL: "http://localhost:8787", PLANS_API_URL: "http://localhost:8787/products" }
+// debe imprimir { WIZARD_WEBHOOK_URL: "http://localhost:8787", PLANS_API_URL: "https://prevision-funeraria.sisteg.workers.dev/api/public/t/lh/planes", PARENTESCOS_API_URL: "http://localhost:8787/wizard/parentescos", CHAT_API_URL: "http://localhost:8787/chat" }
 ```
+
+Nota: `PLANS_API_URL` siempre apunta directo a Prevision-Funeraria (catálogo
+público, CORS abierto) — no pasa por el Worker local ni en dev ni en prod.
 
 Y en otra terminal:
 
 ```powershell
 Invoke-RestMethod -Uri http://localhost:8787 -Method GET
-# tokenLoaded debe ser True
+# pfTokenLoaded debe ser True
 ```
 
 Si ambos pasan, el setup local está completo. Recarga el sitio: las tarjetas
@@ -268,10 +293,12 @@ de planes deben mostrar precios reales (no los de respaldo).
 
 | Método | Ruta | Función | Cuerpo |
 |---|---|---|---|
-| `GET` | `/` | Health check + diagnóstico de config | — |
-| `GET` | `/products` | Lista de productos `legadoweb` desde IN | — |
-| `POST` | `/` | Pipeline de checkout completo | JSON con `intent`, `plan`, `paymentType`, `buyer`, `family` |
+| `GET` | `/` | Health check + diagnóstico de config (secrets cargados, orígenes permitidos) | — |
+| `GET` | `/wizard/parentescos` | Proxy autenticado al catálogo de parentescos de Prevision-Funeraria | — |
+| `POST` | `/` | Checkout del wizard (`processWizardCheckout`, ver 6.3) | JSON con `intent`, `plan`, `planId`, `paymentType`, `buyer`, `family` |
+| `POST` | `/chat` | Proxy al agente Alma (handoff, sin cotizar ni facturar) | JSON del turno de chat |
 | `OPTIONS` | `*` | Preflight CORS | — |
+| `/admin/*` | (todos) | Panel admin del sitio (login todavía vía Invoice Ninja) | Ver `worker/src/admin.js` |
 
 #### Respuesta de `GET /`
 
@@ -280,9 +307,12 @@ de planes deben mostrar precios reales (no los de respaldo).
   "ok": true,
   "service": "legado-checkout",
   "env": "dev",
-  "tokenLoaded": true,
-  "inBase": "https://invoicing.legadoholding.com/api/v1",
-  "emailMode": "explicit",
+  "pfTokenLoaded": true,
+  "pfBase": "https://prevision-funeraria.sisteg.workers.dev",
+  "geminiConfigured": true,
+  "geminiModel": "gemini-2.5-flash",
+  "supabaseConfigured": true,
+  "supabaseUrl": "https://naebpcyphdcopndqovie.supabase.co",
   "allowedOrigins": [
     "https://legadoholding.com",
     "https://www.legadoholding.com",
@@ -294,31 +324,16 @@ de planes deben mostrar precios reales (no los de respaldo).
 }
 ```
 
-#### Respuesta de `GET /products`
-
-```json
-{
-  "data": [
-    {
-      "id": "...",
-      "product_key": "ESENCIAL-ZULIA-MENSUAL",
-      "price": 9.47,
-      "custom_value1": "legadoweb",
-      "custom_value2": "Monthly",
-      "custom_value3": "esencial-zulia",
-      "notes": "...",
-      "is_deleted": false
-    }
-  ]
-}
-```
-
 #### Request a `POST /` (checkout)
+
+Solo cubre los planes migrados (`esencial-zulia`, `vanguardia-zulia`) — los
+planes "Selecto" no pasan por aquí, ver `worker/src/wizard-compra.js`.
 
 ```json
 {
   "intent": "create_payment_intent",
   "plan": "esencial-zulia",
+  "planId": 3,
   "paymentType": "monthly",
   "buyer": {
     "name": "Juan",
@@ -326,29 +341,20 @@ de planes deben mostrar precios reales (no los de respaldo).
     "email": "juan@example.com",
     "cedula": "V-12345678",
     "phone": "+584141112233",
-    "birthDate": "1985-01-15",
-    "zip": "33101"
+    "birthDate": "1985-01-15"
   },
   "family": [
-    { "name": "Ana", "lastName": "Pérez", "cedula": "V-87654321", "birthDate": "1988-03-22", "relation": "Esposa" }
-  ],
-  "timestamp": "2026-05-14T10:00:00.000Z"
+    { "name": "Ana", "lastName": "Pérez", "cedula": "V-87654321", "birthDate": "1988-03-22", "parentescoId": 3 }
+  ]
 }
 ```
 
-#### Respuesta exitosa de `POST /`
-
-```json
-{
-  "success": true,
-  "message": "Tu solicitud fue registrada. Revisa tu correo en juan@example.com para completar el pago.",
-  "plan": "Plan Esencial Zulia",
-  "modalidad": "Suscripción mensual",
-  "invoiceNumber": "0036",
-  "invitationLink": "https://invoicing.legadoholding.com/client/invoice/H32foCIk1Q...",
-  "total": "9.47"
-}
-```
+El Worker traduce este body a `POST /api/public/t/lh/compras` de
+Prevision-Funeraria (`forma_pago: "tarjeta"`, con `success_url`/`cancel_url`
+armados desde `SITE_BASE_URL`) y devuelve el `link_de_cobro` de Stripe
+Checkout al frontend, que redirige al comprador ahí. Contrato completo,
+incluyendo los otros `estado` posibles (`pendiente`, `confirmada`), en
+[docs/api-publica-wizard.md](docs/api-publica-wizard.md).
 
 #### Respuesta de error (HTTP 4xx/5xx)
 
@@ -365,73 +371,51 @@ de planes deben mostrar precios reales (no los de respaldo).
 
 | Variable | Default | Función |
 |---|---|---|
-| `IN_BASE` | `https://invoicing.legadoholding.com/api/v1` | Base URL de la API de Invoice Ninja |
+| `PF_BASE` | `https://prevision-funeraria.sisteg.workers.dev` | Base URL de la API de Prevision-Funeraria |
+| `SITE_BASE_URL` | `https://www.legadoholding.com` | Usada para armar `success_url`/`cancel_url` del checkout con Stripe |
+| `IN_BASE` | `https://invoicing.legadoholding.com/api/v1` | Solo para el login de staff del panel admin |
 | `ENVIRONMENT` | `dev` | Etiqueta de entorno; aparece en el health check |
-| `EMAIL_MODE` | `explicit` | Cómo se envía el email al cliente (ver más abajo) |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | Modelo que ejecuta el agente Alma |
+| `SUPABASE_URL` | (URL del proyecto) | Memoria de sesión y logs de turnos del chat |
 | `ALLOWED_ORIGINS` | (lista CSV) | Orígenes permitidos por CORS |
 
 #### Secrets (cifrados en Cloudflare, no se commitean)
 
 | Secret | Función | Cómo se configura |
 |---|---|---|
-| `IN_TOKEN` | Token de API de Invoice Ninja | `wrangler secret put IN_TOKEN` |
+| `PF_TOKEN` | Token de API de Prevision-Funeraria (tenant `lh`) | `wrangler secret put PF_TOKEN` |
+| `GEMINI_API_KEY` | API key de Google Gemini para el agente Alma | `wrangler secret put GEMINI_API_KEY` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Escritura en Supabase (chat_sessions/chat_turns) | `wrangler secret put SUPABASE_SERVICE_ROLE_KEY` — opcional, el chat sigue funcionando sin esto (no-op fallback) |
 
-#### Modos de envío de email (`EMAIL_MODE`)
+> `IN_TOKEN` fue revocado: el checkout y Alma ya no lo usan. Solo el login
+> del panel admin sigue contra Invoice Ninja, con las credenciales que el
+> propio staff ingresa (no un secret del Worker).
 
-| Valor | Comportamiento |
-|---|---|
-| `"explicit"` *(default)* | Worker llama explícitamente `POST /invoices/bulk { action: "email" }` después de crear la factura. Recomendado: tienes control total del momento de envío. |
-| `"auto"` | Worker NO llama email. Confía en la opción *Email Invoices Automatically* de IN y en `send_email: true` del contacto. |
-| `"none"` | Worker NO envía email. Útil para pruebas sin spamear. |
+### 6.3 Checkout del wizard, paso a paso
 
-> Cuando `EMAIL_MODE = "explicit"`, **desactiva** *Email Invoices
-> Automatically* en IN para evitar correos duplicados.
-
-### 6.3 Pipeline de checkout paso a paso
-
-Implementado en [worker/src/pipeline.js](worker/src/pipeline.js), función `processCheckout(body, env)`:
+Implementado en [worker/src/wizard-compra.js](worker/src/wizard-compra.js),
+función `processWizardCheckout(body, env)` (reemplaza al viejo `pipeline.js`
+de Invoice Ninja):
 
 ```
 1. normalize(body)
-   ├─ Valida que email y plan estén presentes
-   ├─ Normaliza slug del plan (frontend usa '-selecto', IN usa '-ven')
-   ├─ Mapea paymentType → frequency_id de IN (4 = mensual, 9 = anual)
-   ├─ Limpia familia (recorta strings, descarta entradas vacías)
-   └─ Construye clientPrivateNotes con resumen de la compra
+   ├─ Valida intent === 'create_payment_intent'
+   ├─ Valida plan contra VALID_PLAN_SLUGS (solo esencial-zulia, vanguardia-zulia)
+   ├─ Valida planId, paymentType (monthly|annual), email y nombre del comprador
+   └─ Sanitiza y valida afiliados (máx. 6, cada uno con parentesco_id)
 
-2. routing por intent
-   ├─ 'create_payment_intent' → continúa
-   └─ otros → 400 "Intent no reconocido"
+2. createPF(env).crearCompra(...)
+   └─ POST /api/public/t/lh/compras (Bearer PF_TOKEN) con success_url/
+      cancel_url armados desde SITE_BASE_URL
 
-3. resolveClient(IN, ctx)
-   ├─ GET /clients?email=... → busca por email exacto en contactos
-   ├─ Existe → devuelve client_id existente
-   └─ No existe → POST /clients (con send_email: true en el contacto)
-
-4. buildInvoiceContext(IN, ctx)
-   ├─ GET /products?per_page=100
-   ├─ Filtra: custom_value1='legadoweb' AND custom_value3=planFamily
-   ├─ Resuelve line items del primer ciclo:
-   │   • Selecto (-ven): Unico + Monthly (cuota inicial + primer mes)
-   │   • Zulia: el producto que matchea frequencyLabel
-   ├─ GET /subscriptions y, si no existe, POST /subscriptions
-   │   (Si IN devuelve 500, sigue sin subscription_id — solo afecta el link
-   │    visual del portal, no el cobro)
-   └─ Devuelve { strategy, lineItems1, lineItems2, subscriptionId, ... }
-
-5. createInvoices(IN, ctx, invCtx)
-   ├─ POST /recurring_invoices con line_items del primer ciclo, status:2, auto_bill:off
-   ├─ POST /recurring_invoices/bulk { action: "send_now" } → fuerza generación inmediata
-   ├─ Polling: hasta 10 intentos × 800ms buscando la factura con recurring_id
-   ├─ Selecto: PUT /recurring_invoices/{id} para quitar 'Unico' de ciclos siguientes
-   └─ GET /invoices/{id}?include=invitations → extrae invitations[0].link
-
-6. emailInvoice (según EMAIL_MODE)
-   └─ POST /invoices/bulk { action: "email", ids: [invoiceId] }
-
-7. respond
-   └─ { success: true, plan, modalidad, invoiceNumber, invitationLink, total }
+3. respond
+   └─ { success: true, link_de_cobro, ... } según el 'estado' que
+      devuelva Prevision-Funeraria (pendiente_pago | pendiente | confirmada)
 ```
+
+La confirmación real del pago (activación del contrato) ocurre en
+Prevision-Funeraria vía el webhook firmado de Stripe — este Worker no
+participa en ese paso.
 
 ### 6.4 Comandos `wrangler` que usarás
 
@@ -460,7 +444,7 @@ npm run tail     # = wrangler tail
 
 ### 7.1 Configuración global (`LEGADO_CONFIG`)
 
-Definida en [index.html](index.html), línea ~40. Conmuta dev/prod por hostname:
+Definida en [index.html](index.html). Conmuta dev/prod por hostname:
 
 ```html
 <script>
@@ -469,15 +453,23 @@ Definida en [index.html](index.html), línea ~40. Conmuta dev/prod por hostname:
     WIZARD_WEBHOOK_URL: __isDev
       ? "http://localhost:8787"
       : "https://api.legadoholding.com",
-    PLANS_API_URL: __isDev
-      ? "http://localhost:8787/products"
-      : "https://api.legadoholding.com/products",
+    // Catálogo público: siempre directo a Prevision-Funeraria, no cambia por entorno
+    PLANS_API_URL:
+      "https://prevision-funeraria.sisteg.workers.dev/api/public/t/lh/planes",
+    PARENTESCOS_API_URL: __isDev
+      ? "http://localhost:8787/wizard/parentescos"
+      : "https://api.legadoholding.com/wizard/parentescos",
+    CHAT_API_URL: __isDev
+      ? "http://localhost:8787/chat"
+      : "https://api.legadoholding.com/chat",
   };
 </script>
 ```
 
-- En `localhost` / `127.0.0.1` / `file://` → Worker local.
-- En cualquier otro host → Worker desplegado.
+- En `localhost` / `127.0.0.1` / `file://` → Worker local para checkout,
+  parentescos y chat. El catálogo de planes siempre llama directo a
+  Prevision-Funeraria, en dev y en prod.
+- En cualquier otro host → Worker desplegado (`api.legadoholding.com`).
 
 ### 7.2 Internacionalización (i18n)
 
@@ -502,56 +494,48 @@ El toggle de idioma está en la barra de navegación. Persiste en `localStorage`
 
 ### 7.3 Planes y precios
 
-Los precios **se cargan desde Invoice Ninja** vía `GET /products`. La función
-`loadPlansFromAPI()` en [js/main.js](js/main.js) (~línea 546):
+Los precios **se cargan directo desde Prevision-Funeraria**, sin pasar por el
+Worker. La función `loadPlansFromAPI()` en [js/main.js](js/main.js):
 
-1. Llama al Worker (`/products`).
-2. Filtra productos con `custom_value1 === "legadoweb"`.
-3. Agrupa por `custom_value3` (slug del plan).
-4. Mapea `custom_value2` a `monthly` / `annual` / `unico` (cuota inicial).
-5. Reemplaza el objeto `PLANS`. Si la API falla, conserva el fallback hardcoded.
+1. Llama a `PLANS_API_URL` (`GET /api/public/t/lh/planes`, sin token, CORS abierto).
+2. Recibe solo los planes con `mostrar_web = true` y `activo = true`.
+3. Mapea cada item a la forma interna de `PLANS` (precio mensual/anual, id).
+4. Reemplaza el objeto `PLANS`. Si la API falla, conserva el fallback hardcoded.
 
-#### Convenciones de productos en Invoice Ninja
+#### Planes disponibles para checkout digital
 
-Para que un producto aparezca en el sitio, debe tener:
+El modelo `planes` de Prevision-Funeraria todavía no soporta cuota inicial,
+así que solo los planes Zulia tienen checkout digital:
 
-| Campo IN | Valor | Significado |
+| Slug (frontend y API) | Familia | Checkout digital |
 |---|---|---|
-| `custom_value1` | `legadoweb` | Marca el producto como del sitio (los demás se ignoran) |
-| `custom_value2` | `Monthly` / `Annualy` / `Unico` | Frecuencia del cobro |
-| `custom_value3` | slug de plan | Familia: `esencial-zulia`, `vanguardia-zulia`, `esencial-ven`, `vanguardia-ven` |
-| `notes` | texto libre | Beneficios mostrados en el modal "Ver detalles" |
-| `price` | número | Precio en USD |
+| `esencial-zulia` | Zulia | Sí — vía `POST /` del Worker |
+| `vanguardia-zulia` | Zulia | Sí — vía `POST /` del Worker |
+| `esencial-selecto` / `vanguardia-selecto` | Selecto | No — el CTA manda a `#contacto` (cuota inicial no modelada por la API) |
 
-> **Nota sobre slugs**: el frontend usa `-selecto` (`esencial-selecto`), IN usa
-> `-ven` (`esencial-ven`). El Worker hace la traducción en
-> [pipeline.js → SLUG_TO_IN](worker/src/pipeline.js).
-
-#### Lógica de Selecto (plan con cuota inicial)
-
-Plan Selecto cobra:
-- **Primer ciclo**: `Unico` (cuota inicial) + `Monthly` (primer mes).
-- **Ciclos siguientes**: solo `Monthly`.
-
-El Worker maneja esto creando la suscripción con ambos items, generando
-la primera factura, y luego haciendo `PUT` para dejar solo `Monthly` en
-las facturas futuras. Ver
-[pipeline.js → buildInvoiceContext](worker/src/pipeline.js).
+`VALID_PLAN_SLUGS` en [worker/src/wizard-compra.js](worker/src/wizard-compra.js)
+es la fuente de verdad de cuáles slugs aceptan checkout. `planId` (el `id`
+numérico que devuelve `GET /planes`) va en el payload junto al slug — la API
+de Prevision-Funeraria identifica el plan por `plan_id`, no por slug.
 
 ### 7.4 Wizard de compra
 
-4 pasos definidos en [js/main.js](js/main.js) función `openWizard(planId)`:
+Pasos definidos en [js/main.js](js/main.js), función `openWizard(planId)`
+(uno más, "Plan", cuando el wizard se abre sin plan preseleccionado — ver
+`wiz_step_plan` en `LANG`):
 
 | Paso | Contenido | Validación |
 |---|---|---|
-| 0 | Datos del titular (nombre, apellido, cédula, email, teléfono, fecha nac., ZIP) | Email válido + edad ≤ maxAge del plan |
-| 1 | Familiares (hasta 6, con cédula, fecha nac., parentesco) | Opcional |
-| 2 | Forma de pago (modalidad mensual/anual) | Modalidad seleccionada |
-| 3 | Resumen + términos y condiciones | Checkbox "Acepto" marcado |
+| Datos | Titular: nombre, apellido, cédula, email, teléfono, fecha nac. | Email válido + edad ≤ maxAge del plan |
+| Familia | Familiares (hasta 6, con cédula, fecha nac., parentesco) | Opcional |
+| Pago | Forma de pago (modalidad mensual/anual) | Modalidad seleccionada |
+| Resumen | Resumen + términos y condiciones | Checkbox "Acepto" marcado |
 
-Al confirmar el paso 3, `submitWizard()` hace `POST` al Worker. El cierre
-prematuro envía `intent: "lead_abandoned"` con `keepalive: true` (fire-and-forget,
-el Worker responde 400 pero nadie lee la respuesta).
+Al confirmar el paso final, `submitWizard()` hace `POST` al Worker
+(`intent: "create_payment_intent"`), que responde con el `link_de_cobro` de
+Stripe Checkout para redirigir al comprador. El cierre prematuro del wizard
+envía `intent: "lead_abandoned"` con `keepalive: true` (fire-and-forget; no
+bloquea al usuario, y hoy no se persiste en ningún lado — ver sección 12).
 
 ---
 
@@ -562,9 +546,11 @@ el Worker responde 400 pero nadie lee la respuesta).
 Desde `worker/`:
 
 ```powershell
-# Solo una vez: subir el secret a Cloudflare
-wrangler secret put IN_TOKEN
-# (pega el token cuando pida "Enter a secret value:")
+# Solo una vez por secret: subir a Cloudflare
+wrangler secret put PF_TOKEN
+wrangler secret put GEMINI_API_KEY
+wrangler secret put SUPABASE_SERVICE_ROLE_KEY   # opcional
+# (pega el valor cuando pida "Enter a secret value:")
 
 # Cada vez que cambies código o config
 wrangler deploy
@@ -596,13 +582,13 @@ Ya está configurado:
 ### 8.4 Verificación post-deploy
 
 ```powershell
-# Health check
+# Health check del Worker
 Invoke-RestMethod -Uri https://api.legadoholding.com -Method GET
 
-# Productos
-(Invoke-RestMethod -Uri https://api.legadoholding.com/products).data.Count
+# Catálogo de planes (directo a Prevision-Funeraria, sin pasar por el Worker)
+(Invoke-RestMethod -Uri https://prevision-funeraria.sisteg.workers.dev/api/public/t/lh/planes).items.Count
 
-# Logs en vivo
+# Logs en vivo del Worker
 wrangler tail
 ```
 
@@ -612,30 +598,34 @@ wrangler tail
 
 ### 9.1 Añadir un nuevo plan
 
-1. En Invoice Ninja, crea el producto con `custom_value1=legadoweb`,
-   `custom_value2=Monthly|Annualy|Unico`, `custom_value3=<slug>`,
-   `notes=<beneficios>`, y el precio.
-2. Si el slug es nuevo, añade la entrada en [js/main.js](js/main.js):
-   - `PLAN_GROUPS` (para que aparezca en una región).
-   - `PLAN_NAMES` en [worker/src/pipeline.js](worker/src/pipeline.js)
-     (para el nombre legible que va en el email).
-   - Si se llama distinto en frontend vs IN, añade a `SLUG_TO_IN`.
-3. Añade las claves i18n `plan_<slug>_name`, `plan_<slug>_features_*`
-   en `LANG`.
-4. `wrangler deploy` si tocaste el Worker.
+Los planes ya no se crean en Invoice Ninja — viven en Prevision-Funeraria
+(panel admin del tenant `lh`, con `mostrar_web = true` y `activo = true` para
+que aparezcan en `GET /planes`). Pasos en este repo:
 
-### 9.2 Rotar el token de Invoice Ninja
+1. Crea/publica el plan en el panel admin de Prevision-Funeraria (tenant `lh`).
+2. Si el plan debe tener checkout digital (sin cuota inicial), añade su slug
+   a `VALID_PLAN_SLUGS` en
+   [worker/src/wizard-compra.js](worker/src/wizard-compra.js).
+3. Añade el slug a `PLAN_GROUPS` en [js/main.js](js/main.js) para que
+   aparezca en la región correcta del sitio.
+4. Añade las claves i18n `plan_<slug>_name`, `plan_<slug>_features_*` en
+   `LANG` si el copy no viene ya cubierto por el catálogo de la API.
+5. `wrangler deploy` si tocaste el Worker.
+
+### 9.2 Rotar el token de Prevision-Funeraria (`PF_TOKEN`)
 
 ```powershell
-# 1. En IN admin → Settings → Account Management → API Tokens → genera nuevo
+# 1. Panel admin de Prevision-Funeraria → Empresa (tenant lh) → "API de
+#    integración" → Generar/regenerar token (se muestra una sola vez)
 # 2. Sube el nuevo a Cloudflare
 cd worker
-wrangler secret put IN_TOKEN
+wrangler secret put PF_TOKEN
 # pega el token nuevo cuando lo pida
 
 # 3. Actualiza también worker/.dev.vars con el nuevo valor (para dev local)
-# 4. Borra el token viejo en IN admin
 ```
+Regenerar invalida el token anterior de inmediato — coordina con quien tenga
+`.dev.vars` local desactualizado.
 
 ### 9.3 Ver logs del Worker en producción
 
@@ -644,27 +634,10 @@ cd worker
 wrangler tail
 ```
 
-Muestra cada request en tiempo real con los `console.log` del pipeline.
-Útil para depurar problemas reportados por usuarios.
+Muestra cada request en tiempo real con los `console.log` del checkout y de
+Alma. Útil para depurar problemas reportados por usuarios.
 
-### 9.4 Cambiar la plantilla del email de factura
-
-En Invoice Ninja: *Settings → Email Settings → Template & Reminders →
-Initial Invoice*. Soporta variables como `$client.name`, `$invoice.number`,
-`$invoice.invitation_link`, etc.
-
-No requiere redespliegue del Worker.
-
-### 9.5 Apagar el envío de email temporalmente
-
-Edita [worker/wrangler.toml](worker/wrangler.toml):
-```toml
-EMAIL_MODE = "none"
-```
-Luego `wrangler deploy`. El checkout sigue creando cliente + factura, pero
-no manda el correo.
-
-### 9.6 Añadir un origen a CORS
+### 9.4 Añadir un origen a CORS
 
 Edita [worker/wrangler.toml](worker/wrangler.toml):
 ```toml
@@ -682,41 +655,24 @@ Luego `wrangler deploy`. Sin espacios entre comas.
 |---|---|---|
 | Worker caído | `Invoke-RestMethod $URL` → 500 / sin respuesta | Revisar `wrangler tail` y redespliegar |
 | CORS bloqueando | Network → request en rojo, console del navegador menciona CORS | Añadir el origen del sitio a `ALLOWED_ORIGINS` |
-| Token IN inválido | `tokenLoaded: false` en GET / | Re-subir secret con `wrangler secret put IN_TOKEN` |
-| Pipeline lanza excepción | `wrangler tail` muestra "Pipeline error: ..." | Leer el mensaje, suele indicar campo faltante o producto no encontrado |
+| `PF_TOKEN` inválido/vencido | `pfTokenLoaded: false` en GET / o 401 en `wrangler tail` | Regenerar en el panel admin de Prevision-Funeraria y `wrangler secret put PF_TOKEN` |
+| Plan no válido para checkout | `wrangler tail` muestra "Plan no disponible para compra directa" | Confirmar que el slug está en `VALID_PLAN_SLUGS` (`worker/src/wizard-compra.js`) |
+| Afiliado inválido | `wrangler tail` muestra un 400 con el mensaje de validación de edad/parentesco | Revisar el `parentesco_id` y la fecha de nacimiento contra `GET /wizard/parentescos` |
 
 ### Síntoma: las tarjetas de plan muestran precios genéricos en vez de los reales
 
 | Causa probable | Diagnóstico | Solución |
 |---|---|---|
-| `GET /products` falla | Network del navegador, status del request | Igual que arriba — token o Worker |
-| Producto sin `custom_value1=legadoweb` | Inspeccionar `/products` y contar items | Marcar el producto correctamente en IN |
-| Slug no reconocido | Consola del navegador imprime "Plan X no devuelto por la API" | Añadir el slug a `PLAN_GROUPS` o renombrar `custom_value3` en IN |
+| `GET /planes` falla o no responde | Network del navegador, status del request a `prevision-funeraria.sisteg.workers.dev` | Confirmar que Prevision-Funeraria está arriba; no depende de este Worker |
+| Plan sin `mostrar_web=true` | El plan no aparece en la respuesta de `/planes` | Publicarlo desde el panel admin del tenant `lh` |
+| Slug no reconocido en el frontend | Consola del navegador imprime "Plan X no devuelto por la API" | Añadir el slug a `PLAN_GROUPS` en `js/main.js` |
 
-### Síntoma: el cliente no recibe el email
+### Síntoma: el comprador llega a Stripe Checkout pero el contrato no se activa
 
 | Causa probable | Diagnóstico | Solución |
 |---|---|---|
-| `EMAIL_MODE=none` | GET / muestra `emailMode: "none"` | Cambiar a `"explicit"` y redespliegar |
-| IN no tiene SMTP configurado | IN admin → Settings → Email Settings | Configurar Gmail/Postmark/SMTP |
-| Plantilla "Initial Invoice" vacía | IN admin → Templates | Llenar la plantilla con HTML válido |
-| Email en spam | Revisar bandeja de spam del cliente | Configurar SPF/DKIM del dominio remitente en IN |
-
-### Síntoma: error "Sin productos para familia '...'"
-
-Significa que `custom_value3` del producto en IN no coincide con el slug que
-envía el frontend. Revisa la tabla `SLUG_TO_IN` en
-[worker/src/pipeline.js](worker/src/pipeline.js) y los `custom_value3` en IN.
-
-### Síntoma: "Factura inicial no generada (recurring_id=...)"
-
-El cron de Invoice Ninja tardó más de 8s en generar la factura tras el
-`send_now`. Causas:
-- IN sobrecargado o caído.
-- Cron de IN no corriendo (revisar en IN admin → System Logs).
-
-Solución temporal: reintentar la operación. Solución estructural: extender
-el polling en [pipeline.js → createInvoices](worker/src/pipeline.js).
+| Pago en modo test | La cuenta de producción de Stripe de LH todavía no existe | Esperado hasta que exista la cuenta real (ver `docs/api-publica-wizard.md`, "Sección 0") — no es un bug de este repo |
+| Webhook de Stripe no confirmó | Consultar contrato con sesión de staff en Prevision-Funeraria (`GET /api/t/lh/contratos?cliente_id=...`) | Este repo no participa en ese paso — reportar a Prevision-Funeraria si el webhook falla |
 
 ---
 
@@ -724,39 +680,36 @@ el polling en [pipeline.js → createInvoices](worker/src/pipeline.js).
 
 ### Lo que NUNCA debe estar en el repo
 
-- El valor real del `IN_TOKEN` (en cualquier archivo).
+- El valor real de `PF_TOKEN`, `GEMINI_API_KEY` o `SUPABASE_SERVICE_ROLE_KEY`
+  (en cualquier archivo).
 - Credenciales de Cloudflare (`wrangler login` las guarda en
   `%USERPROFILE%\.wrangler\`, fuera del repo).
 - `worker/.dev.vars` (gitignored).
 - Capturas de pantalla con tokens visibles.
 
-### Procedimiento si un token se filtra
+### Procedimiento si un secret se filtra
 
-1. **Inmediatamente**: rotar el token en Invoice Ninja (admin → API Tokens).
-2. Actualizar el secret en Cloudflare: `wrangler secret put IN_TOKEN`.
+1. **Inmediatamente**: regenerar el token en el panel admin de
+   Prevision-Funeraria (para `PF_TOKEN`) o en el proveedor correspondiente
+   (Google Cloud para `GEMINI_API_KEY`, Supabase para `SUPABASE_SERVICE_ROLE_KEY`).
+2. Actualizar el secret en Cloudflare: `wrangler secret put <NOMBRE>`.
 3. Actualizar `worker/.dev.vars` local.
 4. Limpiar el historial de PowerShell:
    ```powershell
    Remove-Item (Get-PSReadLineOption).HistorySavePath
    ```
-5. Si el token apareció en un commit de git: además del rotado, considerar
+5. Si el secret apareció en un commit de git: además del rotado, considerar
    reescribir la historia con `git filter-repo` o
    [BFG Repo-Cleaner](https://rtyley.github.io/bfg-repo-cleaner/) — pero
-   asume que el token ya está comprometido sin importar la limpieza.
+   asume que el secret ya está comprometido sin importar la limpieza.
 
 ### Por qué CORS está restringido
 
-Sin whitelist, cualquier sitio web podría llamar al Worker y crear clientes /
-facturas en nombre de visitas a su página. La whitelist asegura que solo
+Sin whitelist, cualquier sitio web podría llamar al Worker y disparar
+compras/leads en nombre de visitas a su página. La whitelist asegura que solo
 `legadoholding.com` y entornos de desarrollo conocidos puedan disparar el
 flujo desde un navegador. Las llamadas server-to-server (sin header `Origin`)
 no son afectadas y siguen funcionando.
-
-### Por qué `EMAIL_MODE=explicit` es recomendado
-
-Da control total al Worker sobre el momento del envío. Combinado con
-"Email invoices automatically = OFF" en IN, garantiza un único correo
-por checkout y permite logear exactamente cuándo se disparó.
 
 ---
 
@@ -764,13 +717,14 @@ por checkout y permite logear exactamente cuándo se disparó.
 
 | Pendiente | Severidad | Notas |
 |---|---|---|
-| Chat webhook es placeholder | Baja | `CHAT_WEBHOOK_URL` en main.js apunta a una URL inexistente. El chatbot no funciona; deshabilitar el botón o implementar backend. |
-| Sin idempotencia en checkout | Media | Doble click en "Confirmar" puede crear dos clientes/facturas. Mitigar con un `Idempotency-Key` (uuid del wizard) y caché de respuestas en el Worker. |
-| Auto-creación de Subscription template falla con 500 en IN | Baja | El flujo continúa sin link al portal del cliente. No bloquea el cobro. Investigar logs de IN. |
-| Polling fijo de 8 segundos | Baja | Suficiente para el cron actual de IN. Si IN se vuelve más lento, extender. |
-| Worker `lead_abandoned` no se persiste | Media | El frontend envía el evento pero el Worker responde 400 sin guardar nada. Para CRM: añadir lógica de log en el Worker o enviar a un endpoint de marketing. |
-| Sin tests automatizados | Media | No hay unit tests del pipeline. Considerar Vitest + `@cloudflare/vitest-pool-workers`. |
-| n8n viejo sigue corriendo | Baja | El workflow `LEGADO_PostPayment_v7` sigue activo en el VPS Contabo aunque ya no recibe tráfico. Deshabilitar desde la UI de n8n y, eventualmente, apagar el VPS. |
+| Planes "Selecto" sin checkout digital | Media | El modelo `planes` de Prevision-Funeraria no soporta cuota inicial todavía. Su CTA manda a `#contacto`. Ver `docs/api-publica-wizard.md`. |
+| Cuenta Stripe de producción de LH pendiente | Alta (negocio, no de código) | KYC/verificación de Legado Holding Inc. sin completar; todo cobro hoy es en modo test de Stripe. Bloqueo externo, no de este repo. |
+| Login del panel admin sigue en Invoice Ninja | Baja | `worker/src/admin.js` autentica staff contra `IN_BASE`. Deuda de migración, no bloqueante — ver `CLAUDE.md`. |
+| Sin idempotencia en checkout | Media | Doble click en "Confirmar" puede crear dos compras pendientes. Mitigar con un `Idempotency-Key` (uuid del wizard) en el Worker. |
+| Worker `lead_abandoned` no se persiste | Media | El frontend envía el evento fire-and-forget pero el Worker no lo guarda. Para CRM: añadir lógica de log en el Worker o enviar a un endpoint de marketing. |
+| Sin tests automatizados | Media | No hay unit tests del checkout. Considerar Vitest + `@cloudflare/vitest-pool-workers`. |
+| Sin banner de consentimiento granular por región | Baja | El banner de cookies (ver `initCookieConsent()` en `js/main.js`) es binario aceptar/rechazar; no diferencia por jurisdicción (auditoría de marca §8.2). |
+| Sin JSON-LD `LocalBusiness`/`FAQPage`/`BreadcrumbList` | Baja | Solo se agregó `Organization` y `Service` porque el sitio no tiene dirección física verificable ni sección de FAQ visible que los respalde. Añadir cuando exista ese contenido. |
 
 ---
 
@@ -779,26 +733,35 @@ por checkout y permite logear exactamente cuándo se disparó.
 ```
 legado-holding/
 ├── .claude/
-│   └── settings.local.json
+│   └── handoff.json
 ├── .gitignore
 ├── README.md
+├── CLAUDE.md
 ├── css/
 │   └── main.css
+├── docs/
+│   └── api-publica-wizard.md
 ├── images/
 │   └── (logos, fotos, fondos)
 ├── index.html
 ├── js/
-│   ├── gtag.js
 │   ├── main.js
+│   ├── vendor/purify.min.js
 │   └── wizard-generic.js
 ├── terminos-condiciones.txt
+├── politica-privacidad.txt
 └── worker/
     ├── .dev.vars.example
     ├── package.json
     ├── src/
     │   ├── index.js
-    │   ├── invoiceninja.js
-    │   └── pipeline.js
+    │   ├── prevision-api.js
+    │   ├── wizard-compra.js
+    │   ├── chat.js
+    │   ├── alma.js
+    │   ├── supabase.js
+    │   ├── admin.js
+    │   └── errors.js
     └── wrangler.toml
 ```
 
@@ -816,27 +779,29 @@ wrangler deploy                    # Sube el Worker a Cloudflare
 wrangler tail                      # Logs en vivo del Worker desplegado
 
 # === Secrets ===
-wrangler secret put IN_TOKEN       # Añadir/actualizar
-wrangler secret list               # Verificar (sin valores)
-wrangler secret delete IN_TOKEN    # Quitar
+wrangler secret put PF_TOKEN        # Añadir/actualizar
+wrangler secret list                # Verificar (sin valores)
+wrangler secret delete PF_TOKEN     # Quitar
 
 # === Pruebas server-to-server ===
 $URL = "https://api.legadoholding.com"
 Invoke-RestMethod -Uri $URL -Method GET                       # health
-Invoke-RestMethod -Uri "$URL/products" -Method GET            # productos
 
-# Checkout end-to-end (PowerShell)
+# Catálogo (directo a Prevision-Funeraria, sin token)
+Invoke-RestMethod -Uri "https://prevision-funeraria.sisteg.workers.dev/api/public/t/lh/planes" -Method GET
+
+# Checkout end-to-end (PowerShell) — usa un planId real del catálogo de arriba
 $payload = @{
   intent      = "create_payment_intent"
   plan        = "esencial-zulia"
+  planId      = 3
   paymentType = "monthly"
   buyer = @{
     name="Test"; lastName="Worker"; email="tu@email.com"
     cedula="V-12345678"; phone="+584141112233"
-    birthDate="1985-01-15"; zip="33101"
+    birthDate="1985-01-15"
   }
   family = @()
-  timestamp = (Get-Date).ToString("o")
 } | ConvertTo-Json -Depth 4
 Invoke-RestMethod -Uri $URL -Method POST -Body $payload -ContentType "application/json"
 
