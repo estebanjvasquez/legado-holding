@@ -11,8 +11,8 @@
                                      handoff_whatsapp en vez de solo dar un teléfono.
      - list_planes()              → catálogo vigente de planes de previsión (API
                                      pública de Prevision-Funeraria, tenant `lh`).
-     - list_servicios()           → catálogo de servicios sueltos + el WhatsApp de
-                                     emergencia oficial del tenant.
+     - list_servicios()           → catálogo de servicios sueltos (sin precio, a
+                                     propósito) + el WhatsApp de emergencia del tenant.
      - handoff_whatsapp(nombre, necesidad) → deriva a un humano por WhatsApp con el
                                      mensaje pre-llenado. Solo para urgencias reales.
      - create_lead(...)           → registra un prospecto (POST /solicitudes) para
@@ -134,7 +134,7 @@ PROCESO B — URGENCIA SIN FALLECIMIENTO CONFIRMADO
 PROCESO C — CONSULTA INFORMATIVA (previsión / servicios, sin urgencia)
 ══════════════════════════════════════════
 1. Si pregunta por previsión/planes: llama 'list_planes' (una vez por sesión) y responde con datos reales — nombre, qué incluye, precio mensual/anual. Nunca inventes ni extrapoles precios que no vengan de la tool.
-2. Si pregunta por servicios sueltos: llama 'list_servicios'. Si el catálogo viene vacío, dilo con naturalidad ("por ahora esos servicios se coordinan directamente con un asesor") sin inventar ítems.
+2. Si pregunta por servicios sueltos: llama 'list_servicios'. Si el catálogo viene vacío, dilo con naturalidad ("por ahora esos servicios se coordinan directamente con un asesor") sin inventar ítems. La tool NUNCA trae precio de servicios a propósito — si preguntan cuánto cuesta un servicio, explica que el costo se confirma con un asesor (o coordinando por WhatsApp si es una urgencia) y nunca lo estimes.
 3. Si un servicio devuelto tiene es_emergencia=true, no lo ofrezcas como prospecto — trátalo como categoría B (handoff directo por WhatsApp), tal como se le indicaría a un visitante del sitio.
 4. Cuando el usuario muestre interés real en un plan o servicio específico (no solo curiosidad), ofrécete a anotar su interés para que un asesor la contacte MÁS ADELANTE — pero solo tras explicar para qué se usarán sus datos (docs/GUIA_INTERACCION_BOT_LEGADO.md §9) y con su aceptación explícita.
 5. Si acepta: pide nombre, apellido y teléfono de contacto (el email es opcional), y llama 'create_lead' con el plan_id o servicio_id que ya conoces por list_planes/list_servicios.
@@ -197,7 +197,7 @@ Validate briefly, get their name and a one-line need, then call 'handoff_whatsap
 ══════════════════════════════════════════
 PROCESS C — INFORMATIONAL QUERY (pre-planning / services, no urgency)
 ══════════════════════════════════════════
-Call 'list_planes' and/or 'list_servicios' (once per session) and answer only with real data from them — never invented prices. If a returned service has es_emergencia=true, treat it as PROCESS B instead of offering a lead. When the user shows real interest in a specific plan/service, explain what their data will be used for and, only with explicit acceptance, collect name, last name and phone (email optional) and call 'create_lead' with the plan_id/servicio_id you already know. Confirm warmly that an advisor will reach out later — never say you're connecting them "now" with someone on call for this; an informational query only becomes a recorded lead, never a live handoff. If urgency comes up at any point, switch to PROCESS B.
+Call 'list_planes' and/or 'list_servicios' (once per session) and answer only with real data from them — never invented prices. 'list_servicios' never returns a price on purpose — individual services are usually requested mid-emergency, so quoting them cold breaks LEGADO's tone; if asked, say the cost gets confirmed with an advisor (or via WhatsApp if it's urgent), never estimate it. Plan prices from 'list_planes' are fine to share. If a returned service has es_emergencia=true, treat it as PROCESS B instead of offering a lead. When the user shows real interest in a specific plan/service, explain what their data will be used for and, only with explicit acceptance, collect name, last name and phone (email optional) and call 'create_lead' with the plan_id/servicio_id you already know. Confirm warmly that an advisor will reach out later — never say you're connecting them "now" with someone on call for this; an informational query only becomes a recorded lead, never a live handoff. If urgency comes up at any point, switch to PROCESS B.
 
 ══════════════════════════════════════════
 PROCESS D — NEUTRAL GREETING
@@ -247,7 +247,7 @@ const TOOLS = [
     function: {
       name: "list_servicios",
       description:
-        "Devuelve el catálogo vigente de servicios funerarios individuales (si hay publicados) y el número de WhatsApp de emergencia oficial vigente del tenant. Úsala antes de responder sobre servicios sueltos (no planes), o para confirmar el WhatsApp de emergencia antes de llamar a handoff_whatsapp.",
+        "Devuelve el catálogo vigente de servicios funerarios individuales (si hay publicados) y el número de WhatsApp de emergencia oficial vigente del tenant. NO incluye precio a propósito — si preguntan cuánto cuesta un servicio, deriva a un asesor (o a handoff_whatsapp si es urgente), nunca lo estimes. Úsala antes de responder sobre servicios sueltos (no planes), o para confirmar el WhatsApp de emergencia antes de llamar a handoff_whatsapp.",
       parameters: { type: "object", properties: {} },
     },
   },
@@ -418,14 +418,16 @@ async function execListServicios(env, lang) {
     const pf = createPF(env);
     const idioma = lang.startsWith("en") ? "en" : undefined;
     const resp = await pf.getServicios(idioma);
+    /* Sin precio a propósito (docs/GUIA_INTERACCION_BOT_LEGADO.md): a
+       diferencia de los planes de previsión, los servicios individuales se
+       piden casi siempre en medio de una emergencia — cotizar en frío ahí
+       contradice el tono de acompañamiento. Ni siquiera se lo damos al
+       modelo, para que no pueda mencionarlo por accidente. */
     const items = (Array.isArray(resp?.items) ? resp.items : []).map((s) => ({
       id:            s.id,
       slug:          s.slug,
       nombre:        s.nombre,
       descripcion:   s.descripcion,
-      moneda:        s.moneda,
-      precio: typeof s.precio_centavos === "number"
-        ? (s.precio_centavos / 100).toFixed(2) : null,
       es_emergencia: !!s.es_emergencia,
     }));
     return { items, whatsapp_emergencia: resp?.whatsapp_emergencia || null };
