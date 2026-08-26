@@ -19,6 +19,7 @@
 import { runAlma } from "./alma.js";
 import { createSupabase } from "./supabase.js";
 import { ValidationError } from "./errors.js";
+import { sanitizeAttribution } from "./attribution.js";
 
 /* Límites duros para evitar abuso de costos (cada mensaje al chat cuesta
    tokens de OpenAI) y para mantener Supabase saludable. Si un cliente
@@ -73,6 +74,10 @@ export async function handleChat(body, env, executionCtx) {
   const lang      = (body.lang || "es").trim();
   const mode      = (body.mode || "emergency").trim();
   const rawHistory = Array.isArray(body.history) ? body.history : [];
+  /* Atribución de vendedor/canal (?ref=). Viaja en cada turno; se usa para el
+     lead de prospecto (create_lead), para el stub de atribución del handoff a
+     WhatsApp, y para el texto pre-llenado que ve el humano de guardia. */
+  const attribution = sanitizeAttribution(body.attribution);
 
   if (!sessionId) throw new ValidationError("sessionId requerido");
   if (!message)   throw new ValidationError("message requerido");
@@ -120,7 +125,7 @@ export async function handleChat(body, env, executionCtx) {
   /* 3. Llamar al agente. Le pasamos el cliente db para que pueda ejecutar
         la tool lookup_coverage contra Supabase.                              */
   const result = await runAlma(
-    { sessionId, message, history, lang, db },
+    { sessionId, message, history, lang, db, attribution },
     env,
     executionCtx,
   );
@@ -131,12 +136,17 @@ export async function handleChat(body, env, executionCtx) {
         metadata (JSON) con lo que se resolvió en esta sesión.               */
   const persistPromise = (async () => {
     await persistEvents(db, sessionId, result.events, result.model);
-    if (result.coverage || result.handoff || result.waHandoff || result.lead) {
+    if (
+      result.coverage || result.handoff || result.waHandoff || result.lead ||
+      attribution?.codigo_vendedor
+    ) {
       const meta = result.coverage?.covered
         ? { coverage: "covered", coverage_city: result.coverage.city, coverage_state: result.coverage.state }
         : result.coverage
           ? { coverage: "not_covered", coverage_reason: result.coverage.reason }
           : {};
+      if (attribution?.codigo_vendedor) meta.ref_code = attribution.codigo_vendedor;
+      if (attribution?.canal_origen)    meta.canal_origen = attribution.canal_origen;
       if (result.handoff) {
         meta.handoff_partner_name  = result.handoff.partnerName  || null;
         meta.handoff_partner_phone = result.handoff.partnerPhone || null;

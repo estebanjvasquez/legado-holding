@@ -483,9 +483,12 @@ válidos del negocio, ver la tabla arriba.
 - [ ] El token de API vive **solo** en el backend del sitio (variable de entorno/secret
       del Worker de `legado-holding`) — nunca en JS que llegue al navegador, nunca en un
       repo.
-- [ ] El sitio lee `?ref=` al aterrizar y lo reenvía en `atribucion.codigo_vendedor` en
+- [x] El sitio lee `?ref=` al aterrizar y lo reenvía en `atribucion.codigo_vendedor` en
       cada lead/compra durante toda la sesión del visitante (no solo en la primera
-      request).
+      request). — Implementado 2026-08-26: `js/main.js` §ATRIBUCIÓN (first-touch, TTL
+      90d, `localStorage`), `worker/src/attribution.js`, wizard + Alma. Ver
+      `docs/atribucion-vendedor-plan-legado.md`. **Pendiente del lado Previsión:**
+      propagación al contrato vía webhook de Stripe — `docs/ajustes-prevision-funeraria-atribucion-vendedor.md`.
 - [ ] El formulario de afiliados valida edad/cédula en el cliente usando
       `GET /parentescos` (paso 2) para no descubrir el error recién al enviar.
 - [ ] El wizard maneja los tres resultados posibles de `POST /compras` por separado:

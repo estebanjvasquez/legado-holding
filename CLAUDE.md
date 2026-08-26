@@ -46,6 +46,20 @@ Los planes "Selecto" (`esencial-selecto`/`vanguardia-selecto`) siguen sin checko
 digital: cobran una cuota inicial que el modelo `planes` de la API nueva todavía no
 soporta. Su CTA en el sitio manda a contacto en vez de abrir el wizard.
 
+**Atribución de vendedores externos (2026-08-26):** LH opera con vendedores que
+reparten enlaces `legadoholding.com?ref=CODIGO`. El lado de este repo YA está
+implementado: `js/main.js` §"ATRIBUCIÓN" captura el `?ref=` con modelo first-touch
+(TTL 90d, `localStorage`), y `worker/src/attribution.js` lo sanea y lo adjunta como
+`atribucion.codigo_vendedor` a `POST /compras` (wizard), `POST /solicitudes`
+(`create_lead` de Alma) y al lead-stub + texto pre-llenado del handoff a WhatsApp de
+Alma. Alma NO ve el código (se inyecta en los executores, no en el prompt/tools).
+Falta trabajo **del lado de Previsión** para cerrar el círculo (que el vendedor se
+propague al contrato final vía el webhook de Stripe, y se muestre/prellene en el
+panel) — todo listado en `docs/ajustes-prevision-funeraria-atribucion-vendedor.md`;
+el detalle de lo hecho acá en `docs/atribucion-vendedor-plan-legado.md`. Ese mismo
+doc de ajustes tiene la propuesta para la cuota inicial de los Selecto
+(campo `cuota_inicial_centavos` + Stripe `add_invoice_items`).
+
 La migración ya está en producción: `main` despliega ahora a la **raíz** de
 legadoholding.com (antes desplegaba a `/v2`; ver tag `pre-prevision-funeraria-rollback`
 para revertir si hace falta), y el Worker de `api.legadoholding.com` corre el código

@@ -103,8 +103,9 @@
   ],
   "known_gaps_in_prevision_funeraria_api": [
     "1. Sin modelo para el marketplace de aliados regionales de Alma (N aliados con catálogo propio por ciudad) — no es un bug a corregir, es la razón del rediseño a handoff",
-    "2. Sin campo de cuota inicial en 'planes' — bloquea migrar esencial-selecto/vanguardia-selecto (cobran cuota única + mensualidad, ese modelo no existe en la API nueva). CTA de esos 2 planes manda a contacto en vez de abrir el wizard.",
-    "3. tarifas[] (precio por banda de edad) es capacidad nueva que el wizard no explotaba antes — confirmar con negocio si el tenant lh debe usar una sola banda 0-100 para mantener precio plano"
+    "2. Sin campo de cuota inicial en 'planes' — bloquea migrar esencial-selecto/vanguardia-selecto (cobran cuota única + mensualidad, ese modelo no existe en la API nueva). CTA de esos 2 planes manda a contacto en vez de abrir el wizard. Detalle + solución propuesta (Stripe add_invoice_items) en docs/ajustes-prevision-funeraria-atribucion-vendedor.md §4.",
+    "3. tarifas[] (precio por banda de edad) es capacidad nueva que el wizard no explotaba antes — confirmar con negocio si el tenant lh debe usar una sola banda 0-100 para mantener precio plano",
+    "4. ATRIBUCIÓN DE VENDEDOR (?ref=): la API acepta atribucion.codigo_vendedor en /compras y /solicitudes (probado en vivo 2026-08-26), pero falta confirmar/implementar: (a) que el webhook de Stripe copia vendedor_id de compras_pendientes al contrato final — CRÍTICO, si no, ninguna venta con tarjeta genera comisión; (b) que /solicitudes resuelve/persiste/muestra el vendedor y lo prellena al convertir lead->contrato; (c) endpoint GET /vendedores/lookup?codigo= para nombrar al vendedor en el handoff; (d) match case-insensitive del código; (e) /solicitudes devuelve solo {\"ok\":true} sin id. Todo en docs/ajustes-prevision-funeraria-atribucion-vendedor.md."
   ],
   "open_thread_needs_followup": {
     "id": "double-greeting-bug-user-still-sees-it",
@@ -121,7 +122,7 @@
   "known_limitations": [
     "admin.js sigue autenticando staff contra Invoice Ninja (deuda pendiente, no bloqueante)",
     "Planes Selecto sin checkout digital (gap #2 de la API)",
-    "Sin atribución/tracking de vendedor (?ref=, UTMs) — fuera de alcance",
+    "Atribución de vendedor (?ref=) IMPLEMENTADA del lado legado-holding el 2026-08-26 (js/main.js §ATRIBUCIÓN, worker/src/attribution.js, wizard-compra.js, chat.js, alma.js). First-touch TTL 90d. Viaja en compra/lead/handoff. PENDIENTE en Previsión: confirmar que se propaga al contrato final vía webhook de Stripe y se muestra en panel — ver docs/ajustes-prevision-funeraria-atribucion-vendedor.md (gaps P0) y docs/atribucion-vendedor-plan-legado.md",
     "README.md y algunas partes de docs/ pueden seguir describiendo la arquitectura vieja basada en Invoice Ninja — no reescritas por estar fuera de lo pedido"
   ],
   "commands_cheatsheet": {

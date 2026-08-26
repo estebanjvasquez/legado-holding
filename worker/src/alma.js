@@ -1,8 +1,14 @@
 /* =============================================================================
    Agente Alma — OpenAI (gpt-5.6-luna) con function calling.
 
-   Entrada (de chat.js):  { sessionId, message, history, lang, db }
+   Entrada (de chat.js):  { sessionId, message, history, lang, db, attribution? }
    Salida (a chat.js):    { output, handoff?, waHandoff?, lead?, coverage?, events:[...] }
+
+   attribution: bloque {codigo_vendedor?, canal_origen?, utm_*?} del ?ref= del
+   sitio. Alma NO lo ve en el prompt ni en las tools — se inyecta en los
+   executores (create_lead → atribucion; handoff_whatsapp → línea de referido
+   en el texto + stub de lead) para que sea determinista y quede fuera del
+   razonamiento del modelo.
 
    Tools que el modelo puede invocar:
      - lookup_coverage(city)      → aliado funerario activo en la ciudad (emergencia
@@ -446,17 +452,51 @@ async function execListServicios(env, lang) {
 /* Arma el mensaje pre-llenado del link de WhatsApp. Se construye en el
    backend (no lo redacta el modelo) para no depender de que el LLM escape
    bien la URL — el frontend solo hace encodeURIComponent sobre este texto. */
-function buildWhatsAppText(lang, nombre, necesidad) {
+function buildWhatsAppText(lang, nombre, necesidad, vendorCode) {
   const quien = nombre && String(nombre).trim()
     ? String(nombre).trim()
     : (lang.startsWith("en") ? "a visitor" : "un visitante");
-  if (lang.startsWith("en")) {
-    return `Hi, I'm ${quien}. I was chatting with Alma (LEGADO's assistant) about: ${necesidad}. I'd like to talk to someone now.`;
+  const en = lang.startsWith("en");
+  let text = en
+    ? `Hi, I'm ${quien}. I was chatting with Alma (LEGADO's assistant) about: ${necesidad}. I'd like to talk to someone now.`
+    : `Hola, soy ${quien}. Estuve conversando con Alma (asistente de LEGADO) sobre: ${necesidad}. Me gustaría hablar con alguien ahora.`;
+  /* Si el visitante llegó por el enlace de un vendedor externo, el humano de
+     guardia tiene que saber que la venta le corresponde a ese vendedor. Se
+     redacta como algo que el propio cliente diría ("vengo referido/a por..."),
+     no como un código de tracking suelto. */
+  if (vendorCode) {
+    text += en
+      ? `\n\nI was referred by a LEGADO advisor (ref: ${vendorCode}).`
+      : `\n\nVengo referido/a por un asesor de LEGADO (ref: ${vendorCode}).`;
   }
-  return `Hola, soy ${quien}. Estuve conversando con Alma (asistente de LEGADO) sobre: ${necesidad}. Me gustaría hablar con alguien ahora.`;
+  return text;
 }
 
-async function execHandoffWhatsapp(args, env, lang) {
+/* Deja rastro en el sistema del vendedor asociado a un contacto que se derivó
+   por WhatsApp (donde no se crea ninguna transacción en la API en ese
+   momento). Best-effort: si falla, el handoff igual sigue — el código ya va en
+   el texto de WhatsApp. Solo se dispara cuando hay un codigo_vendedor real. */
+async function registerAttributionStub(env, attribution, nombre, necesidad) {
+  if (!attribution || !attribution.codigo_vendedor) return;
+  const parts = String(nombre || "").trim().split(/\s+/).filter(Boolean);
+  const nombres   = parts[0] || "Contacto";
+  const apellidos = parts.slice(1).join(" ") || "(vía WhatsApp)";
+  const body = {
+    nombres,
+    apellidos,
+    telefono: "(se recibe por WhatsApp)",
+    mensaje: `[Atribución vendedor ${attribution.codigo_vendedor}] Contacto derivado a WhatsApp por Alma. Necesidad: ${necesidad || "no indicada"}`.slice(0, 500),
+    atribucion: attribution,
+  };
+  try {
+    const pf = createPF(env);
+    await pf.crearSolicitud(body);
+  } catch (e) {
+    console.warn(`[alma] attribution stub lead falló: ${e.message}`);
+  }
+}
+
+async function execHandoffWhatsapp(args, env, lang, attribution) {
   const nombre    = (args && args.nombre) ? String(args.nombre).trim() : "";
   const necesidad = (args && args.necesidad) ? String(args.necesidad).trim() : "";
   if (!necesidad) {
@@ -474,11 +514,12 @@ async function execHandoffWhatsapp(args, env, lang) {
     console.warn(`[alma] handoff_whatsapp: no se pudo confirmar whatsapp_emergencia, uso fallback: ${e.message}`);
   }
   const digits = String(phone).replace(/[^\d]/g, "");
-  const text = buildWhatsAppText(lang, nombre, necesidad);
+  const vendorCode = attribution && attribution.codigo_vendedor ? attribution.codigo_vendedor : "";
+  const text = buildWhatsAppText(lang, nombre, necesidad, vendorCode);
   return { ok: true, phone: digits, text };
 }
 
-async function execCreateLead(args, env) {
+async function execCreateLead(args, env, attribution) {
   const a = args || {};
   const tipo      = a.tipo === "servicio" ? "servicio" : "plan";
   const nombres   = String(a.nombres || "").trim();
@@ -490,6 +531,9 @@ async function execCreateLead(args, env) {
   const body = { tipo, nombres, apellidos, telefono };
   if (a.email)   body.email   = String(a.email).trim();
   if (a.mensaje) body.mensaje = String(a.mensaje).trim();
+  /* Atribución de vendedor/canal (?ref=) — el prospecto tiene que quedar
+     asociado al vendedor que trajo al visitante. */
+  if (attribution) body.atribucion = attribution;
   if (tipo === "plan") {
     if (!a.plan_id) {
       return { ok: false, error: "Falta plan_id — usa list_planes y confirma con el usuario cuál plan le interesa antes de registrar el prospecto." };
@@ -530,6 +574,7 @@ export async function runAlma(input, env, executionCtx) {
   }
   const lang  = (input.lang || "es").toLowerCase();
   const db    = input.db;   /* puede ser cliente real o noop */
+  const attribution = input.attribution || null;   /* {codigo_vendedor?, canal_origen?, ...} */
 
   /* Config dinámica: leemos agent_config en runtime. Si la BD está caída o
      una key está vacía, caemos al valor hard-coded de este archivo / al
@@ -670,12 +715,20 @@ export async function runAlma(input, env, executionCtx) {
         } else if (name === "list_servicios") {
           result = await execListServicios(env, lang);
         } else if (name === "handoff_whatsapp") {
-          result = await execHandoffWhatsapp(args, env, lang);
+          result = await execHandoffWhatsapp(args, env, lang, attribution);
           if (result.ok) {
             out.waHandoff = { phone: result.phone, text: result.text };
+            /* Stub de atribución: deja el vendedor registrado aunque la venta
+               se cierre por WhatsApp. Best-effort, en background. */
+            if (attribution && attribution.codigo_vendedor) {
+              const stubPromise = registerAttributionStub(env, attribution, args?.nombre, args?.necesidad);
+              if (executionCtx?.waitUntil) executionCtx.waitUntil(stubPromise);
+              else await stubPromise;
+              out.attributionStub = true;
+            }
           }
         } else if (name === "create_lead") {
-          result = await execCreateLead(args, env);
+          result = await execCreateLead(args, env, attribution);
           if (result.ok) {
             out.lead = { tipo: result.tipo, planId: result.plan_id, servicioId: result.servicio_id };
           }

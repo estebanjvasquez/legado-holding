@@ -56,6 +56,151 @@ const PARENTESCOS_API_URL =
   "https://api.legadoholding.com/wizard/parentescos";
 
 /* =============================================================================
+   ATRIBUCIÓN DE VENDEDOR / CANAL  (?ref=CODIGO + UTMs)
+   ─────────────────────────────────────────────────────────────────────────────
+   Legado Holding opera con vendedores externos que reparten un enlace del tipo
+   https://www.legadoholding.com?ref=MN4UYC5Y. El código tiene que sobrevivir a
+   toda la navegación y viajar en cada compra (wizard) y cada prospecto/handoff
+   (Alma) para que Prevision-Funeraria (tenant lh) atribuya la transacción al
+   vendedor. Contrato: docs/api-publica-wizard.md §"Atribución de canal / vendedor".
+
+   Modelo: FIRST-TOUCH con TTL de 90 días. El primer vendedor que trae al
+   visitante se queda con el crédito; un ?ref= posterior distinto NO lo pisa
+   mientras no venza. Sin ?ref=, se deriva canal_origen de UTMs/referrer.
+   ============================================================================= */
+const ATTRIBUTION_KEY = "legado_attribution";
+const ATTRIBUTION_TTL_MS = 90 * 24 * 60 * 60 * 1000; // 90 días
+const REF_RE = /^[A-Za-z0-9]{4,24}$/;
+const CANAL_ENUM = ["directo", "redes_sociales", "buscador", "otro"];
+
+function deriveCanal(utm, referrerUrl) {
+  const src = (utm.utm_source || "").toLowerCase();
+  const med = (utm.utm_medium || "").toLowerCase();
+  const blob = med + " " + src;
+  if (/(social|instagram|facebook|tiktok|whatsapp|\big\b|\bfb\b|linkedin)/.test(blob)) {
+    return "redes_sociales";
+  }
+  if (/(google|bing|yahoo|duckduckgo|search|cpc|ppc|sem|organic)/.test(blob)) {
+    return "buscador";
+  }
+  if (utm.utm_source) return "otro";
+  if (referrerUrl) {
+    try {
+      const host = new URL(referrerUrl).hostname.toLowerCase();
+      if (/(^|\.)(google|bing|yahoo|duckduckgo)\./.test(host)) return "buscador";
+      if (/(^|\.)(instagram|facebook|t\.co|twitter|x|tiktok|linkedin)\./.test(host)) {
+        return "redes_sociales";
+      }
+      return "otro";
+    } catch (_) {
+      /* referrer no parseable */
+    }
+  }
+  return "directo";
+}
+
+function readAttributionFromURL() {
+  if (typeof window === "undefined") return null;
+  let params;
+  try {
+    params = new URLSearchParams(window.location.search);
+  } catch (_) {
+    return null;
+  }
+  const rawRef = (params.get("ref") || "").trim();
+  const ref = REF_RE.test(rawRef) ? rawRef : "";
+
+  const utm = {};
+  ["utm_source", "utm_medium", "utm_campaign"].forEach((k) => {
+    const v = (params.get(k) || "").trim().slice(0, 120);
+    if (v) utm[k] = v;
+  });
+  const referrerUrl =
+    typeof document !== "undefined" ? (document.referrer || "").slice(0, 500) : "";
+
+  if (!ref && Object.keys(utm).length === 0 && !referrerUrl) return null;
+
+  const rec = {
+    v: 1,
+    ts: Date.now(),
+    landing: (window.location.pathname + window.location.search).slice(0, 300),
+    ...utm,
+  };
+  if (referrerUrl) rec.referrer_url = referrerUrl;
+  if (ref) {
+    rec.ref = ref;
+    rec.canal_origen = "vendedor"; // solo para analytics local; NO se envía a la API
+  } else {
+    rec.canal_origen = deriveCanal(utm, referrerUrl);
+  }
+  return rec;
+}
+
+function getStoredAttribution() {
+  if (typeof localStorage === "undefined") return null;
+  let raw;
+  try {
+    raw = localStorage.getItem(ATTRIBUTION_KEY);
+  } catch (_) {
+    return null;
+  }
+  if (!raw) return null;
+  let rec;
+  try {
+    rec = JSON.parse(raw);
+  } catch (_) {
+    return null;
+  }
+  if (!rec || typeof rec !== "object" || !rec.ts) return null;
+  if (Date.now() - rec.ts > ATTRIBUTION_TTL_MS) return null; // vencido
+  return rec;
+}
+
+/* Se ejecuta al cargar el script, antes de cualquier navegación por anclas. */
+function initAttribution() {
+  const fromURL = readAttributionFromURL();
+  if (!fromURL) return;
+  const stored = getStoredAttribution();
+
+  /* FIRST-TOUCH: si ya hay un ref vigente guardado, no lo pisamos aunque
+     llegue otro ?ref= distinto, ni aunque esta visita no traiga ref. Solo se
+     reemplaza cuando venció (getStoredAttribution ya devolvió null) o cuando
+     lo nuevo trae un ref y lo viejo no lo tenía (entró por UTM, ahora por
+     vendedor). */
+  if (stored && stored.ref) {
+    if (!fromURL.ref || stored.ref === fromURL.ref) return;
+    return; // conserva el primer vendedor
+  }
+
+  try {
+    localStorage.setItem(ATTRIBUTION_KEY, JSON.stringify(fromURL));
+  } catch (_) {
+    /* storage lleno/bloqueado — se ignora, la compra igual funciona */
+  }
+}
+
+/* Bloque `atribucion` listo para el payload de compra/lead/chat, o {} si no
+   hay nada que atribuir. Nunca lanza. Cuando hay vendedor NO mandamos
+   canal_origen (la API lo infiere del código; evita un enum no soportado). */
+function getAttribution() {
+  const rec = getStoredAttribution();
+  if (!rec) return {};
+  const out = {};
+  if (rec.ref) {
+    out.codigo_vendedor = rec.ref;
+  } else if (rec.canal_origen && CANAL_ENUM.includes(rec.canal_origen)) {
+    out.canal_origen = rec.canal_origen;
+  }
+  ["utm_source", "utm_medium", "utm_campaign"].forEach((k) => {
+    if (rec[k]) out[k] = rec[k];
+  });
+  if (rec.referrer_url) out.referrer_url = rec.referrer_url;
+  return out;
+}
+
+initAttribution();
+
+/* =============================================================================
    i18n / LANG — Diccionario bilingüe ES / EN
    ─────────────────────────────────────────────────────────────────────────────
    Formato: clave: ["texto en español", "english text"]
@@ -1132,11 +1277,12 @@ async function sendChatMessage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        sessionId: chatSessionId,
-        message:   text,
-        mode:      chatMode,
-        lang:      currentLang,
+        sessionId:   chatSessionId,
+        message:     text,
+        mode:        chatMode,
+        lang:        currentLang,
         history,
+        attribution: getAttribution(),
       }),
     });
     removeTypingIndicator();
@@ -1790,6 +1936,7 @@ async function submitWizard() {
     paymentType: wizardPaymentType,
     buyer:       wizardBuyer,
     family:      wizardFamily,
+    attribution: getAttribution(),
     timestamp:   new Date().toISOString(),
   };
 

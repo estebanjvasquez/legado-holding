@@ -10,6 +10,7 @@
 
 import { createPF } from "./prevision-api.js";
 import { ValidationError } from "./errors.js";
+import { sanitizeAttribution, attributionTag } from "./attribution.js";
 
 function sanitizeText(s, maxLen = 200) {
   if (s === null || s === undefined) return "";
@@ -94,12 +95,13 @@ function normalize(body) {
       birthDate: sanitizeText(buyer.birthDate, 12),
     },
     afiliados,
+    atribucion: sanitizeAttribution(body.attribution),
   };
 }
 
 function buildCompraBody(ctx, env) {
   const siteBase = (env.SITE_BASE_URL || "https://www.legadoholding.com").replace(/\/$/, "");
-  return {
+  const body = {
     cliente: {
       tipo_persona: "natural",
       documento_identidad: ctx.buyer.cedula || null,
@@ -117,6 +119,10 @@ function buildCompraBody(ctx, env) {
     success_url: `${siteBase}/gracias.html`,
     cancel_url: `${siteBase}/cancelado.html`,
   };
+  /* Atribución de vendedor/canal (?ref=). Solo se agrega si el sitio mandó
+     algo aprovechable; un código inválido lo ignora la propia API. */
+  if (ctx.atribucion) body.atribucion = ctx.atribucion;
+  return body;
 }
 
 export async function processWizardCheckout(body, env) {
@@ -131,9 +137,26 @@ export async function processWizardCheckout(body, env) {
 
   const PF = createPF(env);
   const compraBody = buildCompraBody(ctx, env);
-  console.log(`Wizard checkout start: plan=${ctx.planSlug} email=${ctx.buyer.email}`);
+  console.log(
+    `Wizard checkout start: plan=${ctx.planSlug} email=${ctx.buyer.email} atribucion=${attributionTag(ctx.atribucion)}`,
+  );
 
-  const result = await PF.crearCompra(compraBody);
+  let result;
+  try {
+    result = await PF.crearCompra(compraBody);
+  } catch (e) {
+    /* La atribución NUNCA debe bloquear una venta. Si el bloque `atribucion`
+       hiciera fallar la validación de la API (schema distinto al esperado),
+       reintentamos una vez sin él — se pierde el tracking de ese vendedor,
+       pero el checkout sigue. */
+    if (compraBody.atribucion) {
+      console.warn(`[wizard] crearCompra falló con atribucion (${e.message}) — reintento sin atribucion`);
+      const { atribucion, ...bodySinAtribucion } = compraBody;
+      result = await PF.crearCompra(bodySinAtribucion);
+    } else {
+      throw e;
+    }
+  }
   console.log(`Compra creada: estado=${result.estado} id=${result.compra_pendiente_id}`);
 
   return {
