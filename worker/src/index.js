@@ -45,6 +45,9 @@ export default {
       if (url.pathname === "/wizard/parentescos") {
         return await handleParentescos(env, json);
       }
+      if (url.pathname === "/wizard/vendedor") {
+        return await handleVendedorLookup(url.searchParams.get("codigo"), env, json);
+      }
       return json({
         ok: true,
         service:            "legado-checkout",
@@ -114,6 +117,27 @@ async function handleParentescos(env, json) {
   } catch (e) {
     console.error("Parentescos error:", e.message);
     return json({ success: false, message: e.message }, 500);
+  }
+}
+
+/* /wizard/vendedor?codigo= — resuelve un ?ref= a nombre de vendedor para
+   mostrarlo en el sitio ("te atiende por recomendación de X"). El token vive
+   solo en el Worker; el navegador nunca ve la lista de vendedores. Código
+   inválido/inactivo → { activo: false } (nunca error). */
+async function handleVendedorLookup(codigo, env, json) {
+  const c = (codigo || "").replace(/[^A-Za-z0-9]/g, "").slice(0, 24);
+  if (c.length < 4) return json({ activo: false });
+  try {
+    const PF = createPF(env);
+    const resp = await PF.getVendedor(c);
+    return json({
+      activo: !!(resp && resp.activo),
+      codigo: c,
+      nombre: (resp && (resp.nombre || resp.nombre_completo)) || null,
+    });
+  } catch (e) {
+    console.warn(`Vendedor lookup error (${c}): ${e.message}`);
+    return json({ activo: false });
   }
 }
 

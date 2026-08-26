@@ -452,7 +452,7 @@ async function execListServicios(env, lang) {
 /* Arma el mensaje pre-llenado del link de WhatsApp. Se construye en el
    backend (no lo redacta el modelo) para no depender de que el LLM escape
    bien la URL — el frontend solo hace encodeURIComponent sobre este texto. */
-function buildWhatsAppText(lang, nombre, necesidad, vendorCode) {
+function buildWhatsAppText(lang, nombre, necesidad, vendorCode, vendorName) {
   const quien = nombre && String(nombre).trim()
     ? String(nombre).trim()
     : (lang.startsWith("en") ? "a visitor" : "un visitante");
@@ -463,11 +463,13 @@ function buildWhatsAppText(lang, nombre, necesidad, vendorCode) {
   /* Si el visitante llegó por el enlace de un vendedor externo, el humano de
      guardia tiene que saber que la venta le corresponde a ese vendedor. Se
      redacta como algo que el propio cliente diría ("vengo referido/a por..."),
-     no como un código de tracking suelto. */
+     no como un código de tracking suelto. Si se pudo resolver el nombre, se
+     usa; si no, cae al código. */
   if (vendorCode) {
+    const asesor = vendorName ? `${vendorName} (ref: ${vendorCode})` : `un asesor de LEGADO (ref: ${vendorCode})`;
     text += en
-      ? `\n\nI was referred by a LEGADO advisor (ref: ${vendorCode}).`
-      : `\n\nVengo referido/a por un asesor de LEGADO (ref: ${vendorCode}).`;
+      ? `\n\nI was referred by ${vendorName ? `${vendorName}, a LEGADO advisor` : "a LEGADO advisor"} (ref: ${vendorCode}).`
+      : `\n\nVengo referido/a por ${asesor}.`;
   }
   return text;
 }
@@ -515,7 +517,19 @@ async function execHandoffWhatsapp(args, env, lang, attribution) {
   }
   const digits = String(phone).replace(/[^\d]/g, "");
   const vendorCode = attribution && attribution.codigo_vendedor ? attribution.codigo_vendedor : "";
-  const text = buildWhatsAppText(lang, nombre, necesidad, vendorCode);
+  let vendorName = "";
+  if (vendorCode) {
+    try {
+      const pf = createPF(env);
+      const v = await pf.getVendedor(vendorCode);
+      if (v && v.activo && (v.nombre || v.nombre_completo)) {
+        vendorName = String(v.nombre || v.nombre_completo).trim();
+      }
+    } catch (e) {
+      console.warn(`[alma] no se pudo resolver el nombre del vendedor ${vendorCode}: ${e.message}`);
+    }
+  }
+  const text = buildWhatsAppText(lang, nombre, necesidad, vendorCode, vendorName);
   return { ok: true, phone: digits, text };
 }
 

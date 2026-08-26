@@ -45,6 +45,11 @@ export function createPF(env) {
   return {
     getParentescos: () => req("GET", "/parentescos", undefined, { auth: true }),
     crearCompra:     (body) => req("POST", "/compras", body, { auth: true }),
+    /* Resuelve un codigo_vendedor (?ref=) a su nombre para mostrarlo (handoff a
+       WhatsApp, banner del sitio). Server-to-server: no expone la lista de
+       vendedores al navegador. Código inválido/inactivo → { activo: false }. */
+    getVendedor: (codigo) =>
+      req("GET", `/vendedores/lookup?codigo=${encodeURIComponent(codigo)}`, undefined, { auth: true }),
     /* Catálogo público — lo usa el agente Alma para informar sin inventar
        precios/coberturas (docs/GUIA_INTERACCION_BOT_LEGADO.md sección 4.4). */
     getPlanes:    (idioma) => req("GET", `/planes${idioma ? `?idioma=${idioma}` : ""}`),
