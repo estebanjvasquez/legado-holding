@@ -2,10 +2,12 @@
    Pipeline de checkout del wizard de planes — reemplaza pipeline.js (Invoice
    Ninja) llamando a POST /api/public/t/lh/compras de Prevision-Funeraria.
 
-   Solo cubre los planes migrados hoy (esencial-zulia, vanguardia-zulia). Los
-   planes "Selecto" no tienen equivalente en el modelo `planes` de la API nueva
-   (cobran una cuota inicial que esa API no modela) y no pasan por aquí — el
-   frontend ya no ofrece checkout para ellos.
+   Cubre los 4 planes: esencial-zulia, vanguardia-zulia, esencial-selecto,
+   vanguardia-selecto. Los "Selecto" cobran además una cuota inicial única
+   (cuota_inicial_centavos en /planes) — este Worker NO la calcula ni la manda:
+   solo manda plan_id, y Prevision-Funeraria arma el Stripe Checkout con la
+   cuota inicial one-time + la suscripción recurrente
+   (docs/ajustes-prevision-funeraria-atribucion-vendedor.md §4).
    ============================================================================= */
 
 import { createPF } from "./prevision-api.js";
@@ -23,7 +25,16 @@ function sanitizeText(s, maxLen = 200) {
 
 const MAX_FAMILY = 6;
 const VALID_PAYMENT_TYPES = ["monthly", "annual"];
-const VALID_PLAN_SLUGS = ["esencial-zulia", "vanguardia-zulia"];
+/* Los 4 slugs. El frontend hoy solo deja comprar los Zulia
+   (SELECTO_CHECKOUT_ENABLED=false en js/main.js) porque POST /compras de
+   Prevision-Funeraria devuelve 500 para un plan con cuota inicial. El Worker ya
+   los acepta para no tener que redeployar cuando Previsión lo arregle. */
+const VALID_PLAN_SLUGS = [
+  "esencial-zulia",
+  "vanguardia-zulia",
+  "esencial-selecto",
+  "vanguardia-selecto",
+];
 
 function normalize(body) {
   const intent = (body.intent || "").toLowerCase();

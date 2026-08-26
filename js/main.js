@@ -548,15 +548,15 @@ let PLANS = {
   },
   "esencial-selecto": {
     monthly: "$9,47",
-    annual: "$202",
-    mo_save: "$",
+    annual: "$94,7",
+    mo_save: "$19",
     initial: "$35",
     maxAge: 65,
   },
   "vanguardia-selecto": {
     monthly: "$14,7",
-    annual: "$129,7",
-    mo_save: "$",
+    annual: "$147",
+    mo_save: "$29,4",
     initial: "$55",
     maxAge: 65,
   },
@@ -701,12 +701,27 @@ function formatPrice(num) {
   return "$" + s.replace(".", ",");
 }
 
-/* Planes que ya migraron a la API pública de Prevision-Funeraria y por lo
-   tanto tienen checkout digital (wizard). "esencial-selecto"/"vanguardia-selecto"
-   cobran una cuota inicial (Unico) que el modelo `planes` de esa API todavía no
-   soporta — se quedan con los datos de respaldo hardcodeados y su CTA cambia a
-   "Hablar con un asesor" en vez de abrir el wizard (ver bindPlanCardEvents). */
-const WIZARD_ENABLED_SLUGS = new Set(["esencial-zulia", "vanguardia-zulia"]);
+/* Planes con checkout digital (wizard) vía la API pública de Prevision-Funeraria.
+
+   Los "Selecto" cobran además una cuota inicial única (cuota_inicial_centavos en
+   /planes). Todo el camino de LH ya está listo (Worker acepta los slugs, el
+   wizard lee cuota_inicial_centavos y la muestra en pago/resumen, isSelecto =
+   plan.initial). Están APAGADOS acá porque `POST /compras` de Prevision-Funeraria
+   todavía devuelve 500 para un plan con cuota inicial — no arma el Stripe
+   Checkout con la cuota inicial one-time + suscripción (ver
+   docs/ajustes-prevision-funeraria-atribucion-vendedor.md §4).
+
+   Para encenderlos cuando Previsión arregle `/compras`: mover los 2 slugs de
+   SELECTO_CHECKOUT_PENDIENTE a WIZARD_ENABLED_SLUGS (o borrar el spread
+   condicional de abajo) y subir el ?v= de main.js. Mientras estén apagados, su
+   CTA sigue yendo a #contacto. */
+const SELECTO_CHECKOUT_ENABLED = false;
+const SELECTO_SLUGS = ["esencial-selecto", "vanguardia-selecto"];
+const WIZARD_ENABLED_SLUGS = new Set([
+  "esencial-zulia",
+  "vanguardia-zulia",
+  ...(SELECTO_CHECKOUT_ENABLED ? SELECTO_SLUGS : []),
+]);
 
 async function loadPlansFromAPI() {
   try {
@@ -717,7 +732,11 @@ async function loadPlansFromAPI() {
 
     const newPlans = {};
     items.forEach((p) => {
-      if (!WIZARD_ENABLED_SLUGS.has(p.slug)) return; // Selecto: fuera de la migración de hoy
+      /* Refrescamos los datos de TODO plan que ya conocemos (precio, cuota
+         inicial, edad máx) aunque su checkout esté apagado — así las tarjetas
+         muestran valores reales. El botón "Comprar" vs "Hablar con un asesor"
+         lo decide aparte WIZARD_ENABLED_SLUGS + plan.id en renderPlans. */
+      if (!PLANS[p.slug]) return;
       const monthlyCents = Number(p.precio_mensual_centavos);
       const annualCents  = Number(p.precio_anual_centavos);
       const monthlyPrice = Number.isFinite(monthlyCents) ? monthlyCents / 100 : null;
@@ -727,6 +746,9 @@ async function loadPlansFromAPI() {
         ? Math.max(...tarifas.map((t) => Number(t.edad_max) || 0))
         : 65;
 
+      const initialCents = Number(p.cuota_inicial_centavos);
+      const hasInitial = Number.isFinite(initialCents) && initialCents > 0;
+
       newPlans[p.slug] = {
         id:          p.id,
         monthly:     monthlyPrice !== null ? formatPrice(monthlyPrice) : null,
@@ -735,22 +757,30 @@ async function loadPlansFromAPI() {
         maxAge:      maxAge || 65,
         notes:       (p.descripcion_detallada || p.descripcion || "").trim(),
       };
+      /* Cuota inicial única (planes Selecto). Solo se setea `initial` si la API
+         la trae > 0 — es lo que activa la vista de "cuota inicial" en las
+         tarjetas y el wizard (isSelecto = plan.initial !== undefined). */
+      if (hasInitial) {
+        newPlans[p.slug].initial = formatPrice(initialCents / 100);
+        newPlans[p.slug].initialConcept =
+          (p.cuota_inicial_concepto || "").trim() || null;
+      }
     });
 
     if (Object.keys(newPlans).length === 0) return;
 
-    /* Merge: solo pisa los 2 slugs migrados; esencial-selecto/vanguardia-selecto
-       y cualquier otro dato de respaldo quedan intactos. */
-    WIZARD_ENABLED_SLUGS.forEach((slug) => {
+    /* Merge: pisa con datos de la API todo plan conocido que ella devuelva;
+       los que no vengan quedan con su dato de respaldo. */
+    Object.keys(PLANS).forEach((slug) => {
       if (newPlans[slug]) {
         PLANS[slug] = newPlans[slug];
       } else {
-        console.warn(`Plan "${slug}" no devuelto por la API de Prevision-Funeraria — usando datos de respaldo (sin checkout real).`);
+        console.warn(`Plan "${slug}" no devuelto por la API de Prevision-Funeraria — usando datos de respaldo.`);
       }
     });
 
     renderPlans();
-    console.log("Planes Zulia actualizados desde Prevision-Funeraria ✓", Object.keys(newPlans));
+    console.log("Planes actualizados desde Prevision-Funeraria ✓", Object.keys(newPlans));
   } catch (e) {
     console.warn("Plan API no disponible, usando datos de respaldo:", e.message);
   }
@@ -1039,7 +1069,7 @@ function renderPlans() {
           ${features.map((f) => `<li>${checkIcon()}${f}</li>`).join("")}
         </ul>
         ${
-          WIZARD_ENABLED_SLUGS.has(planId)
+          WIZARD_ENABLED_SLUGS.has(planId) && plan.id
             ? `<button class="btn-gold plan-btn-primary" data-plan="${planId}">${t("plan_buy")}</button>`
             : `<a class="btn-gold plan-btn-primary" href="#contacto">${t("plan_contact_advisor")}</a>`
         }

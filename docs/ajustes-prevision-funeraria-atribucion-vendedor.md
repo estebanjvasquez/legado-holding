@@ -162,11 +162,28 @@ usar sesión de staff, que no tiene. El endpoint público-con-token es más limp
 
 ---
 
-## 4. GAP CONOCIDO — cuota inicial de los planes "Selecto" no está en el modelo `planes`
+## 4. GAP CONOCIDO — cuota inicial de los planes "Selecto"
 
-### Problema (confirmado en vivo)
+### Estado 2026-08-26 (tarde) — parcialmente resuelto
 
-`GET /api/public/t/lh/planes` devuelve hoy:
+- ✅ **4.1 / 4.2 hechos:** `GET /api/public/t/lh/planes` ya devuelve
+  `cuota_inicial_centavos` (`esencial-selecto`=3500, `vanguardia-selecto`=5500) y
+  `cuota_inicial_concepto: "Cuota de afiliación"`. El frontend de `legado-holding`
+  ya los lee y los muestra en las tarjetas y el wizard.
+- ❌ **4.3 SIN HACER / roto:** `POST /api/public/t/lh/compras` devuelve **HTTP 500
+  "Internal Server Error"** para cualquier plan con `cuota_inicial_centavos > 0`
+  (probado 2026-08-26 con `esencial-selecto` id 3 y `vanguardia-selecto` id 4,
+  mensual y anual, con y sin atribución — los planes Zulia siguen dando 200). El
+  builder del Stripe Checkout no está armando la cuota inicial one-time + la
+  suscripción. **Este es el bloqueo actual.**
+- ⏸️ **4.6 bloqueado por 4.3:** en `legado-holding` el checkout de Selecto está
+  implementado completo pero **apagado con un flag** (`SELECTO_CHECKOUT_ENABLED =
+  false` en `js/main.js`). Se enciende con un one-liner + bump de `?v=` en cuanto
+  `/compras` deje de dar 500. Mientras tanto el CTA de Selecto sigue en `#contacto`.
+
+### Problema original
+
+`GET /api/public/t/lh/planes` devolvía:
 
 | slug | id | `precio_mensual_centavos` | `precio_anual_centavos` | cuota inicial |
 |---|---|---|---|---|
