@@ -129,6 +129,15 @@ Stub de atribución del handoff a WhatsApp (mismo endpoint):
 > `"(se recibe por WhatsApp)"` (24 chars) violaba el tope de 20 y daba 400 en
 > silencio — por eso `Ramírez`/`Pedro` (y cualquier stub previo) nunca se crearon.
 > Corregido en commit `9fd9f9e`, reverificado 201.
+>
+> ✅ **Confirmado del lado de Prevision-Funeraria (2026-08-26), consulta directa a
+> D1 de `lh`:** el lead `Carla Ruiz` (id 10) sí quedó creado —
+> `telefono: "por WhatsApp"` (12 chars, dentro del tope), `vendedor_id: 1`
+> (ESTEBAN, resuelto correctamente desde `atribucion.codigo_vendedor`),
+> `referencia_publica: "7C5FLX8GV9"`, `estado: "nueva"`. Con `vendedor_id`
+> seteado va a mostrar el vendedor en el panel de leads (mismo mecanismo ya
+> verificado para `María González`, ver PF-3 cerrado más abajo) — el fix del
+> stub funciona de punta a punta.
 
 ## Datos de prueba a limpiar en `lh`
 
@@ -138,8 +147,10 @@ Stub de atribución del handoff a WhatsApp (mismo endpoint):
     `Mendez` (Luis, ×2 — uno directo probando el fix del stub), `Ruiz` (Carla).
   - Compras pendientes: docs `SMOKE-REF-001/002/003`, `SMOKE-SELECTO-001`,
     `REG-CHECK-001`, `CTRL-ZULIA-001`, `E2E-SELECTO-001`, `E2E-SELANUAL-001`,
-    `E2E-SELECTO-001` (id 3, con atribución), + las `SMOKE ATRIBUCION`. (Las
-    `SEL-*` con 500 no crearon nada.)
+    `TAIL-CHECK-001`, `DBG-ATRIB-001` (**= compra_pendiente id 32**, la de PF-5),
+    + las `SMOKE ATRIBUCION`. (Las `SEL-*` con 500 no crearon nada.)
+  - Contrato del navegador: cliente `TEST-EDGE-001` (`Prueba Edge Selecto`),
+    contrato Selecto activo **sin vendedor** — es el caso de PF-5.
   - Nota: `Ramírez` (Pedro) nunca se creó — era el stub roto por el tope de 20
     chars en `telefono` (ver arriba, ya corregido). Confirmado por el agente de
     Prevision-Funeraria con consulta directa a D1.
@@ -160,9 +171,62 @@ Stub de atribución del handoff a WhatsApp (mismo endpoint):
 
 ## Abierto
 
-*(nada abierto de este lado por ahora — todo lo pedido hasta el 2026-08-26 quedó
-cerrado, ver abajo. Si el smoke test de legado-holding encuentra algo nuevo,
-agregarlo acá.)*
+### PF-5 · La atribución NO llega al contrato en el flujo real de compra — **P0, regresión / gap**
+El smoke test end-to-end en navegador (2026-08-26, hecho por el usuario) compró un
+plan Selecto con `?ref=MN4UYC5Y`, pagó con `4242...`, el contrato quedó **activo** —
+pero **el detalle del contrato NO muestra vendedor asociado**, y en el cálculo de
+comisiones no aparece nada.
+
+**El lado de `legado-holding` está descartado como causa** — evidencia:
+- `wrangler tail` en vivo sobre `api.legadoholding.com` durante un checkout Selecto
+  idéntico (cliente doc `DBG-ATRIB-001`, `attribution.codigo_vendedor: "MN4UYC5Y"`):
+  ```
+  Wizard checkout start: plan=esencial-selecto email=dbg-atrib@example.com atribucion=ref:MN4UYC5Y
+  Compra creada: estado=pendiente_pago id=32
+  ```
+  El Worker **sí** arma `body.atribucion = { codigo_vendedor: "MN4UYC5Y", ... }` y
+  lo manda a `POST /api/public/t/lh/compras`. La `compra_pendiente` resultante es
+  **id 32**.
+- El body exacto que manda el Worker está documentado arriba ("Body exacto de
+  `POST /compras`") — `atribucion.codigo_vendedor` anidado como pide el contrato.
+- Unit tests del Worker (20) + lógica de captura del `?ref=` en `js/main.js` (9)
+  pasan.
+
+**Qué revisar en Prevision-Funeraria:**
+1. **`compra_pendiente id 32`** (doc cliente `DBG-ATRIB-001`) — ¿tiene `vendedor_id`
+   seteado? Si NO → el handler de `POST /compras` **no está resolviendo
+   `atribucion.codigo_vendedor` → `vendedor_id` en el flujo Selecto** (o en ningún
+   flujo — la verificación de PF-2 con `FIX-VERIFY-COMBO-1` puede haber sido sobre
+   una build anterior al fix de PF-1 `804abbc`, o sobre otro path).
+2. Si `compra_pendiente` **sí** tiene `vendedor_id` pero el **contrato** no → el
+   path de creación de contrato del webhook de Stripe **para planes con cuota
+   inicial** (el segundo `line_items[]` de `804abbc`) no copia `vendedor_id` de
+   `compras_pendientes` — regresión introducida por el fix de PF-1.
+3. Reproducir de punta a punta: `POST /compras` con `atribucion.codigo_vendedor`
+   **para `plan_id: 3` (Selecto)** → pagar con `4242...` → inspeccionar el contrato
+   resultante. Los tests de PF-2 fueron con curl directo; hay que confirmar que el
+   mismo path que usa el navegador (idéntico, via el Worker) produce el vendedor en
+   el contrato **de un plan Selecto**.
+4. Confirmar contra `contrato #8` (`FIX-VERIFY-COMBO-1`): ¿ese contrato realmente
+   tiene `vendedor_id = 1` HOY, o la verificación quedó registrada de una corrida
+   vieja?
+
+### PF-6 · No hay vista de "transacciones de un vendedor" — **P1, feature faltante**
+Al abrir el detalle de un vendedor en el panel de `lh` no se pueden ver los
+contratos / leads / compras asociados a él. Estaba en la propuesta original
+(`docs/ajustes-prevision-funeraria-atribucion-vendedor.md` §6) pero no se convirtió
+en pedido hasta ahora. Necesario para que un vendedor externo (o el staff) vea su
+pipeline: leads con estado, compras pendientes de pago, contratos activos web,
+comisiones por etapa — filtrado por `vendedor_id` / `codigo_referido`.
+
+### PF-7 · Comisiones de contratos originados por web — **P1, confirmar**
+En el cálculo de comisiones "no aparece nada" para el contrato de prueba. Puede ser
+esperado (PF-2 dijo que `POST /comisiones/calcular` es batch y `semana1` recién
+vence a los 7 días de `fecha_ingreso`). **Confirmar:** una vez que PF-5 esté
+resuelto y el contrato tenga `vendedor_id`, correr `POST /comisiones/calcular`
+después del día 7 debe generar las etapas (`semana1`…) para ESE contrato con ESE
+vendedor. Si el batch filtra por algún campo que los contratos web no traen
+(sucursal, tipo de venta, etc.), ajustarlo.
 
 ## Cerrado
 
@@ -258,12 +322,14 @@ lados de la comparación. Verificado en vivo: `GET
     Node contra el archivo real → 9/9 (`?ref=` se persiste, un 2º ref distinto no
     lo pisa, TTL vencido sí, `?ref=` no manda `canal_origen`, UTM social →
     `redes_sociales`, referrer google → `buscador`).
-- [ ] **Pendiente: pasada visual en navegador real** (no bloqueante, no
-  automatizable desde acá): que `?v=9` esté desplegado en cPanel, abrir
-  `legadoholding.com?ref=MN4UYC5Y`, confirmar `localStorage.legado_attribution`
-  en DevTools, que la tarjeta Selecto abra el wizard y muestre "**$35 + $9,47/mes**"
-  en pago y resumen, y **un pago completo** con `4242 4242 4242 4242` que deje el
-  contrato Selecto activo con `vendedor_id` = ESTEBAN y la 1ª factura en $44,47.
+- [x] **Pasada en navegador hecha (2026-08-26, usuario):** `?v=9` desplegado,
+  `?ref=MN4UYC5Y` capturado en `localStorage`, tarjeta Selecto abre el wizard y
+  muestra "$35 + $9,47/mes", pago completo con `4242...` → contrato Selecto
+  **activo**. El desglose de Stripe y la primera factura ($44,47) OK.
+- [ ] **PERO: el contrato NO quedó asociado al vendedor** → abierto como **PF-5**
+  (es de Previsión, no de LH — el Worker manda `atribucion.codigo_vendedor`,
+  confirmado por `wrangler tail`). Cerrar LH-3 cuando PF-5 esté resuelto y se
+  reverifique un contrato Selecto con `vendedor_id` = ESTEBAN.
 
 ## Cerrado
 
