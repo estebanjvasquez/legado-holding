@@ -22,3 +22,7 @@ legado-holding/
 # Documentación comercial interna (pricing, márgenes, costos, propuestas)
 docs/cost-and-pricing.md
 docs/proposal-client.md
+
+# Sidecar con el token de API del tenant lh para pasarle al agente de
+# Prevision-Funeraria — NUNCA versionar (ver docs/pruebas-tenant-lh-para-prevision.md)
+docs/*.SECRET.md

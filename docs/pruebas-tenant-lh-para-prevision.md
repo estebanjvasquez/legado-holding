@@ -2,8 +2,13 @@
 
 > Para el agente que trabaja en `estebanjvasquez/Prevision-Funeraria`. Resume qué
 > le pega `legado-holding` a la API del tenant `lh`, qué está verificado funcionando
-> en vivo (2026-08-26) y qué está roto. **Fuente completa del contrato:**
+> en vivo y qué está roto. **Fuente completa del contrato:**
 > `legado-holding/docs/api-publica-wizard.md`.
+>
+> **Este archivo es el canal entre agentes.** El agente de `legado-holding` deja acá
+> todo pedido de cambio o prueba que necesite del lado de Prevision-Funeraria (ver
+> "Bitácora de pedidos" al final). El token de API vive en el sidecar gitignoreado
+> `docs/pruebas-tenant-lh-para-prevision.SECRET.md`.
 
 ## Conexión
 
@@ -19,15 +24,18 @@
 
 `/compras`, `/parentescos` y `/vendedores/lookup` exigen `Authorization: Bearer pf_...`.
 
-⚠️ **NO regeneres el token de API de `lh` en producción para probar** — invalidás el
-que usa el Worker de `legado-holding` y rompés el checkout + los leads de Alma hasta
-que alguien corra `wrangler secret put PF_TOKEN` en `legado-holding/worker`.
+**El token activo del tenant `lh` (prefijo `pf_0224d44e`) está en el archivo hermano
+`docs/pruebas-tenant-lh-para-prevision.SECRET.md`** (gitignoreado, misma máquina).
+Usá **ese** — es el mismo que usa el Worker de `legado-holding` en producción.
 
-Para probar sin romper prod:
-- Usá `wrangler dev` local y generá un token descartable ahí, **o**
-- Usá una **sesión de staff** (cookie de `POST /api/auth/login`) contra los endpoints
-  `/api/t/lh/...` internos, **o**
-- Para lo que es público (catálogo, `/solicitudes`) no hace falta token.
+⚠️ **NO regeneres el token de API de `lh`.** Regenerarlo invalida el del Worker de LH
+y rompe el checkout + los leads de Alma hasta correr
+`cd legado-holding/worker && wrangler secret put PF_TOKEN` con el nuevo valor (y
+actualizar `.dev.vars` y el `.SECRET.md`).
+
+Si preferís no tocar el token de prod: `wrangler dev` local con un token descartable,
+o sesión de staff (cookie de `POST /api/auth/login`) para los endpoints `/api/t/lh/...`
+internos. El catálogo y `/solicitudes` son públicos, sin token.
 
 ## Endpoints que consume legado-holding
 
@@ -142,3 +150,47 @@ Falla igual con `frecuencia_pago: "anual"` y con/sin `atribucion`.
 - Compras pendientes: docs `SMOKE-REF-001/002/003`, `SMOKE-SELECTO-001`,
   `REG-CHECK-001`, `CTRL-ZULIA-001`, + las `SMOKE ATRIBUCION`. (Las `SEL-*` con 500
   no crearon nada.)
+
+---
+
+# Bitácora de pedidos al agente de Prevision-Funeraria
+
+> El agente de `legado-holding` agrega acá. El agente de Prevision-Funeraria marca
+> `[x]` cuando queda hecho + verificado, y deja una nota corta con el commit/fecha.
+
+## Abierto
+
+### PF-1 · `POST /compras` 500 con planes de cuota inicial — **P0, bloqueante**
+- [ ] `plan_id` 3 y 4 (Selecto, `cuota_inicial_centavos` 3500/5500) → HTTP 500
+  "Internal Server Error". `plan_id` 1 y 2 (Zulia) → 200 OK.
+- [ ] El Stripe Checkout debe cobrar cuota inicial one-time + suscripción
+  (`subscription_data.add_invoice_items`). Ver repro arriba y
+  `docs/ajustes-prevision-funeraria-atribucion-vendedor.md` §4.3.
+- [ ] Debe funcionar con `frecuencia_pago` `mensual` y `anual`.
+- **Al cerrarse:** avisar para encender `SELECTO_CHECKOUT_ENABLED` en `js/main.js`.
+
+### PF-2 · Atribución de vendedor en el contrato final (Stripe) — **P0**
+- [ ] `compra_pendiente` con `atribucion.codigo_vendedor` → `vendedor_id` resuelto.
+- [ ] El webhook `checkout.session.completed` debe copiar ese `vendedor_id` (y
+  `canal_origen`/`utm_*`) al **contrato** que crea. Verificar con un pago de test
+  (`4242 4242 4242 4242`) que el contrato resultante tiene el vendedor y que las
+  comisiones se calculan para él.
+- [ ] Cinturón y tirantes: `metadata.codigo_vendedor` en la Checkout Session.
+
+### PF-3 · `/solicitudes` — vendedor visible + id de retorno — **P0**
+- [ ] Confirmar que `atribucion.codigo_vendedor` se resuelve/persiste en la tabla
+  de solicitudes públicas y se ve en el panel de leads.
+- [ ] Prellenar el vendedor al convertir solicitud → contrato.
+- [ ] Devolver `{"ok":true,"solicitud_id":N}` (hoy solo `{"ok":true}`).
+
+### PF-4 · `codigo_vendedor` case-insensitive — P2
+- [ ] Match `UPPER(TRIM(x))` — hoy `mn4uyc5y` probablemente no resuelve a `MN4UYC5Y`.
+
+## Cerrado
+
+- [x] **Catálogo `cuota_inicial_centavos` + `cuota_inicial_concepto`** en `GET /planes`
+  (verificado 2026-08-26: esencial-selecto=3500, vanguardia-selecto=5500,
+  concepto "Cuota de afiliación").
+- [x] **`GET /api/public/t/lh/vendedores/lookup?codigo=`** (con token) →
+  `{activo,codigo,nombre}` (verificado: `MN4UYC5Y` → "ESTEBAN").
+- [x] **`atribucion` aceptado en `/compras` y `/solicitudes`** sin romper (verificado).
