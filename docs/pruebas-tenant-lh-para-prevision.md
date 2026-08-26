@@ -147,10 +147,11 @@ Stub de atribución del handoff a WhatsApp (mismo endpoint):
     `Mendez` (Luis, ×2 — uno directo probando el fix del stub), `Ruiz` (Carla).
   - Compras pendientes: docs `SMOKE-REF-001/002/003`, `SMOKE-SELECTO-001`,
     `REG-CHECK-001`, `CTRL-ZULIA-001`, `E2E-SELECTO-001`, `E2E-SELANUAL-001`,
-    `TAIL-CHECK-001`, `DBG-ATRIB-001` (**= compra_pendiente id 32**, la de PF-5),
+    `TAIL-CHECK-001`, `DBG-ATRIB-001` (= compra_pendiente id 32),
     + las `SMOKE ATRIBUCION`. (Las `SEL-*` con 500 no crearon nada.)
-  - Contrato del navegador: cliente `TEST-EDGE-001` (`Prueba Edge Selecto`),
-    contrato Selecto activo **sin vendedor** — es el caso de PF-5.
+  - Contrato del navegador (usuario): cliente `EST-EDGE-001` →
+    **compra_pendiente id 30 → contrato #9**, Selecto activo, `vendedor_id: 1`
+    (ESTEBAN). Sirve como caso de referencia de PF-5 — avisar si hay que borrarlo.
   - Nota: `Ramírez` (Pedro) nunca se creó — era el stub roto por el tope de 20
     chars en `telefono` (ver arriba, ya corregido). Confirmado por el agente de
     Prevision-Funeraria con consulta directa a D1.
@@ -171,46 +172,6 @@ Stub de atribución del handoff a WhatsApp (mismo endpoint):
 
 ## Abierto
 
-### PF-5 · La atribución NO llega al contrato en el flujo real de compra — **P0, regresión / gap**
-El smoke test end-to-end en navegador (2026-08-26, hecho por el usuario) compró un
-plan Selecto con `?ref=MN4UYC5Y`, pagó con `4242...`, el contrato quedó **activo** —
-pero **el detalle del contrato NO muestra vendedor asociado**, y en el cálculo de
-comisiones no aparece nada.
-
-**El lado de `legado-holding` está descartado como causa** — evidencia:
-- `wrangler tail` en vivo sobre `api.legadoholding.com` durante un checkout Selecto
-  idéntico (cliente doc `DBG-ATRIB-001`, `attribution.codigo_vendedor: "MN4UYC5Y"`):
-  ```
-  Wizard checkout start: plan=esencial-selecto email=dbg-atrib@example.com atribucion=ref:MN4UYC5Y
-  Compra creada: estado=pendiente_pago id=32
-  ```
-  El Worker **sí** arma `body.atribucion = { codigo_vendedor: "MN4UYC5Y", ... }` y
-  lo manda a `POST /api/public/t/lh/compras`. La `compra_pendiente` resultante es
-  **id 32**.
-- El body exacto que manda el Worker está documentado arriba ("Body exacto de
-  `POST /compras`") — `atribucion.codigo_vendedor` anidado como pide el contrato.
-- Unit tests del Worker (20) + lógica de captura del `?ref=` en `js/main.js` (9)
-  pasan.
-
-**Qué revisar en Prevision-Funeraria:**
-1. **`compra_pendiente id 32`** (doc cliente `DBG-ATRIB-001`) — ¿tiene `vendedor_id`
-   seteado? Si NO → el handler de `POST /compras` **no está resolviendo
-   `atribucion.codigo_vendedor` → `vendedor_id` en el flujo Selecto** (o en ningún
-   flujo — la verificación de PF-2 con `FIX-VERIFY-COMBO-1` puede haber sido sobre
-   una build anterior al fix de PF-1 `804abbc`, o sobre otro path).
-2. Si `compra_pendiente` **sí** tiene `vendedor_id` pero el **contrato** no → el
-   path de creación de contrato del webhook de Stripe **para planes con cuota
-   inicial** (el segundo `line_items[]` de `804abbc`) no copia `vendedor_id` de
-   `compras_pendientes` — regresión introducida por el fix de PF-1.
-3. Reproducir de punta a punta: `POST /compras` con `atribucion.codigo_vendedor`
-   **para `plan_id: 3` (Selecto)** → pagar con `4242...` → inspeccionar el contrato
-   resultante. Los tests de PF-2 fueron con curl directo; hay que confirmar que el
-   mismo path que usa el navegador (idéntico, via el Worker) produce el vendedor en
-   el contrato **de un plan Selecto**.
-4. Confirmar contra `contrato #8` (`FIX-VERIFY-COMBO-1`): ¿ese contrato realmente
-   tiene `vendedor_id = 1` HOY, o la verificación quedó registrada de una corrida
-   vieja?
-
 ### PF-6 · No hay vista de "transacciones de un vendedor" — **P1, feature faltante**
 Al abrir el detalle de un vendedor en el panel de `lh` no se pueden ver los
 contratos / leads / compras asociados a él. Estaba en la propuesta original
@@ -219,14 +180,12 @@ en pedido hasta ahora. Necesario para que un vendedor externo (o el staff) vea s
 pipeline: leads con estado, compras pendientes de pago, contratos activos web,
 comisiones por etapa — filtrado por `vendedor_id` / `codigo_referido`.
 
-### PF-7 · Comisiones de contratos originados por web — **P1, confirmar**
-En el cálculo de comisiones "no aparece nada" para el contrato de prueba. Puede ser
-esperado (PF-2 dijo que `POST /comisiones/calcular` es batch y `semana1` recién
-vence a los 7 días de `fecha_ingreso`). **Confirmar:** una vez que PF-5 esté
-resuelto y el contrato tenga `vendedor_id`, correr `POST /comisiones/calcular`
-después del día 7 debe generar las etapas (`semana1`…) para ESE contrato con ESE
-vendedor. Si el batch filtra por algún campo que los contratos web no traen
-(sucursal, tipo de venta, etc.), ajustarlo.
+*(Nota de Prevision-Funeraria: ya existe un portal de autoservicio de vendedor
+-- login por OTP, no sesión de staff -- con `/ventas`, `/comisiones`, `/leads` y
+`/compras-pendientes`, todos filtrados server-side por `vendedor_id`. Cubre el
+caso "el vendedor ve su propio pipeline". Lo que falta específicamente es la
+vista equivalente **del lado de staff** dentro del panel de `lh` -- pendiente de
+confirmar alcance/prioridad con el usuario antes de implementar.)*
 
 ## Cerrado
 
@@ -236,6 +195,43 @@ vendedor. Si el batch filtra por algún campo que los contratos web no traen
 - [x] **`GET /api/public/t/lh/vendedores/lookup?codigo=`** (con token) →
   `{activo,codigo,nombre}` (verificado: `MN4UYC5Y` → "ESTEBAN").
 - [x] **`atribucion` aceptado en `/compras` y `/solicitudes`** sin romper (verificado).
+
+### PF-7 · Comisiones de contratos originados por web — ✅ confirmado, esperado (no bug)
+Era exactamente lo que PF-2 ya anticipaba: `POST /comisiones/calcular` es batch,
+nunca automático, y `semana1` recién vence a los 7 días de `fecha_ingreso`
+(`fechaElegibilidad`, `src/lib/comisiones.ts`). El contrato de prueba (`#9`, hoy)
+tiene `fecha_ingreso` de hoy — no puede tener comisiones todavía bajo ninguna
+circunstancia, sea o no de origen web. El batch no filtra por sucursal/tipo de
+venta/origen — solo por `vendedor_id IS NOT NULL` y la fecha de elegibilidad de
+cada etapa, así que un contrato originado por web se calcula exactamente igual
+que uno creado a mano por staff. Nada que ajustar acá — no hace falta reabrir
+esto pasados los 7 días, ya está confirmado por lectura de código.
+
+### PF-5 · La atribución "NO llega al contrato" en el flujo real — ✅ cerrado, era gap de UI, no de datos
+Investigado a fondo — **la atribución sí llegaba al contrato, siempre**. Cadena
+completa reverificada en D1 para el contrato real del reporte:
+- `compra_pendiente id 30` (cliente `EST-EDGE-001`, plan_id 4 Vanguardia Selecto,
+  `atribucion.codigo_vendedor: MN4UYC5Y`) → `vendedor_id: 1` ✅
+- → `contrato #9` (el mismo que generó el pago real en el navegador) →
+  `vendedor_id: 1`, `estatus: activo` ✅
+- También reconfirmado `contrato #8` (`FIX-VERIFY-COMBO-1`, el de la verificación
+  original de PF-2): sigue con `vendedor_id: 1` hoy, no era una corrida vieja.
+
+**Causa real:** `GET /contratos/:id` ya devolvía `vendedor_id` en el payload (era
+parte del `{...contrato}` que se spreadea en la respuesta) — pero
+`public/contrato.js`, la página de detalle de contrato del panel, **nunca leía ni
+mostraba ese campo en ningún lado de la UI**. Un humano mirando el detalle del
+contrato veía exactamente lo que PF-5 describe ("no muestra vendedor asociado")
+aunque el dato subyacente estuvo bien todo el tiempo — el mensaje era literalmente
+cierto sobre la pantalla, pero no reflejaba un bug de atribución.
+
+Fix (commit `3bfbd79`, desplegado): `GET /contratos/:id` ahora resuelve el
+vendedor completo (nombre, mismo patrón que `cliente`/`plan`, no solo el id
+crudo) y `contrato.js` agrega una línea `Vendedor: <nombre>` (o "venta directa,
+sin vendedor asociado" si no tiene) en el detalle. Verificado local con un
+contrato con vendedor y otro sin vendedor — ambos renderizan correctamente.
+**Nada que reproducir del lado de legado-holding** — la investigación con
+`wrangler tail`/`DBG-ATRIB-001` ya había descartado correctamente ese lado.
 
 ### PF-1 · `POST /compras` 500 con planes de cuota inicial — **P0, bloqueante** — ✅ cerrado
 Causa real: `subscription_data.add_invoice_items` no es un parámetro válido en la
@@ -308,31 +304,25 @@ lados de la comparación. Verificado en vivo: `GET
 
 ## Abierto
 
-### LH-3 · Confirmar desde el sitio real (navegador) — parcial
-- [x] **API + lógica verificadas** (2026-08-26, agente legado-holding):
-  - Worker → `POST /compras` Selecto (id 3 mensual, id 4 anual) → `200` +
-    `link_de_cobro`, con `atribucion`.
-  - Alma `create_lead` con `?ref=mn4uyc5y` (minúsculas) → prospecto registrado.
-  - Alma handoff con `?ref=MN4UYC5Y` → texto de WhatsApp: *"…Vengo referido/a por
-    ESTEBAN (ref: MN4UYC5Y)."* + stub de atribución (lead `por WhatsApp` con
-    `[Atribución vendedor ...]` en el mensaje) — **bug encontrado y corregido**:
-    el placeholder de `telefono` violaba el tope de 20 chars y el stub fallaba en
-    silencio (commit `9fd9f9e`). Reverificado 201.
-  - Lógica de `js/main.js` (first-touch, TTL 90d, derivación de canal) cargada en
-    Node contra el archivo real → 9/9 (`?ref=` se persiste, un 2º ref distinto no
-    lo pisa, TTL vencido sí, `?ref=` no manda `canal_origen`, UTM social →
-    `redes_sociales`, referrer google → `buscador`).
-- [x] **Pasada en navegador hecha (2026-08-26, usuario):** `?v=9` desplegado,
-  `?ref=MN4UYC5Y` capturado en `localStorage`, tarjeta Selecto abre el wizard y
-  muestra "$35 + $9,47/mes", pago completo con `4242...` → contrato Selecto
-  **activo**. El desglose de Stripe y la primera factura ($44,47) OK.
-- [ ] **PERO: el contrato NO quedó asociado al vendedor** → abierto como **PF-5**
-  (es de Previsión, no de LH — el Worker manda `atribucion.codigo_vendedor`,
-  confirmado por `wrangler tail`). Cerrar LH-3 cuando PF-5 esté resuelto y se
-  reverifique un contrato Selecto con `vendedor_id` = ESTEBAN.
+*(nada abierto de este lado. PF-6 — vista de transacciones por vendedor del lado
+staff — necesita decisión de alcance/prioridad del usuario; no es trabajo de
+legado-holding.)*
 
 ## Cerrado
 
+- [x] **LH-3 · Smoke test end-to-end en navegador** — ✅ cerrado 2026-08-27.
+  - API + lógica: Worker `POST /compras` Selecto (id 3/4, mensual/anual) → 200 con
+    `atribucion`; Alma `create_lead` + handoff con `?ref=` (incl. minúsculas) OK;
+    stub del handoff arreglado (commit `9fd9f9e`, `telefono` >20 chars); lógica de
+    `js/main.js` (first-touch, TTL 90d, canal) 9/9 en Node contra el archivo real.
+  - Navegador (usuario): `?v=9`, `?ref=MN4UYC5Y` capturado en `localStorage`,
+    tarjeta Selecto abre el wizard ("$35 + $9,47/mes"), pago con `4242...` →
+    contrato Selecto activo, 1ª factura $44,47.
+  - "El contrato no mostraba vendedor" → **era gap de UI de Previsión, no de
+    atribución** (PF-5): el dato (`vendedor_id: 1`) estaba bien en D1 y en el
+    contrato #9 desde siempre; el panel de detalle de contrato no lo renderizaba.
+    Arreglado por Previsión (commit `3bfbd79`). Nuestro lado quedó descartado con
+    `wrangler tail` (`atribucion=ref:MN4UYC5Y` sale del Worker). Nada que tocar acá.
 - [x] **LH-1 · Encender `SELECTO_CHECKOUT_ENABLED`** — commit `b986be3` (`?v=8` →
   `?v=9`). Los 4 planes abren el wizard; `WIZARD_ENABLED_SLUGS` + `VALID_PLAN_SLUGS`
   del Worker incluyen los Selecto; `loadPlansFromAPI` lee `cuota_inicial_centavos`
