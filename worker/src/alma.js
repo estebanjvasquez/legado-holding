@@ -481,12 +481,15 @@ function buildWhatsAppText(lang, nombre, necesidad, vendorCode, vendorName) {
 async function registerAttributionStub(env, attribution, nombre, necesidad) {
   if (!attribution || !attribution.codigo_vendedor) return;
   const parts = String(nombre || "").trim().split(/\s+/).filter(Boolean);
-  const nombres   = parts[0] || "Contacto";
-  const apellidos = parts.slice(1).join(" ") || "(vía WhatsApp)";
+  const nombres   = (parts[0] || "Contacto").slice(0, 60);
+  const apellidos = (parts.slice(1).join(" ") || "(por WhatsApp)").slice(0, 60);
   const body = {
+    /* `telefono` en /solicitudes tope 20 chars — el número real llega por
+       WhatsApp, acá va un placeholder corto. El staff concilia este lead
+       contra la conversación real de WhatsApp usando el `mensaje`. */
     nombres,
     apellidos,
-    telefono: "(se recibe por WhatsApp)",
+    telefono: "por WhatsApp",
     mensaje: `[Atribución vendedor ${attribution.codigo_vendedor}] Contacto derivado a WhatsApp por Alma. Necesidad: ${necesidad || "no indicada"}`.slice(0, 500),
     atribucion: attribution,
   };
@@ -536,9 +539,10 @@ async function execHandoffWhatsapp(args, env, lang, attribution) {
 async function execCreateLead(args, env, attribution) {
   const a = args || {};
   const tipo      = a.tipo === "servicio" ? "servicio" : "plan";
-  const nombres   = String(a.nombres || "").trim();
-  const apellidos = String(a.apellidos || "").trim();
-  const telefono  = String(a.telefono || "").trim();
+  /* Topes de la API de /solicitudes: nombres/apellidos ≤60, telefono ≤20. */
+  const nombres   = String(a.nombres || "").trim().slice(0, 60);
+  const apellidos = String(a.apellidos || "").trim().slice(0, 60);
+  const telefono  = String(a.telefono || "").trim().slice(0, 20);
   if (!nombres || !apellidos || !telefono) {
     return { ok: false, error: "Faltan nombres, apellidos o teléfono — pídeselos al usuario de forma natural (no como error técnico) antes de reintentar." };
   }

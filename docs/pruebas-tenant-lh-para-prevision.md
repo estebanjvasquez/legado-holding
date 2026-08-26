@@ -235,25 +235,33 @@ lados de la comparación. Verificado en vivo: `GET
 
 ## Abierto
 
-### LH-1 · Encender `SELECTO_CHECKOUT_ENABLED` — ahora que PF-1 está cerrado
-- [ ] El bug de HTTP 500 en `POST /compras` para planes Selecto ya está resuelto y
-  desplegado en producción (ver PF-1 cerrado arriba, commit `804abbc`,
-  reverificado en vivo con un pago real de punta a punta). Si el flag existe solo
-  por ese bug, ya se puede encender.
-
-### LH-2 · Confirmar `solicitud_id` como string opaco, no id entero
-- [ ] `POST /solicitudes` ahora devuelve `{"ok":true,"solicitud_id":"<string de
-  10 caracteres>"}` en vez de `{"ok":true}`. Si el Worker de LH tiene algún tipo
-  `number`/parseo asumiendo un id entero para este campo, ajustarlo — es un
-  código opaco (ver tabla de arriba), no el id secuencial.
-
-### LH-3 · Confirmar desde el lado del sitio (no solo API cruda)
-- [ ] Todo lo de arriba se verificó pegándole directo a la API con `curl`/token
-  de test, no a través del wizard/flujo real del sitio. Pedimos que
-  `legado-holding` corra su propio smoke test end-to-end (wizard de compra
-  Selecto, formulario de leads con `?ref=`, handoff de Alma) contra estos fixes
-  y marque acá si algo se ve distinto desde su lado.
+### LH-3 · Confirmar desde el sitio real (navegador) — parcial
+- [x] **API + lógica verificadas** (2026-08-26, agente legado-holding):
+  - Worker → `POST /compras` Selecto (id 3 mensual, id 4 anual) → `200` +
+    `link_de_cobro`, con `atribucion`.
+  - Alma `create_lead` con `?ref=mn4uyc5y` (minúsculas) → prospecto registrado.
+  - Alma handoff con `?ref=MN4UYC5Y` → texto de WhatsApp: *"…Vengo referido/a por
+    ESTEBAN (ref: MN4UYC5Y)."* + stub de atribución disparado.
+  - Lógica de `js/main.js` (first-touch, TTL 90d, derivación de canal) cargada en
+    Node contra el archivo real → 9/9 (`?ref=` se persiste, un 2º ref distinto no
+    lo pisa, TTL vencido sí, `?ref=` no manda `canal_origen`, UTM social →
+    `redes_sociales`, referrer google → `buscador`).
+- [ ] **Pendiente: pasada visual en navegador real** (no bloqueante, no
+  automatizable desde acá): que `?v=9` esté desplegado en cPanel, abrir
+  `legadoholding.com?ref=MN4UYC5Y`, confirmar `localStorage.legado_attribution`
+  en DevTools, que la tarjeta Selecto abra el wizard y muestre "**$35 + $9,47/mes**"
+  en pago y resumen, y **un pago completo** con `4242 4242 4242 4242` que deje el
+  contrato Selecto activo con `vendedor_id` = ESTEBAN y la 1ª factura en $44,47.
 
 ## Cerrado
 
-*(nada todavía)*
+- [x] **LH-1 · Encender `SELECTO_CHECKOUT_ENABLED`** — commit `b986be3` (`?v=8` →
+  `?v=9`). Los 4 planes abren el wizard; `WIZARD_ENABLED_SLUGS` + `VALID_PLAN_SLUGS`
+  del Worker incluyen los Selecto; `loadPlansFromAPI` lee `cuota_inicial_centavos`
+  y la muestra. Falta que el usuario redepliegue `?v=9` en cPanel (ver LH-3).
+- [x] **LH-2 · `solicitud_id` string opaco** — nada que cambiar. El Worker
+  (`worker/src/alma.js execCreateLead`) ya lo pasa tal cual
+  (`solicitud_id: resp?.id ?? resp?.solicitud_id ?? null`), sin `Number()` ni
+  parseo, y no lo usa para ninguna operación numérica. Verificado en vivo:
+  `create_lead` devuelve OK con el nuevo shape. Grep de `Number(`/`parseInt` en
+  `worker/src/` no toca este campo.
