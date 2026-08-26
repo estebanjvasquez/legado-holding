@@ -614,6 +614,10 @@ async function loadPlansFromAPI() {
 /* =============================================================================
    STATE — variables de estado global
    ============================================================================= */
+/* Clave localStorage compartida con terminos-condiciones.html y
+   politica-privacidad.html para que esas páginas abran en el mismo idioma
+   que el usuario tenía elegido en el landing. */
+const LANG_STORAGE_KEY = "legado_lang";
 let currentLang = "es";
 let chatMode = "wizard"; // "wizard" | "emergency"
 let chatMessages = [];
@@ -710,6 +714,11 @@ function applyLanguage() {
 function toggleLang() {
   currentLang = currentLang === "es" ? "en" : "es";
   document.documentElement.lang = currentLang;
+  try {
+    localStorage.setItem(LANG_STORAGE_KEY, currentLang);
+  } catch (e) {
+    /* Storage bloqueado (modo privado, etc.) — no es crítico */
+  }
   applyLanguage();
   if (wizardOpen) renderWizardContent();
 
@@ -1931,6 +1940,19 @@ function almaIconHTML() {
    INIT — punto de entrada
    ============================================================================= */
 document.addEventListener("DOMContentLoaded", () => {
+  /* Idioma inicial: preferencia guardada > idioma del navegador > es */
+  try {
+    const saved = localStorage.getItem(LANG_STORAGE_KEY);
+    if (saved === "es" || saved === "en") {
+      currentLang = saved;
+    } else if ((navigator.language || "").toLowerCase().startsWith("en")) {
+      currentLang = "en";
+    }
+  } catch (e) {
+    /* Storage bloqueado — se queda en el default "es" */
+  }
+  document.documentElement.lang = currentLang;
+
   /* Botones de cambio de idioma */
   $$("[data-toggle-lang]").forEach((btn) =>
     btn.addEventListener("click", toggleLang),

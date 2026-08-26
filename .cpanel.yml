@@ -3,4 +3,4 @@ deployment:
   tasks:
     - export DEPLOYPATH=/home/legadoholding/public_html
     - /bin/mkdir -p $DEPLOYPATH
-    - /bin/cp -R index.html gracias.html cancelado.html css js images terminos-condiciones.txt admin $DEPLOYPATH
+    - /bin/cp -R index.html gracias.html cancelado.html css js images terminos-condiciones.html politica-privacidad.html admin $DEPLOYPATH

@@ -97,7 +97,7 @@
              en el edge, independiente de si cPanel ya desplegó el archivo nuevo en
              origin. Sube este número cada vez que cambies css/main.css o js/main.js
              para forzar que el navegador y el edge pidan la versión nueva. -->
-        <link rel="stylesheet" href="css/main.css?v=3" />
+        <link rel="stylesheet" href="css/main.css?v=4" />
 
         <!-- ═══ CONFIGURACIÓN GLOBAL — Webhooks y API Keys ═══ -->
         <script>
@@ -860,8 +860,10 @@
                                 >PROTEGE TU LEGADO AQUÍ</span
                             >
                         </button>
-                        <!-- Botón llamada — EDITAR: cambia el href con tu número real -->
-                        <a href="tel:+18005342361" class="btn-outline-white">
+                        <!-- Botón llamada — EDITAR: cambia el href con tu número real.
+                             Solo visible en móvil (ver .call-btn en css/main.css):
+                             en desktop un enlace tel: no abre un marcador real. -->
+                        <a href="tel:+18005342361" class="btn-outline-white call-btn">
                             <svg
                                 viewBox="0 0 24 24"
                                 fill="none"
@@ -1028,14 +1030,14 @@
                         <h4 class="footer-section-title">Legal</h4>
                         <div class="footer-links">
                             <a
-                                href="terminos-condiciones.txt"
+                                href="terminos-condiciones.html"
                                 target="_blank"
                                 rel="noopener"
                                 data-i18n="footer_terms"
                                 >Términos y condiciones</a
                             >
                             <a
-                                href="politica-privacidad.txt"
+                                href="politica-privacidad.html"
                                 target="_blank"
                                 rel="noopener"
                                 data-i18n="footer_privacy"
@@ -1241,7 +1243,7 @@
                     sitio.</span
                 >
                 <a
-                    href="politica-privacidad.txt"
+                    href="politica-privacidad.html"
                     target="_blank"
                     rel="noopener"
                     data-i18n="cookie_link"
@@ -1278,7 +1280,7 @@
              Vendoreado en js/vendor para evitar dependencia de CDN externo. -->
         <script src="js/vendor/purify.min.js"></script>
         <!-- ?v= cache-busting, ver comentario junto a css/main.css arriba -->
-        <script src="js/main.js?v=5"></script>
+        <script src="js/main.js?v=6"></script>
         <script src="js/wizard-generic.js?v=1"></script>
     </body>
 </html>

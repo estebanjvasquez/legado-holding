@@ -1,0 +1,769 @@
+<!doctype html>
+<html lang="es">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title data-i18n-title>Términos y Condiciones — LEGADO</title>
+        <meta name="robots" content="noindex" />
+        <link rel="icon" type="image/png" href="images/LogoLegado.png" />
+        <link
+            rel="stylesheet"
+            href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;1,14..32,400&display=swap"
+        />
+        <style>
+            :root {
+                --navy: #263c5b;
+                --navy-light: #3a5581;
+                --gold: #c9a84c;
+                --ink: #17243a;
+                --muted: #6b7280;
+                --border: #e5e7eb;
+                --warm-white: #f3f2ee;
+                --radius: 0.75rem;
+            }
+            * {
+                box-sizing: border-box;
+            }
+            body {
+                margin: 0;
+                font-family: "Inter", Arial, sans-serif;
+                color: var(--ink);
+                background: #ffffff;
+                line-height: 1.65;
+                -webkit-font-smoothing: antialiased;
+            }
+            a {
+                color: var(--navy);
+            }
+            .container {
+                max-width: 860px;
+                margin: 0 auto;
+                padding: 0 1.25rem;
+            }
+
+            /* ── Header ── */
+            header {
+                border-bottom: 1px solid var(--border);
+                background: #ffffff;
+                position: sticky;
+                top: 0;
+                z-index: 10;
+            }
+            .header-inner {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 1.1rem 0;
+            }
+            .logo {
+                font-family: "Inter", Arial, sans-serif;
+                font-weight: 700;
+                font-size: 1.4rem;
+                letter-spacing: 0.02em;
+                color: var(--navy);
+                text-decoration: none;
+            }
+            .header-actions {
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+            }
+            .back-link {
+                font-size: 0.9rem;
+                font-weight: 600;
+                color: var(--navy);
+                text-decoration: none;
+                display: inline-flex;
+                align-items: center;
+                gap: 0.35rem;
+            }
+            .back-link:hover {
+                text-decoration: underline;
+            }
+            .lang-btn {
+                border: 1.5px solid var(--navy);
+                color: var(--navy);
+                background: none;
+                font-family: inherit;
+                font-weight: 700;
+                font-size: 0.8rem;
+                letter-spacing: 0.03em;
+                border-radius: 999px;
+                padding: 0.4rem 0.9rem;
+                cursor: pointer;
+            }
+            .lang-btn:hover {
+                background: var(--navy);
+                color: #fff;
+            }
+
+            /* ── Hero ── */
+            .doc-hero {
+                background: linear-gradient(180deg, #faf8f5 0%, #f0ede6 100%);
+                padding: 3rem 0 2.25rem;
+                border-bottom: 1px solid var(--border);
+            }
+            .doc-hero h1 {
+                font-size: clamp(1.7rem, 3vw, 2.3rem);
+                color: var(--navy);
+                margin: 0 0 0.5rem;
+            }
+            .doc-hero .updated {
+                color: var(--muted);
+                font-size: 0.9rem;
+            }
+
+            /* ── Content ── */
+            main {
+                padding: 2.5rem 0 4rem;
+            }
+            section.clause {
+                margin-bottom: 2.25rem;
+            }
+            section.clause h2 {
+                font-size: 1.15rem;
+                color: var(--navy);
+                margin: 0 0 0.75rem;
+                padding-bottom: 0.5rem;
+                border-bottom: 2px solid var(--gold);
+                display: inline-block;
+            }
+            section.clause p {
+                margin: 0 0 0.85rem;
+            }
+            section.clause ul {
+                margin: 0 0 0.85rem;
+                padding-left: 1.25rem;
+            }
+            section.clause li {
+                margin-bottom: 0.4rem;
+            }
+            .note {
+                background: var(--warm-white);
+                border-left: 3px solid var(--gold);
+                border-radius: 0.4rem;
+                padding: 0.9rem 1.1rem;
+                font-size: 0.92rem;
+                color: var(--ink);
+            }
+            [lang-block] {
+                display: none;
+            }
+            [lang-block].active {
+                display: block;
+            }
+
+            /* ── Footer ── */
+            footer {
+                border-top: 1px solid var(--border);
+                background: var(--warm-white);
+                padding: 2rem 0;
+            }
+            .footer-inner {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.5rem 1.5rem;
+                align-items: center;
+                justify-content: space-between;
+                font-size: 0.85rem;
+                color: var(--muted);
+            }
+            .footer-links {
+                display: flex;
+                gap: 1.25rem;
+                flex-wrap: wrap;
+            }
+            .footer-links a {
+                color: var(--muted);
+                text-decoration: none;
+                font-weight: 600;
+            }
+            .footer-links a:hover {
+                color: var(--navy);
+            }
+
+            @media (max-width: 600px) {
+                .header-inner {
+                    flex-wrap: wrap;
+                    gap: 0.75rem;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <div class="container header-inner">
+                <a href="index.html" class="logo">LEGADO</a>
+                <div class="header-actions">
+                    <a href="index.html" class="back-link" id="back-link">
+                        <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <line x1="19" y1="12" x2="5" y2="12" />
+                            <polyline points="12 19 5 12 12 5" />
+                        </svg>
+                        <span id="back-link-text">Volver al inicio</span>
+                    </a>
+                    <button class="lang-btn" id="lang-toggle" type="button">EN</button>
+                </div>
+            </div>
+        </header>
+
+        <div class="doc-hero">
+            <div class="container">
+                <h1 id="doc-title">Términos y Condiciones</h1>
+                <p class="updated" id="doc-updated">
+                    Última actualización: 26 de agosto de 2026
+                </p>
+            </div>
+        </div>
+
+        <main class="container">
+            <!-- ═══════════════════════════ ESPAÑOL ═══════════════════════════ -->
+            <div lang-block="es" class="active">
+                <p>
+                    Bienvenido(a) a LEGADO (LEGADO HOLDING). Estos Términos y
+                    Condiciones ("Términos") rigen el uso del sitio
+                    legadoholding.com y la contratación de nuestros planes de
+                    previsión funeraria. Al usar el sitio o contratar un plan,
+                    aceptas estos Términos.
+                </p>
+
+                <section class="clause">
+                    <h2>1. Descripción del servicio</h2>
+                    <p>
+                        LEGADO ofrece planes de previsión funeraria digital
+                        dirigidos a personas en Estados Unidos que desean
+                        cubrir, por adelantado, los servicios funerarios de
+                        familiares designados ubicados en Venezuela. La
+                        ejecución del servicio funerario se coordina con
+                        funerarias aliadas en Venezuela (por ejemplo, Funeraria
+                        del Zulia) al momento en que ocurra el fallecimiento.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>2. Definiciones</h2>
+                    <ul>
+                        <li>
+                            <strong>Cliente / Titular:</strong> la persona que
+                            contrata el plan y realiza los pagos.
+                        </li>
+                        <li>
+                            <strong>Familiar designado:</strong> la(s)
+                            persona(s) en Venezuela que recibirán el servicio
+                            funerario cubierto por el plan.
+                        </li>
+                        <li>
+                            <strong>Plan:</strong> el paquete de servicios
+                            seleccionado por el Cliente en el sitio.
+                        </li>
+                        <li>
+                            <strong>Aliado / funeraria aliada:</strong> la
+                            empresa funeraria en Venezuela que ejecuta el
+                            servicio contratado.
+                        </li>
+                    </ul>
+                </section>
+
+                <section class="clause">
+                    <h2>3. Elegibilidad y límite de edad</h2>
+                    <p>
+                        Los familiares designados deben tener, como máximo, 65
+                        años al momento del registro, salvo aprobación especial
+                        de la Empresa. El Cliente debe ser mayor de edad y
+                        proporcionar información veraz sobre sí mismo y sobre
+                        los familiares designados.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>4. Planes, precios y pago</h2>
+                    <ul>
+                        <li>
+                            El Cliente puede elegir entre pago mensual o pago
+                            anual, según el plan disponible.
+                        </li>
+                        <li>
+                            El pago mensual puede incluir una cuota inicial más
+                            pagos recurrentes; el pago anual puede incluir un
+                            descuento por pago anticipado, según la promoción
+                            vigente.
+                        </li>
+                        <li>Los precios se muestran en dólares estadounidenses (USD).</li>
+                        <li>
+                            Los pagos con tarjeta de crédito/débito se
+                            procesan a través de Stripe, un proveedor externo
+                            de pagos. LEGADO no almacena el número completo de
+                            tu tarjeta.
+                        </li>
+                        <li>
+                            Algunos planes ("Selecto") requieren una cuota
+                            inicial que actualmente se coordina de forma
+                            manual con un asesor y no a través del checkout
+                            digital del sitio.
+                        </li>
+                    </ul>
+                </section>
+
+                <section class="clause">
+                    <h2>5. Vigencia, cancelación y terminación</h2>
+                    <ul>
+                        <li>El contrato entra en vigencia al realizar el primer pago.</li>
+                        <li>
+                            El Cliente puede cancelar en cualquier momento
+                            notificando a soporte@legadoholding.com, con al
+                            menos 30 días de aviso previo a la siguiente
+                            fecha de cobro.
+                        </li>
+                        <li>
+                            Si el Cliente incumple el pago por más de 30 días,
+                            el servicio puede ser suspendido hasta regularizar
+                            la situación.
+                        </li>
+                    </ul>
+                </section>
+
+                <section class="clause">
+                    <h2>6. Política de reembolso</h2>
+                    <p>
+                        Salvo que la ley aplicable disponga lo contrario, los
+                        pagos ya realizados no son reembolsables. Si eres
+                        consumidor dentro de la Unión Europea o del Espacio
+                        Económico Europeo, esta cláusula no limita ningún
+                        derecho de reembolso o desistimiento que te
+                        corresponda de forma imperativa según la normativa de
+                        protección al consumidor de tu país de residencia
+                        (ver sección 13).
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>7. Exclusiones</h2>
+                    <p>No están cubiertos por el plan, salvo que se indique expresamente:</p>
+                    <ul>
+                        <li>Servicios no especificados en el plan seleccionado.</li>
+                        <li>Servicios adicionales solicitados por la familia fuera del plan.</li>
+                        <li>Costos de exhumación o reinhumación, si aplica.</li>
+                        <li>Traslados internacionales especiales.</li>
+                    </ul>
+                </section>
+
+                <section class="clause">
+                    <h2>8. Responsabilidades de las partes</h2>
+                    <ul>
+                        <li>
+                            LEGADO se compromete a coordinar los servicios
+                            descritos en el plan de forma profesional, a
+                            través de funerarias aliadas en Venezuela.
+                        </li>
+                        <li>
+                            El Cliente se compromete a mantener actualizados
+                            sus datos de contacto, pago y los de los familiares
+                            designados.
+                        </li>
+                        <li>
+                            LEGADO actúa como intermediario/coordinador; la
+                            prestación material del servicio funerario la
+                            ejecuta la funeraria aliada correspondiente.
+                        </li>
+                    </ul>
+                </section>
+
+                <section class="clause">
+                    <h2>9. Propiedad intelectual y uso del sitio</h2>
+                    <p>
+                        El contenido del sitio (textos, marca, logotipos,
+                        diseño) es propiedad de LEGADO HOLDING o de sus
+                        licenciantes. No está permitido reproducirlo,
+                        distribuirlo o usarlo con fines comerciales sin
+                        autorización previa por escrito.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>10. Limitación de responsabilidad</h2>
+                    <p>
+                        En la medida máxima permitida por la ley, LEGADO no
+                        será responsable por daños indirectos, incidentales o
+                        consecuentes derivados del uso del sitio o del
+                        servicio. Nada en estos Términos excluye o limita la
+                        responsabilidad que no pueda excluirse o limitarse
+                        conforme a la ley aplicable (por ejemplo, en caso de
+                        dolo o negligencia grave).
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>11. Protección de datos</h2>
+                    <p>
+                        El tratamiento de tus datos personales se describe en
+                        nuestra
+                        <a href="politica-privacidad.html" id="link-privacy-1"
+                            >Política de Privacidad</a
+                        >, que forma parte integral de estos Términos.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>12. Ley aplicable y resolución de disputas</h2>
+                    <p>
+                        Estos Términos se rigen por las leyes del Estado de
+                        Florida, Estados Unidos, sin perjuicio de sus normas
+                        sobre conflicto de leyes.
+                    </p>
+                    <div class="note">
+                        Si resides en la Unión Europea o el Espacio Económico
+                        Europeo, esta elección de ley no te priva de la
+                        protección que te otorguen las disposiciones
+                        imperativas de la ley de tu país de residencia
+                        habitual, ni te impide acudir a los tribunales de tu
+                        país o al mecanismo de resolución de litigios en
+                        línea de la Comisión Europea cuando corresponda.
+                    </div>
+                </section>
+
+                <section class="clause">
+                    <h2>13. Modificaciones a estos Términos</h2>
+                    <p>
+                        Podemos actualizar estos Términos ocasionalmente. Los
+                        cambios materiales se comunicarán con al menos 30
+                        días de anticipación y se publicarán en esta misma
+                        página con una nueva fecha de "última actualización".
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>14. Divisibilidad</h2>
+                    <p>
+                        Si alguna disposición de estos Términos resulta
+                        inválida o inaplicable, las demás disposiciones
+                        continuarán vigentes.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>15. Contacto</h2>
+                    <p>
+                        LEGADO HOLDING<br />
+                        Correo: <a href="mailto:soporte@legadoholding.com">soporte@legadoholding.com</a>
+                    </p>
+                </section>
+            </div>
+
+            <!-- ═══════════════════════════ ENGLISH ═══════════════════════════ -->
+            <div lang-block="en">
+                <p>
+                    Welcome to LEGADO (LEGADO HOLDING). These Terms and
+                    Conditions ("Terms") govern the use of the
+                    legadoholding.com website and the purchase of our funeral
+                    pre-planning plans. By using the site or purchasing a
+                    plan, you accept these Terms.
+                </p>
+
+                <section class="clause">
+                    <h2>1. Description of the service</h2>
+                    <p>
+                        LEGADO offers digital funeral pre-planning plans for
+                        people in the United States who want to pre-fund
+                        funeral services for designated family members located
+                        in Venezuela. The funeral service itself is
+                        coordinated with partner funeral homes in Venezuela
+                        (for example, Funeraria del Zulia) at the time the
+                        death occurs.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>2. Definitions</h2>
+                    <ul>
+                        <li>
+                            <strong>Customer / Policyholder:</strong> the
+                            person who purchases the plan and makes payments.
+                        </li>
+                        <li>
+                            <strong>Designated family member:</strong> the
+                            person(s) in Venezuela who will receive the
+                            funeral service covered by the plan.
+                        </li>
+                        <li>
+                            <strong>Plan:</strong> the service package
+                            selected by the Customer on the site.
+                        </li>
+                        <li>
+                            <strong>Partner funeral home:</strong> the funeral
+                            company in Venezuela that carries out the
+                            contracted service.
+                        </li>
+                    </ul>
+                </section>
+
+                <section class="clause">
+                    <h2>3. Eligibility and age limit</h2>
+                    <p>
+                        Designated family members must be a maximum of 65
+                        years old at the time of registration, unless the
+                        Company grants a special exception. The Customer must
+                        be an adult and provide accurate information about
+                        themselves and the designated family members.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>4. Plans, pricing and payment</h2>
+                    <ul>
+                        <li>
+                            The Customer may choose between monthly or annual
+                            payment, depending on the available plan.
+                        </li>
+                        <li>
+                            Monthly payment may include an initial fee plus
+                            recurring payments; annual payment may include a
+                            discount for early payment, per the current
+                            promotion.
+                        </li>
+                        <li>Prices are shown in United States dollars (USD).</li>
+                        <li>
+                            Credit/debit card payments are processed through
+                            Stripe, a third-party payment provider. LEGADO
+                            does not store your full card number.
+                        </li>
+                        <li>
+                            Some plans ("Selecto") require an initial fee that
+                            is currently coordinated manually with an advisor
+                            rather than through the site's digital checkout.
+                        </li>
+                    </ul>
+                </section>
+
+                <section class="clause">
+                    <h2>5. Term, cancellation and termination</h2>
+                    <ul>
+                        <li>The contract becomes effective upon the first payment.</li>
+                        <li>
+                            The Customer may cancel at any time by notifying
+                            soporte@legadoholding.com, with at least 30 days'
+                            notice before the next billing date.
+                        </li>
+                        <li>
+                            If the Customer defaults on payment for more than
+                            30 days, the service may be suspended until the
+                            situation is resolved.
+                        </li>
+                    </ul>
+                </section>
+
+                <section class="clause">
+                    <h2>6. Refund policy</h2>
+                    <p>
+                        Unless applicable law provides otherwise, payments
+                        already made are non-refundable. If you are a consumer
+                        in the European Union or the European Economic Area,
+                        this clause does not limit any refund or withdrawal
+                        right you are mandatorily entitled to under the
+                        consumer-protection law of your country of residence
+                        (see section 13).
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>7. Exclusions</h2>
+                    <p>The following are not covered by the plan unless expressly stated:</p>
+                    <ul>
+                        <li>Services not specified in the selected plan.</li>
+                        <li>Additional services requested by the family outside the plan.</li>
+                        <li>Exhumation or reburial costs, if applicable.</li>
+                        <li>Special international transfers.</li>
+                    </ul>
+                </section>
+
+                <section class="clause">
+                    <h2>8. Responsibilities of the parties</h2>
+                    <ul>
+                        <li>
+                            LEGADO commits to coordinating the services
+                            described in the plan professionally, through
+                            partner funeral homes in Venezuela.
+                        </li>
+                        <li>
+                            The Customer commits to keeping their contact and
+                            payment information, and that of the designated
+                            family members, up to date.
+                        </li>
+                        <li>
+                            LEGADO acts as intermediary/coordinator; the
+                            actual funeral service is carried out by the
+                            corresponding partner funeral home.
+                        </li>
+                    </ul>
+                </section>
+
+                <section class="clause">
+                    <h2>9. Intellectual property and use of the site</h2>
+                    <p>
+                        The content of the site (text, brand, logos, design)
+                        is owned by LEGADO HOLDING or its licensors. You may
+                        not reproduce, distribute, or use it for commercial
+                        purposes without prior written authorization.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>10. Limitation of liability</h2>
+                    <p>
+                        To the maximum extent permitted by law, LEGADO will
+                        not be liable for indirect, incidental, or
+                        consequential damages arising from use of the site or
+                        the service. Nothing in these Terms excludes or limits
+                        liability that cannot be excluded or limited under
+                        applicable law (for example, in cases of fraud or
+                        gross negligence).
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>11. Data protection</h2>
+                    <p>
+                        The processing of your personal data is described in
+                        our
+                        <a href="politica-privacidad.html" id="link-privacy-2"
+                            >Privacy Policy</a
+                        >, which forms an integral part of these Terms.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>12. Governing law and dispute resolution</h2>
+                    <p>
+                        These Terms are governed by the laws of the State of
+                        Florida, United States, without regard to its
+                        conflict-of-laws principles.
+                    </p>
+                    <div class="note">
+                        If you reside in the European Union or the European
+                        Economic Area, this choice of law does not deprive you
+                        of the protection afforded by the mandatory provisions
+                        of the law of your habitual country of residence, and
+                        does not prevent you from bringing proceedings before
+                        the courts of your own country or from using the
+                        European Commission's online dispute resolution
+                        platform where applicable.
+                    </div>
+                </section>
+
+                <section class="clause">
+                    <h2>13. Changes to these Terms</h2>
+                    <p>
+                        We may update these Terms from time to time. Material
+                        changes will be communicated at least 30 days in
+                        advance and posted on this same page with a new "last
+                        updated" date.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>14. Severability</h2>
+                    <p>
+                        If any provision of these Terms is found invalid or
+                        unenforceable, the remaining provisions will remain in
+                        full force and effect.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>15. Contact</h2>
+                    <p>
+                        LEGADO HOLDING<br />
+                        Email: <a href="mailto:soporte@legadoholding.com">soporte@legadoholding.com</a>
+                    </p>
+                </section>
+            </div>
+        </main>
+
+        <footer>
+            <div class="container footer-inner">
+                <span id="footer-copy">© 2026 Legado. Todos los derechos reservados.</span>
+                <div class="footer-links">
+                    <a href="index.html" id="footer-home">Inicio</a>
+                    <a href="politica-privacidad.html" id="footer-privacy">Política de privacidad</a>
+                    <a href="mailto:soporte@legadoholding.com">soporte@legadoholding.com</a>
+                </div>
+            </div>
+        </footer>
+
+        <script>
+            (function () {
+                var LANG_KEY = "legado_lang";
+                var TEXT = {
+                    es: {
+                        title: "Términos y Condiciones — LEGADO",
+                        heading: "Términos y Condiciones",
+                        updated: "Última actualización: 26 de agosto de 2026",
+                        back: "Volver al inicio",
+                        toggle: "EN",
+                        footerCopy: "© 2026 Legado. Todos los derechos reservados.",
+                        footerHome: "Inicio",
+                        footerPrivacy: "Política de privacidad",
+                        htmlLang: "es",
+                    },
+                    en: {
+                        title: "Terms and Conditions — LEGADO",
+                        heading: "Terms and Conditions",
+                        updated: "Last updated: August 26, 2026",
+                        back: "Back to home",
+                        toggle: "ES",
+                        footerCopy: "© 2026 Legado. All rights reserved.",
+                        footerHome: "Home",
+                        footerPrivacy: "Privacy policy",
+                        htmlLang: "en",
+                    },
+                };
+
+                function getInitialLang() {
+                    try {
+                        var saved = localStorage.getItem(LANG_KEY);
+                        if (saved === "es" || saved === "en") return saved;
+                    } catch (e) {}
+                    return (navigator.language || "").toLowerCase().indexOf("en") === 0
+                        ? "en"
+                        : "es";
+                }
+
+                function applyLang(lang) {
+                    var t = TEXT[lang];
+                    document.documentElement.lang = t.htmlLang;
+                    document.title = t.title;
+                    document.getElementById("doc-title").textContent = t.heading;
+                    document.getElementById("doc-updated").textContent = t.updated;
+                    document.getElementById("back-link-text").textContent = t.back;
+                    document.getElementById("lang-toggle").textContent = t.toggle;
+                    document.getElementById("footer-copy").textContent = t.footerCopy;
+                    document.getElementById("footer-home").textContent = t.footerHome;
+                    document.getElementById("footer-privacy").textContent = t.footerPrivacy;
+
+                    document.querySelectorAll("[lang-block]").forEach(function (el) {
+                        el.classList.toggle("active", el.getAttribute("lang-block") === lang);
+                    });
+                }
+
+                var currentLang = getInitialLang();
+                applyLang(currentLang);
+
+                document.getElementById("lang-toggle").addEventListener("click", function () {
+                    currentLang = currentLang === "es" ? "en" : "es";
+                    try {
+                        localStorage.setItem(LANG_KEY, currentLang);
+                    } catch (e) {}
+                    applyLang(currentLang);
+                });
+            })();
+        </script>
+    </body>
+</html>

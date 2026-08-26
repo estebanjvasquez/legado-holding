@@ -480,6 +480,22 @@ select {
     height: 20px;
 }
 
+/* Botón "Llámanos" (enlace tel:) — solo tiene sentido en un dispositivo que
+   pueda lanzar una app de marcado real, así que se oculta en desktop y
+   aparece únicamente en la versión móvil del sitio. No existe una forma
+   fiable de detectar mediante cookies si el usuario de escritorio tiene una
+   app de llamadas instalada (las cookies son almacenamiento del sitio, no
+   una API de integración con el sistema operativo), así que usamos el mismo
+   breakpoint móvil que el resto del sitio. */
+.call-btn {
+    display: none;
+}
+@media (max-width: 767px) {
+    .call-btn {
+        display: inline-flex;
+    }
+}
+
 /* =============================================================================
    WIZARD INFO / ERROR / PROCESSING STYLES
    ============================================================================= */

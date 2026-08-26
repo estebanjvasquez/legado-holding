@@ -1,0 +1,766 @@
+<!doctype html>
+<html lang="es">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title data-i18n-title>Política de Privacidad — LEGADO</title>
+        <meta name="robots" content="noindex" />
+        <link rel="icon" type="image/png" href="images/LogoLegado.png" />
+        <link
+            rel="stylesheet"
+            href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;1,14..32,400&display=swap"
+        />
+        <style>
+            :root {
+                --navy: #263c5b;
+                --navy-light: #3a5581;
+                --gold: #c9a84c;
+                --ink: #17243a;
+                --muted: #6b7280;
+                --border: #e5e7eb;
+                --warm-white: #f3f2ee;
+                --radius: 0.75rem;
+            }
+            * {
+                box-sizing: border-box;
+            }
+            body {
+                margin: 0;
+                font-family: "Inter", Arial, sans-serif;
+                color: var(--ink);
+                background: #ffffff;
+                line-height: 1.65;
+                -webkit-font-smoothing: antialiased;
+            }
+            a {
+                color: var(--navy);
+            }
+            .container {
+                max-width: 860px;
+                margin: 0 auto;
+                padding: 0 1.25rem;
+            }
+
+            /* ── Header ── */
+            header {
+                border-bottom: 1px solid var(--border);
+                background: #ffffff;
+                position: sticky;
+                top: 0;
+                z-index: 10;
+            }
+            .header-inner {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 1.1rem 0;
+            }
+            .logo {
+                font-family: "Inter", Arial, sans-serif;
+                font-weight: 700;
+                font-size: 1.4rem;
+                letter-spacing: 0.02em;
+                color: var(--navy);
+                text-decoration: none;
+            }
+            .header-actions {
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+            }
+            .back-link {
+                font-size: 0.9rem;
+                font-weight: 600;
+                color: var(--navy);
+                text-decoration: none;
+                display: inline-flex;
+                align-items: center;
+                gap: 0.35rem;
+            }
+            .back-link:hover {
+                text-decoration: underline;
+            }
+            .lang-btn {
+                border: 1.5px solid var(--navy);
+                color: var(--navy);
+                background: none;
+                font-family: inherit;
+                font-weight: 700;
+                font-size: 0.8rem;
+                letter-spacing: 0.03em;
+                border-radius: 999px;
+                padding: 0.4rem 0.9rem;
+                cursor: pointer;
+            }
+            .lang-btn:hover {
+                background: var(--navy);
+                color: #fff;
+            }
+
+            /* ── Hero ── */
+            .doc-hero {
+                background: linear-gradient(180deg, #faf8f5 0%, #f0ede6 100%);
+                padding: 3rem 0 2.25rem;
+                border-bottom: 1px solid var(--border);
+            }
+            .doc-hero h1 {
+                font-size: clamp(1.7rem, 3vw, 2.3rem);
+                color: var(--navy);
+                margin: 0 0 0.5rem;
+            }
+            .doc-hero .updated {
+                color: var(--muted);
+                font-size: 0.9rem;
+            }
+
+            /* ── Content ── */
+            main {
+                padding: 2.5rem 0 4rem;
+            }
+            section.clause {
+                margin-bottom: 2.25rem;
+            }
+            section.clause h2 {
+                font-size: 1.15rem;
+                color: var(--navy);
+                margin: 0 0 0.75rem;
+                padding-bottom: 0.5rem;
+                border-bottom: 2px solid var(--gold);
+                display: inline-block;
+            }
+            section.clause p {
+                margin: 0 0 0.85rem;
+            }
+            section.clause ul {
+                margin: 0 0 0.85rem;
+                padding-left: 1.25rem;
+            }
+            section.clause li {
+                margin-bottom: 0.4rem;
+            }
+            .note {
+                background: var(--warm-white);
+                border-left: 3px solid var(--gold);
+                border-radius: 0.4rem;
+                padding: 0.9rem 1.1rem;
+                font-size: 0.92rem;
+                color: var(--ink);
+            }
+            [lang-block] {
+                display: none;
+            }
+            [lang-block].active {
+                display: block;
+            }
+
+            /* ── Footer ── */
+            footer {
+                border-top: 1px solid var(--border);
+                background: var(--warm-white);
+                padding: 2rem 0;
+            }
+            .footer-inner {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.5rem 1.5rem;
+                align-items: center;
+                justify-content: space-between;
+                font-size: 0.85rem;
+                color: var(--muted);
+            }
+            .footer-links {
+                display: flex;
+                gap: 1.25rem;
+                flex-wrap: wrap;
+            }
+            .footer-links a {
+                color: var(--muted);
+                text-decoration: none;
+                font-weight: 600;
+            }
+            .footer-links a:hover {
+                color: var(--navy);
+            }
+
+            @media (max-width: 600px) {
+                .header-inner {
+                    flex-wrap: wrap;
+                    gap: 0.75rem;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <div class="container header-inner">
+                <a href="index.html" class="logo">LEGADO</a>
+                <div class="header-actions">
+                    <a href="index.html" class="back-link" id="back-link">
+                        <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <line x1="19" y1="12" x2="5" y2="12" />
+                            <polyline points="12 19 5 12 12 5" />
+                        </svg>
+                        <span id="back-link-text">Volver al inicio</span>
+                    </a>
+                    <button class="lang-btn" id="lang-toggle" type="button">EN</button>
+                </div>
+            </div>
+        </header>
+
+        <div class="doc-hero">
+            <div class="container">
+                <h1 id="doc-title">Política de Privacidad</h1>
+                <p class="updated" id="doc-updated">
+                    Última actualización: 26 de agosto de 2026
+                </p>
+            </div>
+        </div>
+
+        <main class="container">
+            <!-- ═══════════════════════════ ESPAÑOL ═══════════════════════════ -->
+            <div lang-block="es" class="active">
+                <p>
+                    Esta Política de Privacidad explica qué datos personales
+                    recopila LEGADO HOLDING ("LEGADO", "nosotros") a través de
+                    legadoholding.com, para qué los usamos, con quién los
+                    compartimos y qué derechos tienes sobre ellos, incluyendo
+                    los derechos que te corresponden bajo el Reglamento
+                    General de Protección de Datos de la Unión Europea
+                    ("RGPD") y bajo leyes de privacidad de Estados Unidos
+                    como la California Consumer Privacy Act ("CCPA/CPRA").
+                </p>
+
+                <section class="clause">
+                    <h2>1. Quiénes somos</h2>
+                    <p>
+                        LEGADO HOLDING es el responsable del tratamiento de
+                        los datos personales recopilados a través de este
+                        sitio. Puedes contactarnos para cualquier consulta
+                        sobre privacidad en
+                        <a href="mailto:soporte@legadoholding.com">soporte@legadoholding.com</a>.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>2. Qué datos recopilamos</h2>
+                    <p>Cuando contratas un plan, usas el chat o nos contactas, podemos recopilar:</p>
+                    <ul>
+                        <li>
+                            <strong>Datos del Cliente/titular:</strong>
+                            nombre, correo electrónico, teléfono y datos de
+                            pago.
+                        </li>
+                        <li>
+                            <strong>Datos de familiares designados:</strong>
+                            nombre, parentesco y la información necesaria
+                            para identificar al beneficiario del servicio en
+                            Venezuela.
+                        </li>
+                        <li>
+                            <strong>Datos de navegación:</strong> páginas
+                            visitadas e interacciones con el sitio,
+                            recopilados mediante Google Analytics solo tras tu
+                            consentimiento (ver sección 6).
+                        </li>
+                        <li>
+                            <strong>Conversaciones con Alma</strong>, nuestro
+                            asistente virtual, si decides usar el chat.
+                        </li>
+                    </ul>
+                    <p>
+                        Los datos de pago (tarjeta de crédito/débito) son
+                        procesados directamente por Stripe y por la
+                        plataforma de Previsión Funeraria que administra los
+                        planes; LEGADO no almacena el número completo de tu
+                        tarjeta en sus propios sistemas.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>3. Base legal y finalidad del tratamiento</h2>
+                    <p>Tratamos tus datos personales sobre las siguientes bases legales:</p>
+                    <ul>
+                        <li>
+                            <strong>Ejecución de un contrato:</strong> para
+                            gestionar tu plan de previsión funeraria,
+                            coordinar el servicio con funerarias aliadas y
+                            procesar tus pagos.
+                        </li>
+                        <li>
+                            <strong>Consentimiento:</strong> para las cookies
+                            de analítica y para tus conversaciones con Alma.
+                        </li>
+                        <li>
+                            <strong>Interés legítimo:</strong> para responder
+                            consultas de soporte, prevenir fraude y mejorar la
+                            seguridad del sitio.
+                        </li>
+                        <li>
+                            <strong>Obligación legal:</strong> cuando debamos
+                            conservar registros por razones contables o
+                            fiscales.
+                        </li>
+                    </ul>
+                </section>
+
+                <section class="clause">
+                    <h2>4. Cómo usamos tus datos</h2>
+                    <ul>
+                        <li>Gestionar tu contrato y coordinar el servicio funerario cuando sea necesario.</li>
+                        <li>Procesar pagos y enviarte confirmaciones y recibos.</li>
+                        <li>Responder tus consultas de soporte y contacto.</li>
+                        <li>Entender el uso del sitio y mejorar la experiencia (analítica, con consentimiento).</li>
+                        <li>Registrar tu solicitud como prospecto si nos dejas tus datos sin contratar de inmediato.</li>
+                    </ul>
+                </section>
+
+                <section class="clause">
+                    <h2>5. Con quién compartimos tus datos</h2>
+                    <p>No vendemos tus datos personales. Los compartimos únicamente con:</p>
+                    <ul>
+                        <li>Stripe, para procesar pagos con tarjeta.</li>
+                        <li>
+                            La plataforma de Previsión Funeraria (Cloudflare
+                            Workers/D1) que administra los planes y contratos.
+                        </li>
+                        <li>
+                            Funerarias aliadas en Venezuela (p. ej. Funeraria
+                            del Zulia), solo lo necesario para prestar el
+                            servicio contratado al familiar designado.
+                        </li>
+                        <li>OpenAI, como proveedor del modelo de lenguaje que impulsa a Alma, nuestro asistente virtual.</li>
+                        <li>Google Analytics, de forma agregada y con tu consentimiento previo.</li>
+                    </ul>
+                    <p>
+                        Estos terceros actúan como encargados del tratamiento
+                        o proveedores independientes y solo reciben los datos
+                        estrictamente necesarios para prestar su servicio.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>6. Cookies y analítica</h2>
+                    <p>
+                        Usamos Google Analytics (GA4) para entender cómo se
+                        usa el sitio. Estas cookies no son esenciales para el
+                        funcionamiento del sitio y solo se activan después de
+                        que aceptas el banner de cookies que aparece en tu
+                        primera visita. Puedes cambiar tu decisión en
+                        cualquier momento borrando las cookies del sitio
+                        desde la configuración de tu navegador.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>7. Transferencias internacionales de datos</h2>
+                    <p>
+                        LEGADO opera desde Estados Unidos y coordina servicios
+                        con funerarias en Venezuela. Si accedes al sitio
+                        desde la Unión Europea o el Espacio Económico Europeo,
+                        tus datos pueden transferirse a Estados Unidos y a
+                        Venezuela. Cuando aplique, usamos las salvaguardas
+                        exigidas por el RGPD (por ejemplo, cláusulas
+                        contractuales tipo con nuestros proveedores) para
+                        proteger esas transferencias.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>8. Retención de datos</h2>
+                    <p>
+                        Conservamos los datos del contrato mientras el plan
+                        esté activo y durante el tiempo adicional requerido
+                        por obligaciones legales o contables. Los datos de
+                        navegación se conservan según la configuración por
+                        defecto de Google Analytics. Los datos de un
+                        prospecto que no llegó a contratar se conservan hasta
+                        que solicites su eliminación o durante un período
+                        razonable de seguimiento comercial.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>9. Tus derechos</h2>
+                    <p><strong>Si resides en la Unión Europea / Espacio Económico Europeo (RGPD):</strong></p>
+                    <ul>
+                        <li>Derecho de acceso a tus datos personales.</li>
+                        <li>Derecho de rectificación de datos inexactos.</li>
+                        <li>Derecho de supresión ("derecho al olvido").</li>
+                        <li>Derecho a la limitación del tratamiento.</li>
+                        <li>Derecho a la portabilidad de tus datos.</li>
+                        <li>Derecho de oposición al tratamiento.</li>
+                        <li>Derecho a retirar tu consentimiento en cualquier momento, sin afectar la licitud del tratamiento previo.</li>
+                        <li>Derecho a presentar una reclamación ante la autoridad de protección de datos de tu país de residencia.</li>
+                    </ul>
+                    <p><strong>Si resides en California, Estados Unidos (CCPA/CPRA):</strong></p>
+                    <ul>
+                        <li>Derecho a saber qué datos personales recopilamos, usamos y compartimos.</li>
+                        <li>Derecho a solicitar la eliminación de tus datos personales.</li>
+                        <li>Derecho a corregir datos personales inexactos.</li>
+                        <li>Derecho a optar por no vender ni compartir tus datos personales (LEGADO no vende ni comparte datos personales para publicidad).</li>
+                        <li>Derecho a no recibir trato discriminatorio por ejercer tus derechos de privacidad.</li>
+                    </ul>
+                    <p>
+                        Para ejercer cualquiera de estos derechos, escríbenos
+                        a <a href="mailto:soporte@legadoholding.com">soporte@legadoholding.com</a>.
+                        Responderemos dentro de los plazos exigidos por la ley
+                        aplicable.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>10. Privacidad de menores</h2>
+                    <p>
+                        Nuestros servicios están dirigidos a personas mayores
+                        de edad y no recopilamos intencionalmente datos
+                        personales de menores. Los datos de familiares
+                        designados menores de edad, cuando existan, son
+                        proporcionados por el Cliente titular bajo su
+                        responsabilidad, únicamente con el fin de identificar
+                        al beneficiario del servicio.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>11. Seguridad de la información</h2>
+                    <p>
+                        Aplicamos medidas técnicas y organizativas razonables
+                        para proteger tus datos personales contra acceso no
+                        autorizado, pérdida o alteración. Ningún sistema es
+                        100% seguro, por lo que no podemos garantizar
+                        seguridad absoluta.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>12. Cambios a esta política</h2>
+                    <p>
+                        Podemos actualizar esta política. Publicaremos
+                        cualquier cambio en esta misma página con una nueva
+                        fecha de "última actualización".
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>13. Contacto</h2>
+                    <p>
+                        LEGADO HOLDING<br />
+                        Correo de privacidad: <a href="mailto:soporte@legadoholding.com">soporte@legadoholding.com</a>
+                    </p>
+                </section>
+            </div>
+
+            <!-- ═══════════════════════════ ENGLISH ═══════════════════════════ -->
+            <div lang-block="en">
+                <p>
+                    This Privacy Policy explains what personal data LEGADO
+                    HOLDING ("LEGADO", "we") collects through
+                    legadoholding.com, what we use it for, who we share it
+                    with, and what rights you have over it, including the
+                    rights available to you under the European Union's
+                    General Data Protection Regulation ("GDPR") and under
+                    U.S. privacy laws such as the California Consumer Privacy
+                    Act ("CCPA/CPRA").
+                </p>
+
+                <section class="clause">
+                    <h2>1. Who we are</h2>
+                    <p>
+                        LEGADO HOLDING is the data controller for personal
+                        data collected through this site. You can contact us
+                        with any privacy question at
+                        <a href="mailto:soporte@legadoholding.com">soporte@legadoholding.com</a>.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>2. What data we collect</h2>
+                    <p>When you purchase a plan, use the chat, or contact us, we may collect:</p>
+                    <ul>
+                        <li>
+                            <strong>Customer (policyholder) data:</strong>
+                            name, email, phone number, and payment details.
+                        </li>
+                        <li>
+                            <strong>Designated family member data:</strong>
+                            name, relationship, and information needed to
+                            identify the service beneficiary in Venezuela.
+                        </li>
+                        <li>
+                            <strong>Browsing data:</strong> pages visited and
+                            interaction events on the site, collected via
+                            Google Analytics only after you consent (see
+                            section 6).
+                        </li>
+                        <li>
+                            <strong>Conversations with Alma</strong>, our
+                            virtual assistant, if you choose to use the chat.
+                        </li>
+                    </ul>
+                    <p>
+                        Payment data (credit/debit card) is processed
+                        directly by Stripe and by the Prevision Funeraria
+                        platform that administers the plans; LEGADO does not
+                        store your full card number in its own systems.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>3. Legal basis and purposes of processing</h2>
+                    <p>We process your personal data under the following legal bases:</p>
+                    <ul>
+                        <li>
+                            <strong>Contract performance:</strong> to manage
+                            your funeral pre-planning contract, coordinate
+                            the service with partner funeral homes, and
+                            process your payments.
+                        </li>
+                        <li>
+                            <strong>Consent:</strong> for analytics cookies
+                            and for your conversations with Alma.
+                        </li>
+                        <li>
+                            <strong>Legitimate interest:</strong> to respond
+                            to support inquiries, prevent fraud, and improve
+                            site security.
+                        </li>
+                        <li>
+                            <strong>Legal obligation:</strong> when we must
+                            retain records for accounting or tax purposes.
+                        </li>
+                    </ul>
+                </section>
+
+                <section class="clause">
+                    <h2>4. How we use your data</h2>
+                    <ul>
+                        <li>Managing your contract and coordinating the funeral service when needed.</li>
+                        <li>Processing payments and sending confirmations and receipts.</li>
+                        <li>Responding to your support and contact inquiries.</li>
+                        <li>Understanding site usage and improving the experience (analytics, with consent).</li>
+                        <li>Recording your request as a lead if you provide your details without purchasing right away.</li>
+                    </ul>
+                </section>
+
+                <section class="clause">
+                    <h2>5. Who we share your data with</h2>
+                    <p>We do not sell your personal data. We share it only with:</p>
+                    <ul>
+                        <li>Stripe, to process card payments.</li>
+                        <li>
+                            The Prevision Funeraria platform (Cloudflare
+                            Workers/D1) that administers plans and contracts.
+                        </li>
+                        <li>
+                            Partner funeral homes in Venezuela (e.g. Funeraria
+                            del Zulia), only what is necessary to deliver the
+                            contracted service to the designated family
+                            member.
+                        </li>
+                        <li>OpenAI, as the provider of the language model that powers Alma, our virtual assistant.</li>
+                        <li>Google Analytics, aggregated and only with your prior consent.</li>
+                    </ul>
+                    <p>
+                        These third parties act as data processors or
+                        independent providers and only receive the data
+                        strictly necessary to deliver their service.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>6. Cookies and analytics</h2>
+                    <p>
+                        We use Google Analytics (GA4) to understand how the
+                        site is used. These cookies are not essential to the
+                        site's operation and are only activated after you
+                        accept the cookie banner shown on your first visit.
+                        You can change your decision at any time by clearing
+                        the site's cookies from your browser settings.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>7. International data transfers</h2>
+                    <p>
+                        LEGADO operates from the United States and coordinates
+                        services with funeral homes in Venezuela. If you
+                        access the site from the European Union or the
+                        European Economic Area, your data may be transferred
+                        to the United States and to Venezuela. Where
+                        applicable, we use the safeguards required by the
+                        GDPR (for example, standard contractual clauses with
+                        our providers) to protect those transfers.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>8. Data retention</h2>
+                    <p>
+                        We retain contract data for as long as the plan is
+                        active and for any additional time required by legal
+                        or accounting obligations. Browsing data is retained
+                        according to Google Analytics' default settings. Lead
+                        data from prospects who did not purchase is retained
+                        until you request its deletion or for a reasonable
+                        follow-up period.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>9. Your rights</h2>
+                    <p><strong>If you reside in the European Union / European Economic Area (GDPR):</strong></p>
+                    <ul>
+                        <li>Right of access to your personal data.</li>
+                        <li>Right to rectification of inaccurate data.</li>
+                        <li>Right to erasure ("right to be forgotten").</li>
+                        <li>Right to restriction of processing.</li>
+                        <li>Right to data portability.</li>
+                        <li>Right to object to processing.</li>
+                        <li>Right to withdraw consent at any time, without affecting the lawfulness of prior processing.</li>
+                        <li>Right to lodge a complaint with the data protection authority of your country of residence.</li>
+                    </ul>
+                    <p><strong>If you reside in California, United States (CCPA/CPRA):</strong></p>
+                    <ul>
+                        <li>Right to know what personal data we collect, use, and share.</li>
+                        <li>Right to request deletion of your personal data.</li>
+                        <li>Right to correct inaccurate personal data.</li>
+                        <li>Right to opt out of the sale or sharing of your personal data (LEGADO does not sell or share personal data for advertising).</li>
+                        <li>Right to non-discrimination for exercising your privacy rights.</li>
+                    </ul>
+                    <p>
+                        To exercise any of these rights, write to us at
+                        <a href="mailto:soporte@legadoholding.com">soporte@legadoholding.com</a>.
+                        We will respond within the timeframes required by
+                        applicable law.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>10. Children's privacy</h2>
+                    <p>
+                        Our services are directed at adults, and we do not
+                        knowingly collect personal data from minors. Data
+                        about minor designated family members, where
+                        applicable, is provided by the policyholder under
+                        their own responsibility, solely to identify the
+                        service beneficiary.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>11. Information security</h2>
+                    <p>
+                        We apply reasonable technical and organizational
+                        measures to protect your personal data against
+                        unauthorized access, loss, or alteration. No system is
+                        100% secure, so we cannot guarantee absolute security.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>12. Changes to this policy</h2>
+                    <p>
+                        We may update this policy. Any changes will be posted
+                        on this same page with a new "last updated" date.
+                    </p>
+                </section>
+
+                <section class="clause">
+                    <h2>13. Contact</h2>
+                    <p>
+                        LEGADO HOLDING<br />
+                        Privacy contact: <a href="mailto:soporte@legadoholding.com">soporte@legadoholding.com</a>
+                    </p>
+                </section>
+            </div>
+        </main>
+
+        <footer>
+            <div class="container footer-inner">
+                <span id="footer-copy">© 2026 Legado. Todos los derechos reservados.</span>
+                <div class="footer-links">
+                    <a href="index.html" id="footer-home">Inicio</a>
+                    <a href="terminos-condiciones.html" id="footer-terms">Términos y condiciones</a>
+                    <a href="mailto:soporte@legadoholding.com">soporte@legadoholding.com</a>
+                </div>
+            </div>
+        </footer>
+
+        <script>
+            (function () {
+                var LANG_KEY = "legado_lang";
+                var TEXT = {
+                    es: {
+                        title: "Política de Privacidad — LEGADO",
+                        heading: "Política de Privacidad",
+                        updated: "Última actualización: 26 de agosto de 2026",
+                        back: "Volver al inicio",
+                        toggle: "EN",
+                        footerCopy: "© 2026 Legado. Todos los derechos reservados.",
+                        footerHome: "Inicio",
+                        footerTerms: "Términos y condiciones",
+                        htmlLang: "es",
+                    },
+                    en: {
+                        title: "Privacy Policy — LEGADO",
+                        heading: "Privacy Policy",
+                        updated: "Last updated: August 26, 2026",
+                        back: "Back to home",
+                        toggle: "ES",
+                        footerCopy: "© 2026 Legado. All rights reserved.",
+                        footerHome: "Home",
+                        footerTerms: "Terms and conditions",
+                        htmlLang: "en",
+                    },
+                };
+
+                function getInitialLang() {
+                    try {
+                        var saved = localStorage.getItem(LANG_KEY);
+                        if (saved === "es" || saved === "en") return saved;
+                    } catch (e) {}
+                    return (navigator.language || "").toLowerCase().indexOf("en") === 0
+                        ? "en"
+                        : "es";
+                }
+
+                function applyLang(lang) {
+                    var t = TEXT[lang];
+                    document.documentElement.lang = t.htmlLang;
+                    document.title = t.title;
+                    document.getElementById("doc-title").textContent = t.heading;
+                    document.getElementById("doc-updated").textContent = t.updated;
+                    document.getElementById("back-link-text").textContent = t.back;
+                    document.getElementById("lang-toggle").textContent = t.toggle;
+                    document.getElementById("footer-copy").textContent = t.footerCopy;
+                    document.getElementById("footer-home").textContent = t.footerHome;
+                    document.getElementById("footer-terms").textContent = t.footerTerms;
+
+                    document.querySelectorAll("[lang-block]").forEach(function (el) {
+                        el.classList.toggle("active", el.getAttribute("lang-block") === lang);
+                    });
+                }
+
+                var currentLang = getInitialLang();
+                applyLang(currentLang);
+
+                document.getElementById("lang-toggle").addEventListener("click", function () {
+                    currentLang = currentLang === "es" ? "en" : "es";
+                    try {
+                        localStorage.setItem(LANG_KEY, currentLang);
+                    } catch (e) {}
+                    applyLang(currentLang);
+                });
+            })();
+        </script>
+    </body>
+</html>
