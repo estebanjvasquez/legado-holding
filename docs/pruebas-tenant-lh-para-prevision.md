@@ -112,28 +112,37 @@ opaco (guardar/loguear tal cual, nunca `Number(solicitud_id)`).
 
 Respuesta hoy: `{"ok":true,"solicitud_id":"<10 caracteres, ver nota arriba>"}`.
 
+**Límites de campo de `/solicitudes` (descubiertos 2026-08-26):** `telefono` **≤ 20
+caracteres** (400 `"Too big: expected string to have <=20 characters"` si se pasa),
+`nombres`/`apellidos` ≤ 60. El Worker de LH ahora capa esos campos antes de mandar.
+
 Stub de atribución del handoff a WhatsApp (mismo endpoint):
 
 ```json
 { "nombres": "Pedro", "apellidos": "Ramírez",
-  "telefono": "(se recibe por WhatsApp)",
+  "telefono": "por WhatsApp",
   "mensaje": "[Atribución vendedor MN4UYC5Y] Contacto derivado a WhatsApp por Alma. Necesidad: ...",
   "atribucion": { "codigo_vendedor": "MN4UYC5Y" } }
 ```
+
+> El stub del handoff **estaba roto**: el placeholder anterior
+> `"(se recibe por WhatsApp)"` (24 chars) violaba el tope de 20 y daba 400 en
+> silencio — por eso `Ramírez`/`Pedro` (y cualquier stub previo) nunca se crearon.
+> Corregido en commit `9fd9f9e`, reverificado 201.
 
 ## Datos de prueba a limpiar en `lh`
 
 - **Creados desde `legado-holding` el 2026-08-26:**
   - Leads (`/solicitudes`): apellidos `REF-ATRIBUCION-TEST`, `HANDOFF-NOPLAN`,
-    `HANDOFF-TIPOSOLO`, `TEST-ID-CHECK`, `González` (María).
+    `HANDOFF-TIPOSOLO`, `TEST-ID-CHECK`, `González` (María), `Torres` (Ana),
+    `Mendez` (Luis, ×2 — uno directo probando el fix del stub), `Ruiz` (Carla).
   - Compras pendientes: docs `SMOKE-REF-001/002/003`, `SMOKE-SELECTO-001`,
-    `REG-CHECK-001`, `CTRL-ZULIA-001`, + las `SMOKE ATRIBUCION`. (Las `SEL-*` con
-    500 no crearon nada — el bug impedía llegar a crear la fila.)
-  - Nota: `Ramírez` (Pedro) estaba listado acá pero **nunca se creó** — se
-    confirmó por consulta directa a D1 que no hay ninguna solicitud con ese
-    apellido. El "stub" documentado arriba parece haber quedado solo como
-    ejemplo de payload, no una llamada real. Si sí la hicieron desde otra
-    corrida, avisen y lo busco de nuevo.
+    `REG-CHECK-001`, `CTRL-ZULIA-001`, `E2E-SELECTO-001`, `E2E-SELANUAL-001`,
+    `E2E-SELECTO-001` (id 3, con atribución), + las `SMOKE ATRIBUCION`. (Las
+    `SEL-*` con 500 no crearon nada.)
+  - Nota: `Ramírez` (Pedro) nunca se creó — era el stub roto por el tope de 20
+    chars en `telefono` (ver arriba, ya corregido). Confirmado por el agente de
+    Prevision-Funeraria con consulta directa a D1.
 - **Creados desde Prevision-Funeraria el 2026-08-26, verificando estos fixes:**
   - Clientes/compras: documento `FIX-VERIFY-Z-1`, `FIX-VERIFY-SEL-1`,
     `FIX-VERIFY-COMBO-1` (esta última **pagada de punta a punta** con tarjeta de
@@ -241,7 +250,10 @@ lados de la comparación. Verificado en vivo: `GET
     `link_de_cobro`, con `atribucion`.
   - Alma `create_lead` con `?ref=mn4uyc5y` (minúsculas) → prospecto registrado.
   - Alma handoff con `?ref=MN4UYC5Y` → texto de WhatsApp: *"…Vengo referido/a por
-    ESTEBAN (ref: MN4UYC5Y)."* + stub de atribución disparado.
+    ESTEBAN (ref: MN4UYC5Y)."* + stub de atribución (lead `por WhatsApp` con
+    `[Atribución vendedor ...]` en el mensaje) — **bug encontrado y corregido**:
+    el placeholder de `telefono` violaba el tope de 20 chars y el stub fallaba en
+    silencio (commit `9fd9f9e`). Reverificado 201.
   - Lógica de `js/main.js` (first-touch, TTL 90d, derivación de canal) cargada en
     Node contra el archivo real → 9/9 (`?ref=` se persiste, un 2º ref distinto no
     lo pisa, TTL vencido sí, `?ref=` no manda `canal_origen`, UTM social →
