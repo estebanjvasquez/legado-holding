@@ -704,18 +704,16 @@ function formatPrice(num) {
 /* Planes con checkout digital (wizard) vía la API pública de Prevision-Funeraria.
 
    Los "Selecto" cobran además una cuota inicial única (cuota_inicial_centavos en
-   /planes). Todo el camino de LH ya está listo (Worker acepta los slugs, el
-   wizard lee cuota_inicial_centavos y la muestra en pago/resumen, isSelecto =
-   plan.initial). Están APAGADOS acá porque `POST /compras` de Prevision-Funeraria
-   todavía devuelve 500 para un plan con cuota inicial — no arma el Stripe
-   Checkout con la cuota inicial one-time + suscripción (ver
-   docs/ajustes-prevision-funeraria-atribucion-vendedor.md §4).
+   /planes). Prevision-Funeraria arma el Stripe Checkout con la cuota inicial como
+   un line_item sin `recurring` (va solo a la primera factura) + la suscripción
+   recurrente — verificado en vivo 2026-08-26 con un pago end-to-end (contrato #8,
+   primera factura $44,47 = $9,47 + $35, luego $9,47/mes). El wizard lee
+   cuota_inicial_centavos y la muestra en pago/resumen (isSelecto = plan.initial).
 
-   Para encenderlos cuando Previsión arregle `/compras`: mover los 2 slugs de
-   SELECTO_CHECKOUT_PENDIENTE a WIZARD_ENABLED_SLUGS (o borrar el spread
-   condicional de abajo) y subir el ?v= de main.js. Mientras estén apagados, su
-   CTA sigue yendo a #contacto. */
-const SELECTO_CHECKOUT_ENABLED = false;
+   Para apagar de nuevo (si Previsión rompe /compras): SELECTO_CHECKOUT_ENABLED =
+   false + subir el ?v= de main.js. Con el flag apagado el CTA de Selecto vuelve
+   a #contacto. */
+const SELECTO_CHECKOUT_ENABLED = true;
 const SELECTO_SLUGS = ["esencial-selecto", "vanguardia-selecto"];
 const WIZARD_ENABLED_SLUGS = new Set([
   "esencial-zulia",
