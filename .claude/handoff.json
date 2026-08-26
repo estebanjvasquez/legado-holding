@@ -121,7 +121,7 @@
   },
   "known_limitations": [
     "admin.js sigue autenticando staff contra Invoice Ninja (deuda pendiente, no bloqueante)",
-    "Planes Selecto sin checkout digital (gap #2 de la API)",
+    "Planes Selecto: checkout digital ACTIVADO 2026-08-26 (SELECTO_CHECKOUT_ENABLED=true en js/main.js). Prevision-Funeraria cobra la cuota inicial como line_item sin recurring + suscripcion. Verificado end-to-end (contrato #8). Falta redeploy cPanel de ?v=9 + pasada visual en navegador.",
     "Atribución de vendedor (?ref=) IMPLEMENTADA del lado legado-holding el 2026-08-26 (js/main.js §ATRIBUCIÓN, worker/src/attribution.js, wizard-compra.js, chat.js, alma.js). First-touch TTL 90d. Viaja en compra/lead/handoff. PENDIENTE en Previsión: confirmar que se propaga al contrato final vía webhook de Stripe y se muestra en panel — ver docs/ajustes-prevision-funeraria-atribucion-vendedor.md (gaps P0) y docs/atribucion-vendedor-plan-legado.md",
     "README.md y algunas partes de docs/ pueden seguir describiendo la arquitectura vieja basada en Invoice Ninja — no reescritas por estar fuera de lo pedido"
   ],

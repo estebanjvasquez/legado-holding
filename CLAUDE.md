@@ -42,9 +42,12 @@ eliminados. La única parte de este repo que sigue hablando con Invoice Ninja es
 login del panel admin (`worker/src/admin.js`, via `env.IN_BASE`) — deuda pendiente, no
 bloqueante.
 
-Los planes "Selecto" (`esencial-selecto`/`vanguardia-selecto`) siguen sin checkout
-digital: cobran una cuota inicial que el modelo `planes` de la API nueva todavía no
-soporta. Su CTA en el sitio manda a contacto en vez de abrir el wizard.
+Los 4 planes tienen checkout digital. Los "Selecto" (`esencial-selecto`/
+`vanguardia-selecto`) cobran una cuota inicial única (`cuota_inicial_centavos` en
+`GET /planes`): Prevision-Funeraria la mete como un `line_item` sin `recurring` en
+el Stripe Checkout (va solo a la 1ª factura) + la suscripción. Verificado
+end-to-end 2026-08-26 (contrato #8, 1ª factura $44,47 = $9,47 + $35). Se activa/
+desactiva con `SELECTO_CHECKOUT_ENABLED` en `js/main.js` (hoy `true`).
 
 **Atribución de vendedores externos (2026-08-26):** LH opera con vendedores que
 reparten enlaces `legadoholding.com?ref=CODIGO`. El lado de este repo YA está
