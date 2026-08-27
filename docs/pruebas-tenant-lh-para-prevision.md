@@ -162,8 +162,10 @@ Stub de atribución del handoff a WhatsApp (mismo endpoint):
     `TAIL-CHECK-001`, `DBG-ATRIB-001` (= compra_pendiente id 32),
     + las `SMOKE ATRIBUCION`. (Las `SEL-*` con 500 no crearon nada.)
   - **Re-smoke 2026-08-27:** compras `RETEST-ZUL`, `RETEST-SELM`, `RETEST-SELA`,
-    `RETEST-BADREF`, `RETEST-NOATTR`; leads apellidos `Lead`/`Handoff`/`StubOK`
-    (nombres `Retest`) + `referencia_publica` `H2G5P99ZDM`.
+    `RETEST-BADREF`, `RETEST-NOATTR`, `RETEST-CAMPANA`; leads apellidos
+    `Lead`/`Handoff`/`StubOK`/`Campana` (nombres `Retest`) + `referencia_publica`
+    `H2G5P99ZDM` y `VGW5FYLNXT`. La de `Campana` lleva `utm_campaign: verano-2026`
+    — sirve de dato de prueba para PF-6.
   - Contrato del navegador (usuario): cliente `EST-EDGE-001` →
     **compra_pendiente id 30 → contrato #9**, Selecto activo, `vendedor_id: 1`
     (ESTEBAN). Sirve como caso de referencia de PF-5 — avisar si hay que borrarlo.
@@ -187,20 +189,105 @@ Stub de atribución del handoff a WhatsApp (mismo endpoint):
 
 ## Abierto
 
-### PF-6 · No hay vista de "transacciones de un vendedor" — **P1, feature faltante**
-Al abrir el detalle de un vendedor en el panel de `lh` no se pueden ver los
-contratos / leads / compras asociados a él. Estaba en la propuesta original
-(`docs/ajustes-prevision-funeraria-atribucion-vendedor.md` §6) pero no se convirtió
-en pedido hasta ahora. Necesario para que un vendedor externo (o el staff) vea su
-pipeline: leads con estado, compras pendientes de pago, contratos activos web,
-comisiones por etapa — filtrado por `vendedor_id` / `codigo_referido`.
+### PF-6 · Vista staff de atribución / transacciones por origen, vendedor y campaña — **P1, APROBADO, hacer**
+El usuario confirmó (2026-08-27) que **sí** hay que hacerlo, es 100% de
+Prevision-Funeraria. Requisito literal del usuario:
 
-*(Nota de Prevision-Funeraria: ya existe un portal de autoservicio de vendedor
--- login por OTP, no sesión de staff -- con `/ventas`, `/comisiones`, `/leads` y
-`/compras-pendientes`, todos filtrados server-side por `vendedor_id`. Cubre el
-caso "el vendedor ve su propio pipeline". Lo que falta específicamente es la
-vista equivalente **del lado de staff** dentro del panel de `lh` -- pendiente de
-confirmar alcance/prioridad con el usuario antes de implementar.)*
+> "Esa vista debe detallar **las transacciones, el origen, el vendedor y la
+> campaña** si corresponde a una campaña."
+
+**Contexto — lo que ya existe:** portal de autoservicio del vendedor (login OTP)
+con `/ventas`, `/comisiones`, `/leads`, `/compras-pendientes` filtrados server-side
+por `vendedor_id`. Reutilizar esa lógica de query; lo que falta es (a) exponerla
+**del lado de staff** parametrizada por `:vendedorId`, y (b) agregarle las columnas
+de **origen** y **campaña**, más una vista **global** (no sólo por vendedor) para
+ver el tráfico directo/redes/buscador que no tiene vendedor.
+
+#### Alcance
+
+**Vista global "Atribución / Origen de ventas"** en el panel de staff de `lh`
+(sección nueva, o pestaña dentro de Reportes). Una tabla de **transacciones** con
+filtros. La misma vista, pre-filtrada por `vendedor_id`, es el "detalle de
+transacciones" que se abre desde la ficha de un vendedor.
+
+**Qué cuenta como "transacción" (una fila por cada una):**
+| Tipo | Tabla | Estados a mostrar |
+|---|---|---|
+| Contrato | `contratos` | activo / suspendido / anulado / renuncia / finalizado |
+| Compra pendiente de pago | `compras_pendientes` | pendiente_pago (Stripe sin completar), pendiente (conciliación manual), rechazada |
+| Lead / solicitud pública | `solicitudes` (`prev_solicitudes_publicas` / equiv.) | nueva / en gestión / convertida / descartada |
+
+**Columnas de cada fila:**
+- **Fecha** (de creación; para contrato, `fecha_ingreso`).
+- **Tipo** (contrato / compra pendiente / lead).
+- **Cliente** (nombre; para lead, nombre del prospecto).
+- **Plan / interés** (nombre del plan; para lead sin plan, el `tipo` o "—").
+- **Monto** — mensualidad; y si el plan tiene `cuota_inicial_centavos`, mostrarla
+  aparte ("$9,47/mes + $35 inicial"). Para lead, "—".
+- **Estado** (el de la tabla origen).
+- **Origen** — `canal_origen`: `vendedor` / `directo` / `redes_sociales` /
+  `buscador` / `otro`. (LH manda `canal_origen` sólo cuando **no** hay
+  `codigo_vendedor`; cuando hay vendedor, el origen es implícitamente `vendedor`
+  aunque el campo venga vacío — resolverlo así en la query/UI.)
+- **Vendedor** — nombre + `codigo_referido`. "—" si es venta directa.
+- **Campaña** — `utm_campaign` si viene; además, como subdato o tooltip,
+  `utm_source` / `utm_medium` (ej. `verano-2026 · instagram/social`). "—" si no
+  hubo campaña. Una "campaña" hoy es simplemente el valor libre de `utm_campaign`
+  que llegó en el bloque `atribucion` — no hay catálogo de campañas (a futuro
+  podría haberlo).
+
+**Filtros:** rango de fechas · tipo · estado · **origen** · **vendedor** ·
+**campaña** (`utm_campaign`) · plan.
+
+**Totales / resumen arriba de la tabla:** conteo y monto por origen, y por
+campaña (para responder "¿cuánto trajo la campaña verano-2026?" y "¿cuánto trajo
+el vendedor X?").
+
+#### De dónde sale el dato (verificar / completar en Prevision-Funeraria)
+
+LH manda en `atribucion` (en `POST /compras` y `POST /solicitudes`):
+`codigo_vendedor`, `canal_origen`, `utm_source`, `utm_medium`, `utm_campaign`,
+`referrer_url` (ver "Bloque `atribucion`" arriba).
+
+- [ ] Confirmar que `compras_pendientes` persiste **las 6**: `vendedor_id`
+  (resuelto), `canal_origen`, `utm_source/medium/campaign`, `referrer_url`. PF-2
+  dijo que el webhook "recupera `vendedor_id` (y `canal_origen`/`utm_*`) desde
+  D1" → implica que ya están en `compras_pendientes`; confirmar columna por
+  columna y agregar las que falten.
+- [ ] Confirmar que esos campos se **propagan al `contrato`** cuando el webhook
+  lo materializa (PF-2 dijo que sí para `vendedor_id`, `canal_origen`, `utm_*` —
+  reconfirmar `utm_campaign` y `referrer_url` puntualmente).
+- [ ] Confirmar que `solicitudes` persiste los mismos 6 campos de atribución (no
+  sólo `vendedor_id` — PF-3 sólo mencionó el vendedor).
+- [ ] Si alguna tabla no tiene esas columnas → migración para agregarlas +
+  backfill nulo.
+
+#### Endpoints sugeridos (staff, sesión de staff — no el token público)
+
+- `GET /api/t/lh/atribucion/transacciones` con query params:
+  `?desde=&hasta=&tipo=&estado=&origen=&vendedor_id=&campana=&plan_id=&page=`
+  → filas unificadas de las 3 tablas + paginación.
+- `GET /api/t/lh/atribucion/resumen` con los mismos filtros → totales por origen
+  y por campaña.
+- La ficha del vendedor enlaza a `…/transacciones?vendedor_id=<id>`.
+
+#### Criterio de "hecho"
+
+Con el contrato #9 (vendedor ESTEBAN, plan Selecto) y algún lead de prueba con
+`utm_campaign`: la vista global los lista con Origen=`vendedor`, Vendedor=ESTEBAN,
+Campaña=el `utm_campaign` correspondiente; filtrando por `vendedor_id` de ESTEBAN
+aparecen sólo los suyos; el resumen suma correctamente por origen y por campaña.
+
+*(Portal de autoservicio del vendedor ya cubre "el vendedor ve su propio
+pipeline" — esto es la vista de staff + el corte por origen/campaña.)*
+
+**Nota LH — nada que hacer de nuestro lado:** el Worker de `legado-holding` ya
+manda los 6 campos de atribución (`codigo_vendedor`, `canal_origen`,
+`utm_source/medium/campaign`, `referrer_url`) en cada `POST /compras` y
+`POST /solicitudes`, incluso cuando hay vendedor **y** campaña a la vez (un link
+`?ref=MN4UYC5Y&utm_campaign=verano-2026` manda ambos). Verificado por unit test
+(`sanitizeAttribution` + body de `/compras`) y `wrangler tail`. PF-6 es enteramente
+trabajo de Prevision-Funeraria: persistir/propagar/exponer lo que ya llega.
 
 ## Cerrado
 
