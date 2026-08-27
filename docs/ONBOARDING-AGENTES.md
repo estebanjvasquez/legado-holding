@@ -118,10 +118,12 @@ Navegador ──GET catálogo (CORS, sin token)──▶ prevision-funeraria.sis
 - **Páginas legales** (Términos, Privacidad) publicadas.
 
 ### Pendiente / hilos abiertos
-- **PF-6** (Previsión): vista de staff de atribución (transacciones por origen, vendedor
-  y campaña). Aprobada por el usuario, **100% trabajo de Prevision-Funeraria** — este
-  repo ya manda los 6 campos de atribución. El resto de la bitácora (PF-1..5, PF-7)
-  está cerrado. Ver `docs/pruebas-tenant-lh-para-prevision.md`.
+- **Canal entre agentes: todo cerrado.** PF-1..PF-7 y LH-1..LH-3 cerrados y verificados.
+  PF-6 (vista de staff de atribución en `/atribucion`) se cerró el 2026-08-27 — de paso,
+  Previsión encontró y corrigió que `canal_origen`/`utm_*`/`referrer_url` no se
+  propagaban al contrato (solo `vendedor_id`); migración 0035, backfill verificado en
+  prod. **Nada pendiente del lado de legado-holding.** Ver
+  `docs/pruebas-tenant-lh-para-prevision.md`.
 - **`admin.js` sigue con Invoice Ninja** — deuda técnica, no bloqueante.
 - **Hilo abierto**: el usuario reportó que Alma "se presenta dos veces" en su navegador,
   pese a que el fix está verificado correcto en backend y frontend. Falta confirmarlo en

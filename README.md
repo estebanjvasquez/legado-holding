@@ -722,7 +722,7 @@ no son afectadas y siguen funcionando.
 
 | Pendiente | Severidad | Notas |
 |---|---|---|
-| Atribución de vendedor: falta la vista de staff en Previsión (PF-6) | Media | Este repo ya manda los 6 campos de atribución en `/compras` y `/solicitudes`. Falta que Prevision-Funeraria exponga la vista de transacciones por origen/vendedor/campaña. Ver `docs/pruebas-tenant-lh-para-prevision.md`. |
+| Alma se presenta dos veces (reporte del usuario) | Media | Fix verificado correcto en backend y frontend; falta que el usuario confirme en ventana de incógnito. Ver `.claude/handoff.json` → `open_thread_needs_followup`. |
 | Cuenta Stripe de producción de LH pendiente | Alta (negocio, no de código) | KYC/verificación de Legado Holding Inc. sin completar; todo cobro hoy es en modo test de Stripe. Bloqueo externo, no de este repo. |
 | Login del panel admin sigue en Invoice Ninja | Baja | `worker/src/admin.js` autentica staff contra `IN_BASE`. Deuda de migración, no bloqueante — ver `CLAUDE.md`. |
 | Sin idempotencia en checkout | Media | Doble click en "Confirmar" puede crear dos compras pendientes. Mitigar con un `Idempotency-Key` (uuid del wizard) en el Worker. |

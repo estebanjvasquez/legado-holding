@@ -119,13 +119,15 @@
     "2026-08-26 — Páginas legales HTML (Términos, Privacidad) + botón llamar solo en móvil.",
     "2026-08-27 — Checkout de planes Selecto ENCENDIDO (SELECTO_CHECKOUT_ENABLED=true, ?v=8→?v=9). Cuota inicial como line_item sin recurring en Stripe Checkout. Verificado end-to-end (contratos #8 y #9).",
     "2026-08-27 — Canal entre agentes formalizado en docs/pruebas-tenant-lh-para-prevision.md (bitácora PF-*/LH-*). Smoke test end-to-end en navegador (LH-3). Re-smoke de todo el doc.",
-    "2026-08-27 — docs/ONBOARDING-AGENTES.md creado como punto de entrada único para cualquier agente/colaborador."
+    "2026-08-27 — docs/ONBOARDING-AGENTES.md creado como punto de entrada único para cualquier agente/colaborador.",
+    "2026-08-27 — Manual de pruebas para el cliente en Word (docs/*.docx, gitignoreado) + guía de links de vendedor/campaña para marketing (docs/campanasatribucion.md, gitignoreado).",
+    "2026-08-27 — PF-6 cerrado por Prevision-Funeraria: vista /atribucion + fix de propagación de canal_origen/utm_*/referrer_url al contrato. Canal entre agentes: todo cerrado."
   ],
   "known_gaps_in_prevision_funeraria_api": [
     "1. Sin modelo para el marketplace de aliados regionales de Alma (N aliados con catálogo propio por ciudad) — no es un bug a corregir, es la razón del rediseño a handoff",
     "2. RESUELTO (PF-1, 2026-08-26): la cuota inicial de los Selecto se cobra como un line_item sin 'recurring' en el Stripe Checkout (add_invoice_items NO es válido al crear una Checkout Session). GET /planes expone cuota_inicial_centavos. Checkout de Selecto encendido y verificado.",
     "3. tarifas[] (precio por banda de edad) es capacidad nueva que el wizard no explotaba antes — confirmar con negocio si el tenant lh debe usar una sola banda 0-100 para mantener precio plano",
-    "4. RESUELTO (PF-2..5/7, 2026-08-26/27): la atribución llega al contrato vía el webhook de Stripe (verificado contratos #8/#9); /vendedores/lookup existe y es case-insensitive; /solicitudes devuelve solicitud_id (string opaco de 10 chars, nunca Number()) y resuelve/muestra el vendedor. Único abierto: PF-6, vista de staff de atribución — 100% trabajo de Prevision-Funeraria."
+    "4. RESUELTO (PF-2..7, 2026-08-26/27): la atribución llega al contrato vía el webhook de Stripe (verificado contratos #8/#9); /vendedores/lookup existe y es case-insensitive; /solicitudes devuelve solicitud_id (string opaco de 10 chars, nunca Number()) y resuelve/muestra el vendedor. PF-6 cerrado 2026-08-27: vista de staff en /atribucion + fix de propagación de canal_origen/utm_*/referrer_url al contrato (migración 0035). Canal entre agentes: TODO cerrado, nada pendiente de este lado."
   ],
   "open_thread_needs_followup": {
     "id": "double-greeting-bug-user-still-sees-it",
