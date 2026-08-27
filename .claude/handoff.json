@@ -1,7 +1,8 @@
 {
   "schema_version": "2.0",
+  "read_first": "docs/ONBOARDING-AGENTES.md — panorama + estado actual + gotchas, escrito para cualquier agente/colaborador. Este JSON es el snapshot estructurado que lo acompaña.",
   "generated_for": "Conversación nueva que retoma el proyecto Legado Holding tras la migración Invoice Ninja → Prevision-Funeraria",
-  "last_updated": "2026-08-25",
+  "last_updated": "2026-08-27",
   "project": {
     "name": "legado-holding",
     "description": "Sitio bilingüe (ES/EN) de previsión funeraria para venezolanos en USA. Stack estático + Cloudflare Worker. Billing YA NO usa Invoice Ninja: el wizard y el bot Alma consumen la API pública del sistema Prevision-Funeraria (repo separado).",
@@ -62,26 +63,39 @@
   },
   "file_tree": {
     "frontend": [
-      { "path": "index.html", "role": "single page; LEGADO_CONFIG dev/prod switch; PLANS_API_URL apunta directo a Prevision-Funeraria; PARENTESCOS_API_URL apunta al proxy del Worker" },
-      { "path": "css/main.css", "role": "estilos; branding navy/gold, sin rojo en modo emergencia" },
-      { "path": "js/main.js", "role": "i18n LANG, wizard 4 pasos (parentesco-driven), chat Alma, cache-bust ?v=3" },
+      { "path": "index.html", "role": "single page; LEGADO_CONFIG dev/prod switch; PLANS_API_URL apunta directo a Prevision-Funeraria; PARENTESCOS_API_URL/chat vía proxy del Worker; cache-bust css/main.css?v=4 y js/main.js?v=9 (independientes, líneas ~100 y ~1283)" },
+      { "path": "css/main.css", "role": "estilos; branding navy #263c5b / gold #c9a84c (decorativo), fuente Inter, sin rojo en modo emergencia" },
+      { "path": "js/main.js", "role": "i18n LANG, wizard 4 pasos (parentesco-driven), chat Alma, §ATRIBUCIÓN (initAttribution/getAttribution, localStorage[legado_attribution], first-touch 90d), SELECTO_CHECKOUT_ENABLED=true, WIZARD_ENABLED_SLUGS" },
+      { "path": "js/wizard-generic.js", "role": "botones 'Protege tu Legado' sin plan → scroll a #planes" },
+      { "path": "js/vendor/purify.min.js", "role": "DOMPurify — sanitiza HTML del chat" },
       { "path": "gracias.html", "role": "página estática, success_url de Stripe Checkout" },
       { "path": "cancelado.html", "role": "página estática, cancel_url de Stripe Checkout" },
+      { "path": "terminos-condiciones.html / politica-privacidad.html", "role": "páginas legales (fuentes en los .txt homónimos)" },
+      { "path": "admin/", "role": "panel admin (index.html + admin.js), login de staff vía Invoice Ninja" },
       { "path": "images/IconoLegado.png", "role": "ícono de marca (círculos concéntricos), usado en el header del chat de Alma via almaIconHTML()" }
     ],
     "worker": [
-      { "path": "worker/wrangler.toml", "role": "config: PF_BASE, SITE_BASE_URL en [vars]; secret PF_TOKEN" },
-      { "path": "worker/src/index.js", "role": "router: health check, GET /wizard/parentescos, POST / (checkout)" },
-      { "path": "worker/src/prevision-api.js", "role": "cliente HTTP hacia Prevision-Funeraria (getParentescos, crearCompra)" },
-      { "path": "worker/src/wizard-compra.js", "role": "processWizardCheckout(body, env) — reemplaza al viejo pipeline.js" },
-      { "path": "worker/src/alma.js", "role": "bot: lookup_coverage + handoff (teléfono de aliado), ya NO cotiza/factura" },
-      { "path": "worker/src/chat.js", "role": "persiste handoff en chat_sessions.metadata" },
-      { "path": "worker/src/admin.js", "role": "login staff vía IN_BASE (sin cambios, fuera de alcance)" }
+      { "path": "worker/wrangler.toml", "role": "config: routes api.legadoholding.com/*; [vars] PF_BASE, SITE_BASE_URL, ALLOWED_ORIGINS, OPENAI_MODEL=gpt-5.6-luna, SUPABASE_URL, IN_BASE; [observability] enabled=false. Secrets: PF_TOKEN, OPENAI_API_KEY, SUPABASE_SERVICE_ROLE_KEY" },
+      { "path": "worker/src/index.js", "role": "router: health check, GET /wizard/parentescos, POST / (checkout), POST /chat" },
+      { "path": "worker/src/prevision-api.js", "role": "cliente HTTP hacia Prevision-Funeraria (getParentescos, crearCompra, lookup de vendedor)" },
+      { "path": "worker/src/wizard-compra.js", "role": "processWizardCheckout(body, env) — arma el body de POST /compras; reemplaza al viejo pipeline.js" },
+      { "path": "worker/src/alma.js", "role": "agente Alma: loop OpenAI, tools list_planes/list_servicios/lookup_coverage/handoff_whatsapp/create_lead; NO cotiza/factura; fuerza reasoning_effort=none; ignora agent_config.model de Gemini; inyecta atribución en los executores" },
+      { "path": "worker/src/chat.js", "role": "handler /chat: sanea attribution, llama runAlma, persiste en chat_sessions.metadata de Supabase" },
+      { "path": "worker/src/attribution.js", "role": "sanitizeAttribution(raw) (whitelists + límites), attributionTag() para logs" },
+      { "path": "worker/src/supabase.js", "role": "memoria del chat; no-op si faltan SUPABASE_URL/secret" },
+      { "path": "worker/src/admin.js", "role": "login staff vía IN_BASE (Invoice Ninja); legacy, fuera de alcance" },
+      { "path": "worker/src/errors.js", "role": "helpers de error" }
     ],
     "docs": [
+      { "path": "docs/ONBOARDING-AGENTES.md", "role": "PUNTO DE ENTRADA para cualquier agente/colaborador; panorama + estado + gotchas + mapa del repo" },
       { "path": "docs/api-publica-wizard.md", "role": "contrato de la API de Prevision-Funeraria consumida por este repo" },
-      { "path": "docs/GUIA_INTERACCION_BOT_LEGADO.md", "role": "tono/branding del bot Alma — fuente del saludo actual" },
-      { "path": "docs/GUIA_ESPECIFICACIONES_WEB_LEGADO.md", "role": "specs de UI del sitio" }
+      { "path": "docs/GUIA_INTERACCION_BOT_LEGADO.md", "role": "tono/branding + clasificación A/B/C del bot Alma" },
+      { "path": "docs/GUIA_ESPECIFICACIONES_WEB_LEGADO.md", "role": "specs de UI del sitio" },
+      { "path": "docs/pruebas-tenant-lh-para-prevision.md", "role": "canal entre agentes (este repo ↔ Prevision-Funeraria); bitácora PF-*/LH-*; token en el .SECRET.md gitignoreado" },
+      { "path": "docs/atribucion-vendedor-plan-legado.md", "role": "qué está implementado del lado legado-holding para ?ref= / UTM" },
+      { "path": "docs/ajustes-prevision-funeraria-atribucion-vendedor.md", "role": "qué falta del lado de Previsión (pedidos)" },
+      { "path": "docs/campanasatribucion.md", "role": "(gitignoreado) guía para marketing: cómo armar links de vendedor/campaña" },
+      { "path": "docs/prevision/ + docs/legado-holding-prevision/", "role": "ARCHIVO HISTÓRICO: diseño del módulo de Previsión que iba dentro de este repo, descartado. No es estado actual." }
     ]
   },
   "eliminados_en_la_migracion": [
@@ -99,24 +113,30 @@
     "Fix gracias.html/cancelado.html 404 (faltaban en la lista de copia de .cpanel.yml)",
     "Bot: saludo de emergencia reescrito según docs/GUIA_INTERACCION_BOT_LEGADO.md (ya no presupone duelo), colores rojo/destructive reemplazados por navy/gold del branding",
     "Bot: ícono del header del chat cambiado de triángulo de alerta a images/IconoLegado.png",
-    "Fix doble-presentación de Alma: chatMessages ahora se inicializa con el saludo estático incluido, para que el historial enviado al backend ya lo tenga — verificado correcto en aislamiento (frontend origin + backend/Gemini vía curl directo a /chat)"
+    "Fix doble-presentación de Alma: chatMessages se inicializa con el saludo estático incluido (2026-08-25); ver hilo abierto abajo",
+    "2026-08-26 — Alma migró de Google Gemini a OpenAI (gpt-5.6-luna). Dos gotchas de prod: fuerza reasoning_effort=none (el modelo reasoning rechaza function tools sin eso) e ignora un agent_config.model de Gemini obsoleto en Supabase. Alma usa el catálogo (list_planes/list_servicios), no cotiza/factura, deriva por handoff_whatsapp o registra prospecto (create_lead).",
+    "2026-08-26 — Atribución de vendedor externo (?ref=) + campañas (UTM): js/main.js §ATRIBUCIÓN (first-touch, TTL 90d, localStorage) + worker/src/attribution.js. Viaja en POST /compras, POST /solicitudes y el handoff a WhatsApp. Alma nombra al vendedor via /vendedores/lookup. Alma NO ve el código.",
+    "2026-08-26 — Páginas legales HTML (Términos, Privacidad) + botón llamar solo en móvil.",
+    "2026-08-27 — Checkout de planes Selecto ENCENDIDO (SELECTO_CHECKOUT_ENABLED=true, ?v=8→?v=9). Cuota inicial como line_item sin recurring en Stripe Checkout. Verificado end-to-end (contratos #8 y #9).",
+    "2026-08-27 — Canal entre agentes formalizado en docs/pruebas-tenant-lh-para-prevision.md (bitácora PF-*/LH-*). Smoke test end-to-end en navegador (LH-3). Re-smoke de todo el doc.",
+    "2026-08-27 — docs/ONBOARDING-AGENTES.md creado como punto de entrada único para cualquier agente/colaborador."
   ],
   "known_gaps_in_prevision_funeraria_api": [
     "1. Sin modelo para el marketplace de aliados regionales de Alma (N aliados con catálogo propio por ciudad) — no es un bug a corregir, es la razón del rediseño a handoff",
-    "2. Sin campo de cuota inicial en 'planes' — bloquea migrar esencial-selecto/vanguardia-selecto (cobran cuota única + mensualidad, ese modelo no existe en la API nueva). CTA de esos 2 planes manda a contacto en vez de abrir el wizard. Detalle + solución propuesta (Stripe add_invoice_items) en docs/ajustes-prevision-funeraria-atribucion-vendedor.md §4.",
+    "2. RESUELTO (PF-1, 2026-08-26): la cuota inicial de los Selecto se cobra como un line_item sin 'recurring' en el Stripe Checkout (add_invoice_items NO es válido al crear una Checkout Session). GET /planes expone cuota_inicial_centavos. Checkout de Selecto encendido y verificado.",
     "3. tarifas[] (precio por banda de edad) es capacidad nueva que el wizard no explotaba antes — confirmar con negocio si el tenant lh debe usar una sola banda 0-100 para mantener precio plano",
-    "4. ATRIBUCIÓN DE VENDEDOR (?ref=): la API acepta atribucion.codigo_vendedor en /compras y /solicitudes (probado en vivo 2026-08-26), pero falta confirmar/implementar: (a) que el webhook de Stripe copia vendedor_id de compras_pendientes al contrato final — CRÍTICO, si no, ninguna venta con tarjeta genera comisión; (b) que /solicitudes resuelve/persiste/muestra el vendedor y lo prellena al convertir lead->contrato; (c) endpoint GET /vendedores/lookup?codigo= para nombrar al vendedor en el handoff; (d) match case-insensitive del código; (e) /solicitudes devuelve solo {\"ok\":true} sin id. Todo en docs/ajustes-prevision-funeraria-atribucion-vendedor.md."
+    "4. RESUELTO (PF-2..5/7, 2026-08-26/27): la atribución llega al contrato vía el webhook de Stripe (verificado contratos #8/#9); /vendedores/lookup existe y es case-insensitive; /solicitudes devuelve solicitud_id (string opaco de 10 chars, nunca Number()) y resuelve/muestra el vendedor. Único abierto: PF-6, vista de staff de atribución — 100% trabajo de Prevision-Funeraria."
   ],
   "open_thread_needs_followup": {
     "id": "double-greeting-bug-user-still-sees-it",
-    "status": "backend y frontend verificados correctos en aislamiento, pero el usuario reportó (2026-08-25, después del fix + deploy) que Alma TODAVÍA se presenta dos veces en su navegador",
+    "status": "backend y frontend verificados correctos en aislamiento, pero el usuario reportó que Alma TODAVÍA se presenta dos veces en su navegador. Sigue sin confirmarse resuelto por el usuario al 2026-08-27.",
     "evidence_fix_is_correct": [
       "Fetch con query string único (bypass cache) de js/main.js en producción confirma que 'chatMessages = [{ role: \"assistant\", content: greeting }]' SÍ está en el código servido",
-      "curl directo a https://api.legadoholding.com/chat con sessionId sintético + history conteniendo el saludo + mensaje de usuario devolvió respuesta SIN reintroducción — prueba que el backend/prompt de Gemini funciona bien cuando recibe el history correcto",
+      "curl directo a https://api.legadoholding.com/chat con sessionId sintético + history conteniendo el saludo + mensaje de usuario devolvió respuesta SIN reintroducción — el backend funciona bien cuando recibe el history correcto (verificado primero con Gemini, sigue válido con OpenAI)",
       "grep en todo el repo (js/, admin/) no encontró ningún segundo openChat/chat_greeting/chatMessages duplicado que explique un path alterno"
     ],
     "leading_hypothesis": "el navegador del usuario tenía una pestaña/sesión abierta desde ANTES del deploy del fix (JS ya cargado en memoria no se reemplaza sin recargar), o Cloudflare seguía sirviendo un ?v=N cacheado con contenido viejo por una carrera con la propagación del deploy",
-    "next_step": "pedirle al usuario que pruebe en ventana de incógnito/privada (descarta JS viejo en memoria) y confirme en DevTools → Network que carga js/main.js?v=3 — si falla incluso así, investigar más a fondo",
+    "next_step": "pedirle al usuario que pruebe en ventana de incógnito/privada (descarta JS viejo en memoria) y confirme en DevTools → Network que carga js/main.js?v=9 (versión actual) — si falla incluso así, investigar más a fondo",
     "not_yet_confirmed_resolved_by_user": true
   },
   "known_limitations": [
@@ -128,9 +148,9 @@
   "commands_cheatsheet": {
     "deploy_worker": "cd worker && wrangler deploy",
     "deploy_frontend": "git push origin main (dispara .cpanel.yml automáticamente) — el usuario debe confirmar que el deploy de cPanel se disparó, no siempre es instantáneo",
-    "set_secret": "cd worker && wrangler secret put PF_TOKEN",
+    "set_secret": "cd worker && wrangler secret put PF_TOKEN  (o OPENAI_API_KEY, SUPABASE_SERVICE_ROLE_KEY)",
     "health_check": "Invoke-RestMethod -Uri 'https://api.legadoholding.com' -Method GET  (debe reportar pfTokenLoaded:true)",
-    "cache_bust_after_css_js_change": "bump ?v=N en index.html líneas ~48/1180/1181, commit, push",
+    "cache_bust_after_css_js_change": "bump ?v=N en index.html (css/main.css?v=4 línea ~100, js/main.js?v=9 línea ~1283; son independientes), commit, push",
     "verify_true_cache_miss": "curl -sI 'https://www.legadoholding.com/js/main.js?zzz=<timestamp único>' | grep cf-cache-status  → debe decir MISS con contenido nuevo"
   },
   "user_preferences": {

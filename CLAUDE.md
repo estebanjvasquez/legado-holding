@@ -1,5 +1,10 @@
 # Legado Holding — contexto adicional
 
+> **¿Retomando el proyecto o entrando por primera vez?** Lee primero
+> `docs/ONBOARDING-AGENTES.md` — panorama, estado actual, mapa del repo y gotchas en
+> un solo archivo. Este CLAUDE.md es la narrativa detallada de los cambios; el
+> snapshot estructurado está en `.claude/handoff.json`.
+
 ## Módulo de Previsión (nuevo sistema, otro repo)
 
 Se está construyendo un sistema multiempresa de previsión funeraria en el repositorio

@@ -1,10 +1,13 @@
 # LEGADO Holding — Sitio web y plataforma de checkout
 
-> **Actualizado 2026-08-25.** Este repo migró de Invoice Ninja a la API pública
+> **Actualizado 2026-08-27.** Este repo migró de Invoice Ninja a la API pública
 > de **Prevision-Funeraria** (repo separado `estebanjvasquez/Prevision-Funeraria`,
 > tenant `lh`). Ver `CLAUDE.md` y `docs/api-publica-wizard.md` para el contrato
 > completo. El login del panel admin (`worker/src/admin.js`) es la única parte
 > que sigue hablando con Invoice Ninja — deuda pendiente, no bloqueante.
+>
+> **Para retomar el proyecto rápido:** empieza por `docs/ONBOARDING-AGENTES.md`
+> (panorama + estado + gotchas). Este README es la referencia profunda.
 
 Sitio bilingüe (ES/EN) de previsión funeraria para venezolanos en EE. UU., con
 catálogo de planes, wizard de afiliación, y checkout con tarjeta (Stripe
@@ -81,7 +84,7 @@ propio que también sirve de proxy autenticado para el bot "Alma".
 | Invoice Ninja | `invoicing.legadoholding.com` — solo login de staff del panel admin |
 | Idiomas | Español / Inglés (toggle en la barra de navegación) |
 | Pagos | Stripe Checkout (vía Prevision-Funeraria); cuenta de producción de LH pendiente — hoy corre en modo test |
-| Suscripción | Mensual o anual (planes Zulia). Planes "Selecto" no tienen checkout digital (cuota inicial no soportada por la API); su CTA manda a contacto |
+| Suscripción | Mensual o anual. Los 4 planes tienen checkout digital. Los "Selecto" cobran además una cuota inicial única (`cuota_inicial_centavos`) que Previsión mete como `line_item` sin `recurring` en el Stripe Checkout. Se activa/desactiva con `SELECTO_CHECKOUT_ENABLED` en `js/main.js` (hoy `true`) |
 
 ---
 
@@ -326,8 +329,9 @@ de planes deben mostrar precios reales (no los de respaldo).
 
 #### Request a `POST /` (checkout)
 
-Solo cubre los planes migrados (`esencial-zulia`, `vanguardia-zulia`) — los
-planes "Selecto" no pasan por aquí, ver `worker/src/wizard-compra.js`.
+Cubre los 4 planes (`esencial-zulia`, `vanguardia-zulia`, `esencial-selecto`,
+`vanguardia-selecto`). La cuota inicial de los Selecto la maneja Previsión al
+armar el Stripe Checkout; ver `worker/src/wizard-compra.js`.
 
 ```json
 {
@@ -504,14 +508,15 @@ Worker. La función `loadPlansFromAPI()` en [js/main.js](js/main.js):
 
 #### Planes disponibles para checkout digital
 
-El modelo `planes` de Prevision-Funeraria todavía no soporta cuota inicial,
-así que solo los planes Zulia tienen checkout digital:
+Los 4 planes tienen checkout digital (2026-08-27). Los "Selecto" cobran una
+cuota inicial única que Previsión adjunta como `line_item` sin `recurring` en
+el Stripe Checkout (solo a la 1ª factura):
 
 | Slug (frontend y API) | Familia | Checkout digital |
 |---|---|---|
 | `esencial-zulia` | Zulia | Sí — vía `POST /` del Worker |
 | `vanguardia-zulia` | Zulia | Sí — vía `POST /` del Worker |
-| `esencial-selecto` / `vanguardia-selecto` | Selecto | No — el CTA manda a `#contacto` (cuota inicial no modelada por la API) |
+| `esencial-selecto` / `vanguardia-selecto` | Selecto | Sí — mensualidad + cuota inicial. Se apaga con `SELECTO_CHECKOUT_ENABLED=false` en `js/main.js` |
 
 `VALID_PLAN_SLUGS` en [worker/src/wizard-compra.js](worker/src/wizard-compra.js)
 es la fuente de verdad de cuáles slugs aceptan checkout. `planId` (el `id`
@@ -717,7 +722,7 @@ no son afectadas y siguen funcionando.
 
 | Pendiente | Severidad | Notas |
 |---|---|---|
-| Planes "Selecto" sin checkout digital | Media | El modelo `planes` de Prevision-Funeraria no soporta cuota inicial todavía. Su CTA manda a `#contacto`. Ver `docs/api-publica-wizard.md`. |
+| Atribución de vendedor: falta la vista de staff en Previsión (PF-6) | Media | Este repo ya manda los 6 campos de atribución en `/compras` y `/solicitudes`. Falta que Prevision-Funeraria exponga la vista de transacciones por origen/vendedor/campaña. Ver `docs/pruebas-tenant-lh-para-prevision.md`. |
 | Cuenta Stripe de producción de LH pendiente | Alta (negocio, no de código) | KYC/verificación de Legado Holding Inc. sin completar; todo cobro hoy es en modo test de Stripe. Bloqueo externo, no de este repo. |
 | Login del panel admin sigue en Invoice Ninja | Baja | `worker/src/admin.js` autentica staff contra `IN_BASE`. Deuda de migración, no bloqueante — ver `CLAUDE.md`. |
 | Sin idempotencia en checkout | Media | Doble click en "Confirmar" puede crear dos compras pendientes. Mitigar con un `Idempotency-Key` (uuid del wizard) en el Worker. |
