@@ -189,7 +189,49 @@ Stub de atribución del handoff a WhatsApp (mismo endpoint):
 
 ## Abierto
 
-### PF-6 · Vista staff de atribución / transacciones por origen, vendedor y campaña — **P1, APROBADO, hacer**
+*(nada abierto de este lado.)*
+
+## Cerrado
+
+### PF-6 · Vista staff de atribución / transacciones por origen, vendedor y campaña — **P1, APROBADO, hacer** — ✅ cerrado (2026-08-27)
+
+**Resultado:** implementado tal cual el pedido, pero **tenant-agnóstico** (no solo
+`lh`) — el schema de atribución (`canal_origen`/`utm_*`/`referrer_url`) ya es nativo
+en `fdz` y `lh` desde antes, y `CLAUDE.md` de Prevision-Funeraria exige la misma UI de
+administración para ambas empresas. La vista vive en `/atribucion` (panel de staff,
+sección "Comercial", junto a "Vendedores"), no bajo `/reportes`. Endpoints reales:
+`GET /api/t/:slug/atribucion/transacciones` y `GET /api/t/:slug/atribucion/resumen`
+(mismos params sugeridos: `desde/hasta/tipo/estado/origen/vendedor_id/campana/plan_id/page/limit`).
+La ficha de cada vendedor en `/vendedores` enlaza a `/atribucion?vendedor_id=<id>`.
+
+**Gap real encontrado al revisar el pedido (no estaba en el checklist original):**
+`confirmarCompraPendiente` copiaba `vendedor_id` al contrato al confirmarse una
+compra, pero nunca `canal_origen`/`utm_*`/`referrer_url` — se perdían aunque
+`compras_pendientes` sí los tuviera guardados. Corregido en el mismo punto de
+escritura que usan los 3 caminos de confirmación (Mercantil síncrono, webhook
+Stripe, confirmación manual de staff). Migración `0035` hizo backfill de
+`canal_origen='vendedor'` en contratos ya confirmados con `vendedor_id` (aplicada y
+verificada contra D1 remoto real, `fdz`+`lh` — confirmado en producción que el
+contrato #9 de `lh` (vendedor ESTEBAN) quedó con `canal_origen='vendedor'`).
+
+**Checklist de verificación (resuelto):**
+- [x] `compras_pendientes` persiste las 6 (ya lo hacía, `src/routes/compras-publico.ts`).
+- [x] Se propagan al `contrato` — era el gap real, corregido (ver arriba).
+- [x] `solicitudes` persiste las 6 (ya lo hacía, `src/db/solicitudes.ts`).
+- [x] No hizo falta migración de columnas nuevas, solo el backfill de datos viejos.
+
+Commit `3ecef44` (`feat: vista de staff de atribucion/transacciones (PF-6) + fix de
+propagacion a contratos`), rama `claude/intercambio-file-improvements-eeon58`,
+pusheada a `origin`. `npm run typecheck` limpio, `npx vitest run`: 267/268 (única
+falla: el mismo flake preexistente y documentado de `comisiones (Fase 7)`, no
+relacionado). Migración 0035 aplicada y verificada contra D1 remoto real (`--remote`)
+en `fdz` y `lh`, Worker desplegado a producción (versión `a17a02f0`). Verificado en
+vivo: `/atribucion` sirve 200, `/api/t/lh/atribucion/transacciones` exige sesión de
+staff (401 sin cookie, mismo patrón que el resto del panel) y el contrato #9 real de
+`lh` quedó con `canal_origen='vendedor'` tras el backfill.
+
+<details><summary>Pedido original (para referencia)</summary>
+
 El usuario confirmó (2026-08-27) que **sí** hay que hacerlo, es 100% de
 Prevision-Funeraria. Requisito literal del usuario:
 
@@ -249,17 +291,17 @@ LH manda en `atribucion` (en `POST /compras` y `POST /solicitudes`):
 `codigo_vendedor`, `canal_origen`, `utm_source`, `utm_medium`, `utm_campaign`,
 `referrer_url` (ver "Bloque `atribucion`" arriba).
 
-- [ ] Confirmar que `compras_pendientes` persiste **las 6**: `vendedor_id`
+- [x] Confirmar que `compras_pendientes` persiste **las 6**: `vendedor_id`
   (resuelto), `canal_origen`, `utm_source/medium/campaign`, `referrer_url`. PF-2
   dijo que el webhook "recupera `vendedor_id` (y `canal_origen`/`utm_*`) desde
   D1" → implica que ya están en `compras_pendientes`; confirmar columna por
   columna y agregar las que falten.
-- [ ] Confirmar que esos campos se **propagan al `contrato`** cuando el webhook
+- [x] Confirmar que esos campos se **propagan al `contrato`** cuando el webhook
   lo materializa (PF-2 dijo que sí para `vendedor_id`, `canal_origen`, `utm_*` —
   reconfirmar `utm_campaign` y `referrer_url` puntualmente).
-- [ ] Confirmar que `solicitudes` persiste los mismos 6 campos de atribución (no
+- [x] Confirmar que `solicitudes` persiste los mismos 6 campos de atribución (no
   sólo `vendedor_id` — PF-3 sólo mencionó el vendedor).
-- [ ] Si alguna tabla no tiene esas columnas → migración para agregarlas +
+- [x] Si alguna tabla no tiene esas columnas → migración para agregarlas +
   backfill nulo.
 
 #### Endpoints sugeridos (staff, sesión de staff — no el token público)
@@ -289,7 +331,7 @@ manda los 6 campos de atribución (`codigo_vendedor`, `canal_origen`,
 (`sanitizeAttribution` + body de `/compras`) y `wrangler tail`. PF-6 es enteramente
 trabajo de Prevision-Funeraria: persistir/propagar/exponer lo que ya llega.
 
-## Cerrado
+</details>
 
 - [x] **Catálogo `cuota_inicial_centavos` + `cuota_inicial_concepto`** en `GET /planes`
   (verificado 2026-08-26: esencial-selecto=3500, vanguardia-selecto=5500,
