@@ -43,7 +43,19 @@ internos. El catálogo y `/solicitudes` son públicos, sin token.
 
 ## Endpoints que consume legado-holding
 
-| Endpoint | Quién llama | Auth | Estado en vivo (verificado 2026-08-26) |
+> **Re-smoke test 2026-08-27 (agente legado-holding) — todo lo de esta sección y
+> las bitácoras verificado de nuevo en vivo:** `GET /planes` 4 planes + cuota
+> inicial (3500/5500, "Cuota de afiliación"); `GET /servicios` 3 items
+> `es_emergencia`, `whatsapp_emergencia:+584246950136`; `GET /vendedores/lookup`
+> `MN4UYC5Y` y `mn4uyc5y` → ESTEBAN, inválido → `{activo:false}`; `POST /compras`
+> vía Worker 5/5 variantes (Zulia/Selecto mensual+anual, código válido/inválido/
+> sin código) → `200 pendiente_pago + link`; `POST /solicitudes` `telefono` 24
+> chars → 400, 12 chars → `201 {"solicitud_id":"H2G5P99ZDM"}`; Alma `create_lead`
+> con `?ref=` → prospecto; Alma handoff con `?ref=` → *"Vengo referido/a por
+> ESTEBAN (ref: MN4UYC5Y)"*; frontend prod `?v=9`, `SELECTO_CHECKOUT_ENABLED=true`;
+> Worker health OK; unit tests 20/20 + lógica frontend 9/9.
+
+| Endpoint | Quién llama | Auth | Estado en vivo (verificado 2026-08-27) |
 |---|---|---|---|
 | `GET /api/public/t/lh/planes` | navegador | — | ✅ 4 planes, `cuota_inicial_centavos` presente |
 | `GET /api/public/t/lh/servicios` | navegador | — | ✅ 3 items (`es_emergencia:true`), `whatsapp_emergencia:"+584246950136"` |
@@ -149,6 +161,9 @@ Stub de atribución del handoff a WhatsApp (mismo endpoint):
     `REG-CHECK-001`, `CTRL-ZULIA-001`, `E2E-SELECTO-001`, `E2E-SELANUAL-001`,
     `TAIL-CHECK-001`, `DBG-ATRIB-001` (= compra_pendiente id 32),
     + las `SMOKE ATRIBUCION`. (Las `SEL-*` con 500 no crearon nada.)
+  - **Re-smoke 2026-08-27:** compras `RETEST-ZUL`, `RETEST-SELM`, `RETEST-SELA`,
+    `RETEST-BADREF`, `RETEST-NOATTR`; leads apellidos `Lead`/`Handoff`/`StubOK`
+    (nombres `Retest`) + `referencia_publica` `H2G5P99ZDM`.
   - Contrato del navegador (usuario): cliente `EST-EDGE-001` →
     **compra_pendiente id 30 → contrato #9**, Selecto activo, `vendedor_id: 1`
     (ESTEBAN). Sirve como caso de referencia de PF-5 — avisar si hay que borrarlo.
