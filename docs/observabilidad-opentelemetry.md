@@ -1,9 +1,10 @@
 # Observabilidad del Worker / bot Alma — análisis y determinación sobre OpenTelemetry
 
-> **Fecha:** 2026-09-09. **Estado:** determinación cerrada. **No implementado aún.**
-> Restricciones confirmadas: Cloudflare **plan Free**, presupuesto **$0** (ni ahora ni
-> después). Camino elegido: `@microlabs/otel-cf-workers` → **Honeycomb Free**. Ver §4 y §6.
-> Único bloqueante: crear la cuenta Honeycomb Free + API key.
+> **Fecha:** 2026-09-09. **Estado:** ✅ **implementado y desplegado** (paso `tenant` +
+> Etapa 1 OTel). Worker versión `7c61ad55`. Restricciones: Cloudflare **plan Free**,
+> presupuesto **$0**. Backend: **Honeycomb Free** (`@microlabs/otel-cf-workers`).
+> Pendiente del usuario: ver trazas en Honeycomb (dataset `alma-lh`), rotar la ingest key,
+> y (opcional) environment `production` + la migración SQL de columnas `tenant`. Ver §6.
 
 ---
 
@@ -119,40 +120,64 @@ Construir la opción D (dashboards + alertas a mano). Es reimplementar OTel peor
 
 Orden, antes de arrancar el bot de FDZ:
 
-1. **Paso `tenant` (sin vendor, sin costo, independiente). — ✅ HECHO (código), commit
-   `035d2df`.**
+1. **Paso `tenant`. — ✅ HECHO + DESPLEGADO.** Commits `035d2df` / `5a5f90e`. Worker
+   versión `339d4681`.
    - `worker/src/tenant.js` → `resolveTenant(env)`, única fuente de verdad. `TENANT="lh"`
-     en `wrangler.toml`. `service.name = alma-${tenant}` listo para OTel.
+     en `wrangler.toml`. `service.name = alma-${tenant}`.
    - `prevision-api.js` arma `/api/public/t/<tenant>` desde `env.TENANT` (antes `"lh"` fijo).
    - `chat.js` / `alma.js`: `tenant=<id>` en las líneas de log; `meta.tenant` en
      `chat_sessions.metadata` (jsonb, sin migración).
-   - `index.js`: `tenant` en el health check.
+   - `index.js`: `tenant` en el health check (verificado: `"tenant":"lh"`).
    - **Pendiente (opcional):** correr `worker/sql/2026-09-09-tenant-columns.sql` en Supabase
      para tener `tenant` como columna de primera clase en `chat_sessions`/`chat_turns`
      (hoy vive en el jsonb `metadata`). Tras correrlo, un commit chico añade `tenant` a los
      `INSERT` de `insertTurn`/`upsertSession`.
-   - **Falta:** desplegar (`cd worker && wrangler deploy`).
 
-2. **Etapa 1 — `@microlabs/otel-cf-workers` → Honeycomb Free.** (Backend elegido por el
-   usuario 2026-09-09; Grafana Cloud Free era la alternativa, se descartó por retención de
-   14 días vs 60 y por preferir la UI de exploración de trazas de Honeycomb.)
-   - Crear cuenta Honeycomb Free en `https://ui.honeycomb.io/signup` (el usuario) →
-     Environment (`production`) → *API Keys* → una **Ingest key** → `wrangler secret put`.
-   - `npm init` en `worker/` (hoy sin `package.json`) + `npm i @microlabs/otel-cf-workers`.
-   - Envolver el handler de `index.js` con `instrument()`, `service.name = alma-${tenant}`.
-   - ~5 spans manuales (loop de hops, FASE 0, cada executor de tool).
-   - Deploy + verificar trazas en Honeycomb.
-   - ~medio día.
+2. **Etapa 1 — `@microlabs/otel-cf-workers` → Honeycomb Free. — ✅ HECHO + DESPLEGADO.**
+   Commit `9e1be2b`. Worker versión `7c61ad55`. (Backend: Honeycomb Free; Grafana Cloud
+   Free era la alternativa, se descartó por retención 14 d vs 60 y por la UI de trazas.)
+   - Primera dependencia npm del Worker: `@microlabs/otel-cf-workers@1.0.0-rc.52` +
+     `@opentelemetry/api@1.9.0`. `compatibility_flags = ["nodejs_compat"]` (lo exige la lib).
+   - `worker/src/otel.js`: `resolveOtelConfig(env)` — endpoint + headers desde secrets
+     `OTEL_EXPORTER_OTLP_ENDPOINT` (`https://api.honeycomb.io`) y `OTEL_EXPORTER_OTLP_HEADERS`
+     (`x-honeycomb-team=<ingest key>`). `service: { name: alma-lh, namespace: grupo-legado }`.
+   - **Kill-switch:** `index.js` solo envuelve el handler con `instrument()` si
+     `OTEL_EXPORTER_OTLP_ENDPOINT` está seteado. Para apagar OTel en prod sin redeploy:
+     `wrangler secret delete OTEL_EXPORTER_OTLP_ENDPOINT`.
+   - Auto-instrumenta cada `fetch` saliente (OpenAI / PF / Supabase / Stripe).
+   - Spans manuales: `alma.tool <name>` por ejecución de tool (con `tool.latency_ms`,
+     `tool.covered`, `tool.error`); atributos `alma.*` y `legado.*` (tenant, session,
+     handoff, lead, coverage, hops) en el span del request.
+   - Bundle: 27 → **135 KiB gzip** (límite Free: 3 MiB). Smoke Alma 11/11.
+   - **Verificado:** deploy OK, health OK, `/chat` (neutro + urgencia) responde sin error,
+     `wrangler tail` sin errores de export, POST OTLP manual a `/v1/traces` → HTTP 200,
+     key validada (`GET /1/auth`: team `sisteg`, environment `test`, `events:true`,
+     `createDatasets:true`, E&S — no necesita `x-honeycomb-dataset`).
+   - **Pendiente del usuario:**
+     a. Ver las trazas en Honeycomb → dataset **`alma-lh`**, environment **`test`**.
+     b. La key pertenece al environment **`test`**. Si se quiere separar prod, crear un
+        environment `production` en Honeycomb, generar su ingest key y
+        `wrangler secret put OTEL_EXPORTER_OTLP_HEADERS` con la nueva.
+     c. **Rotar la ingest key** (quedó en texto plano en el chat) una vez confirmado el flujo.
 
 3. **Etapa 2 — `chat_turns` queda como transcripción + analítica de negocio**, no como
    "tracing". Sin trabajo, solo dejar de ampliarlo con esa intención.
 
-**Bloqueante para el paso 2:** que el usuario cree la cuenta Honeycomb Free y pase la API
-key (o me confirme que la creo yo y él la mete como secret).
+### Nota de seguridad — `npm audit`
+
+`npm audit` reporta 9 *moderate* (GHSA-8988-4f7v-96qf: *unbounded memory allocation en la
+propagación de W3C Baggage*, `@opentelemetry/core` <2.8.0, **sin fix** aguas arriba). Vector:
+un header `baggage` malicioso y enorme en un request entrante. Mitigado en la práctica:
+`api.legadoholding.com` está detrás de Cloudflare (tope de tamaño de headers ~32 KB) y el
+endpoint no es un colector de trazas público. Riesgo aceptado; revisar cuando la cadena
+`@microlabs/otel-cf-workers` bumpee `@opentelemetry/core`.
 
 ## 7. Referencias
 
-- `worker/src/index.js` — handler a envolver.
-- `worker/src/alma.js` / `worker/src/chat.js` — el loop de Alma y la persistencia en Supabase.
-- `worker/wrangler.toml` — `[observability] enabled = false` (ver comentario del entitlement).
+- `worker/src/index.js` — handler + wrap condicional de `instrument()`.
+- `worker/src/otel.js` — config de OTel (endpoint/headers/service).
+- `worker/src/tenant.js` — `resolveTenant(env)`.
+- `worker/src/alma.js` / `worker/src/chat.js` — spans manuales + atributos.
+- `worker/wrangler.toml` — `compatibility_flags = ["nodejs_compat"]`; `[observability] enabled = false` (plan Free).
+- `worker/sql/2026-09-09-tenant-columns.sql` — migración opcional de columnas `tenant`.
 - `docs/plan-bot-alma-funeraria-del-zulia.md` — plan del bot de FDZ (multi-tenant).
