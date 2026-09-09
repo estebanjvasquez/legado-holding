@@ -1,8 +1,9 @@
 # Observabilidad del Worker / bot Alma — análisis y determinación sobre OpenTelemetry
 
-> **Fecha:** 2026-09-09. **Estado:** análisis + recomendación. **No implementado.**
-> Decisión que falta del usuario: plan de Cloudflare y si se acepta un backend de
-> observabilidad de terceros (tier gratuito).
+> **Fecha:** 2026-09-09. **Estado:** determinación cerrada. **No implementado aún.**
+> Restricciones confirmadas: Cloudflare **plan Free**, presupuesto **$0** (ni ahora ni
+> después). Camino elegido: `@microlabs/otel-cf-workers` → **Honeycomb Free**. Ver §4 y §6.
+> Único bloqueante: crear la cuenta Honeycomb Free + API key.
 
 ---
 
@@ -60,19 +61,36 @@ Lo que OTel **no** reemplaza: `chat_turns` como **transcripción** de la convers
 
 ## 4. Determinación (recomendación)
 
-Depende de dos cosas que hay que confirmar:
-1. **El plan de Cloudflare.** El `10007` en `observability` sugiere plan **Free** (o muy restringido). Si se puede pasar a Workers Paid ($5/mes), se abre la opción B.
-2. **Aceptar un backend de terceros** (Grafana Cloud / Honeycomb tienen tier gratuito de sobra para este tráfico).
+### Restricciones confirmadas por el usuario (2026-09-09)
 
-### Camino recomendado, por etapas
+1. **Plan de Cloudflare: Free.** Confirmado. No se va a pasar a Workers Paid.
+2. **Presupuesto: $0, ni ahora ni más adelante.** Nada que pueda facturar. Los free
+   tiers permanentes de Grafana Cloud / Honeycomb sí encajan (ver nota de volumen abajo);
+   cualquier cosa con tarjeta de crédito o que "escale a de pago" queda descartada.
 
-**Etapa 0 — ya, barato, sin código.** Confirmar el plan. Si el upgrade a Workers Paid ($5/mes) es aceptable, poner `[observability] enabled = true` (o `logs = { enabled = true }` en wrangler nuevo). Solo eso da logs consultables + analítica de invocación con retención en el dashboard — cierra el hueco #1 con el mínimo esfuerzo, reutilizando los `console.log` que ya existen.
+**Consecuencia:**
+- **Etapa 0 (observabilidad nativa de Cloudflare) → DESCARTADA.** Requiere plan Paid
+  (`10007 entitlements.not_available` en Free). No hay camino sin costo por acá.
+- **Opción B y C → DESCARTADAS** (ambas necesitan Paid).
+- **Opción A (`@microlabs/otel-cf-workers` → backend free) → es el único camino que
+  cumple las dos restricciones.** Backend recomendado: **Honeycomb Free**.
 
-**Etapa 1 — OTel real con `@microlabs/otel-cf-workers`** (si queremos tracing de verdad).
+### Nota de volumen — por qué el free tier es seguro "para siempre" a este tráfico
+
+Honeycomb Free = **20 M eventos/mes**, 60 días de retención, sin tarjeta. El bot todavía
+no tiene usuarios finales; en producción real haría del orden de cientos de requests/día,
+~5–15 spans por request → **~150 k spans/mes**. Eso es **~130× por debajo** del límite
+gratuito. Grafana Cloud Free (50 GB trazas/mes, 14 días) da un margen similar. Si algún
+día nos acercáramos al límite, se controla con sampling (bajar a 10–20 % de trazas) sin
+tocar el resto. No hay un escenario realista en el que esto genere una factura.
+
+### Camino a ejecutar
+
+**Etapa 1 — OTel con `@microlabs/otel-cf-workers` → Honeycomb Free.**
 - Envolver el handler de `index.js` con `instrument()`.
 - Auto-captura cada `fetch` a OpenAI / PF / Supabase / Stripe como span hijo con tiempo y status, por request, casi sin código nuestro.
 - Añadir ~5 spans manuales: el loop de hops de Alma, la clasificación FASE 0, cada executor de tool.
-- Exportar OTLP a **Grafana Cloud** (free: 50 GB trazas/mes) o **Honeycomb** free. Config con 2 secrets (`OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS`).
+- Exportar OTLP a **Honeycomb Free** (`api.honeycomb.io:443`, header `x-honeycomb-team: <api-key>`). Config con 2 secrets del Worker (`OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS`) — la API key nunca en código.
 - **`service.name` por tenant** (`alma-lh`, `alma-fdz`) → dashboards por tenant gratis cuando entre FDZ. **Este es el argumento más fuerte para hacerlo ANTES de FDZ.**
 - Costo: 1 dep npm + ~decenas de KB de bundle, ~medio día de trabajo.
 
@@ -88,20 +106,39 @@ Construir la opción D (dashboards + alertas a mano). Es reimplementar OTel peor
 
 ## 5. Esfuerzo / costo
 
-| Camino | Código | $ | Tiempo | Da |
-|---|---|---|---|---|
-| CF logs nativos (`observability=true`) | 1 línea en `wrangler.toml` | ~$5/mes (si no es ya Paid) | 15 min | logs consultables + analítica de invocación, retención |
-| `@microlabs/otel-cf-workers` → Grafana/Honeycomb free | envolver handler + ~5 spans + 2 secrets | $0 (free tiers) | ~medio día | trazas distribuidas, percentiles, por tenant, `fetch` auto-instrumentado, alertas |
-| Tail Worker → OTLP | Worker nuevo + config | $5/mes (plan Paid) | ~1 día | ídem, desacoplado, sin deps en el hot path |
-| Artesanal (opción D) | tablas + consultas + cron alertador + panel | $0 | varios días, y mantenimiento | parcial, a medida, sin tracing |
+| Camino | Código | $ | Tiempo | Da | Estado |
+|---|---|---|---|---|---|
+| CF logs nativos (`observability=true`) | 1 línea en `wrangler.toml` | ~$5/mes (plan Paid) | 15 min | logs consultables + analítica de invocación, retención | **descartado** (Free + $0) |
+| `@microlabs/otel-cf-workers` → Honeycomb Free | envolver handler + ~5 spans + 2 secrets | $0 (free tier, ~130× de margen) | ~medio día | trazas distribuidas, percentiles, por tenant, `fetch` auto-instrumentado, alertas | **elegido** |
+| Tail Worker → OTLP | Worker nuevo + config | $5/mes (plan Paid) | ~1 día | ídem, desacoplado, sin deps en el hot path | **descartado** (Paid) |
+| Artesanal (opción D) | tablas + consultas + cron alertador + panel | $0 | varios días, y mantenimiento | parcial, a medida, sin tracing | descartado (reimplementa OTel peor) |
 
 ---
 
-## 6. Próximo paso pendiente del usuario
+## 6. Plan de ejecución (restricciones ya confirmadas)
 
-1. ¿Plan de Cloudflare actual? (define si B/C son viables).
-2. ¿OK con un backend de observabilidad de terceros en tier gratuito (Grafana Cloud / Honeycomb)?
-3. Con eso: se ejecuta **Etapa 0** (si aplica) + **Etapa 1** + el paso de `tenant`, en ese orden, antes de arrancar el bot de FDZ.
+Orden, antes de arrancar el bot de FDZ:
+
+1. **Paso `tenant` (sin vendor, sin costo, independiente).** Añadir `tenant` (`"lh"` por
+   ahora, resuelto de la config del Worker) como campo de primera clase en:
+   - las líneas de `console.log/warn/error` de `worker/src/` (prefijo `[lh]` o campo),
+   - `chat_turns` (columna o dentro del `meta`),
+   - `chat_sessions.metadata`.
+   ~1–2 h. No necesita decisión adicional. **Se puede hacer ya.**
+
+2. **Etapa 1 — `@microlabs/otel-cf-workers` → Honeycomb Free.**
+   - Crear cuenta Honeycomb Free (el usuario) → 1 API key → `wrangler secret put`.
+   - `npm init` en `worker/` (hoy sin `package.json`) + `npm i @microlabs/otel-cf-workers`.
+   - Envolver el handler de `index.js` con `instrument()`, `service.name = alma-${tenant}`.
+   - ~5 spans manuales (loop de hops, FASE 0, cada executor de tool).
+   - Deploy + verificar trazas en Honeycomb.
+   - ~medio día.
+
+3. **Etapa 2 — `chat_turns` queda como transcripción + analítica de negocio**, no como
+   "tracing". Sin trabajo, solo dejar de ampliarlo con esa intención.
+
+**Bloqueante para el paso 2:** que el usuario cree la cuenta Honeycomb Free y pase la API
+key (o me confirme que la creo yo y él la mete como secret).
 
 ## 7. Referencias
 
