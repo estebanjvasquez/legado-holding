@@ -126,8 +126,11 @@ Orden, antes de arrancar el bot de FDZ:
    - `chat_sessions.metadata`.
    ~1–2 h. No necesita decisión adicional. **Se puede hacer ya.**
 
-2. **Etapa 1 — `@microlabs/otel-cf-workers` → Honeycomb Free.**
-   - Crear cuenta Honeycomb Free (el usuario) → 1 API key → `wrangler secret put`.
+2. **Etapa 1 — `@microlabs/otel-cf-workers` → Honeycomb Free.** (Backend elegido por el
+   usuario 2026-09-09; Grafana Cloud Free era la alternativa, se descartó por retención de
+   14 días vs 60 y por preferir la UI de exploración de trazas de Honeycomb.)
+   - Crear cuenta Honeycomb Free en `https://ui.honeycomb.io/signup` (el usuario) →
+     Environment (`production`) → *API Keys* → una **Ingest key** → `wrangler secret put`.
    - `npm init` en `worker/` (hoy sin `package.json`) + `npm i @microlabs/otel-cf-workers`.
    - Envolver el handler de `index.js` con `instrument()`, `service.name = alma-${tenant}`.
    - ~5 spans manuales (loop de hops, FASE 0, cada executor de tool).
