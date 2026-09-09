@@ -196,16 +196,24 @@ El cliente confirmó (2026-09-09) que la **guardia 24/7 real** de LEGADO es
 **`+584246677030`** y que ese es el número al que Alma debe derivar por WhatsApp
 (emergencias, urgencias y repatriación).
 
-**Pedido:** actualizar `whatsapp_emergencia` del tenant `lh` a `+584246677030` (panel de
-staff → configuración del tenant, o donde viva ese campo). Al hacerlo, Alma y el CTA de
-emergencia del wizard lo toman solos — `legado-holding` ya lee ese campo en vivo
-(`worker/src/alma.js` `execHandoffWhatsapp` / `execListServicios`).
+**Pedido:** actualizar `whatsapp_emergencia` del tenant `lh` a `+584246677030`. Al hacerlo,
+Alma y el CTA de emergencia del wizard lo toman solos — `legado-holding` ya lee ese campo
+en vivo (`worker/src/alma.js` `execHandoffWhatsapp` / `execListServicios`,
+`GET /api/public/t/lh/servicios`).
+
+**Dónde NO está (verificado 2026-09-09):** el usuario editó *Empresa → Datos de la empresa
+→ Teléfono* a `+584246677030` y guardó; `GET /api/public/t/lh/servicios` **sigue**
+devolviendo `whatsapp_emergencia: "+584246950136"` tras >1 min. O sea ese campo se
+alimenta de OTRO lado (¿Siniestros? ¿config de emergencia/guardia? ¿nivel plataforma?
+¿algún servicio `es_emergencia`?). **Pedido concreto al agente de PF:** decir en qué
+tabla/pantalla vive `whatsapp_emergencia` del tenant y (si el panel no lo expone) exponerlo
+o actualizarlo directo.
 
 **Mientras tanto (lado LH):** el fallback `DEFAULT_WHATSAPP_EMERGENCIA` de `alma.js` ya
-apunta a `+584246677030` (commit pendiente), pero **si la API sigue devolviendo el número
+apunta a `+584246677030` (commit `29d17e6`), pero **si la API sigue devolviendo el número
 viejo, gana la API**. El fix real es de este lado.
 
-- [ ] `whatsapp_emergencia` del tenant `lh` = `+584246677030` en prod.
+- [ ] `whatsapp_emergencia` del tenant `lh` = `+584246677030` en prod (`GET /servicios`).
 
 ## Cerrado
 
