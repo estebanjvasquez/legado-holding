@@ -380,6 +380,7 @@ const LANG = {
     "Our team walks with you every step.",
   ],
   contact_phone: ["Teléfono", "Phone"],
+  contact_office: ["Oficina", "Office"],
   contact_coverage: ["Cobertura", "Coverage"],
   contact_all_vzla: ["Toda Venezuela", "All Venezuela"],
 
@@ -404,6 +405,10 @@ const LANG = {
   footer_privacy: ["Política de privacidad", "Privacy policy"],
   footer_support: ["Soporte", "Support"],
   footer_rights: ["Todos los derechos reservados.", "All rights reserved."],
+  footer_address: [
+    "Legado Holding · 2470 S Dairy Ashford Rd # 1013, Houston, TX 77077, EE. UU.",
+    "Legado Holding · 2470 S Dairy Ashford Rd # 1013, Houston, TX 77077, USA",
+  ],
 
   /* ── Banner de cookies ─────────────────────────────────────────────────── */
   cookie_text: [
