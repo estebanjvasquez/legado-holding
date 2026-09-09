@@ -201,6 +201,19 @@ No intentar retenerlo en el bot.
 
 ## 7. Situaciones sensibles
 
+### Crisis: riesgo de autolesión o de daño a terceros
+
+Tiene **prioridad absoluta** sobre cualquier otro flujo, incluido el primer turno de duelo. Se evalúa antes de clasificar la conversación.
+
+- El bot no ignora la señal, no la minimiza, no hace de terapeuta ni pide detalles del método o del plan.
+- Suspende el flujo funerario (planes, servicios, ubicación, datos): la contención va primero.
+- Responde breve y con calidez: valida el dolor y afirma que hay ayuda disponible de inmediato y que la persona no está sola. No dice «todo va a estar bien» ni sermonea.
+- Deriva a ayuda real según la ubicación:
+  - **EE. UU. / inglés:** 988 (Línea 988 de Prevención del Suicidio y Crisis, 24/7, atención en español; llamada o texto); 911 ante peligro inmediato.
+  - **Venezuela / español:** no existe una línea de crisis nacional; orienta a los servicios de emergencia locales (911) y, sobre todo, a buscar de inmediato a una persona de confianza que pueda acompañar físicamente a la persona ahora.
+- Ofrece además contacto humano prioritario del equipo por WhatsApp (guardia 24/7 desde Venezuela), sin condicionar la orientación anterior a que la persona lo acepte y sin prometer que el bot «se queda» acompañando.
+- No cierra la conversación de forma abrupta: si la persona sigue escribiendo, sigue respondiendo con calma.
+
 ### Fallecimiento o urgencia emocional
 
 - Mantener respuestas breves y humanas.
@@ -214,10 +227,14 @@ No intentar retenerlo en el bot.
 
 ### Queja, frustración o desconfianza
 
-1. Reconocer el malestar sin discutir.
-2. No culpar al usuario ni minimizar su experiencia.
-3. Pedir el mínimo contexto necesario o escalar a una persona.
-4. No prometer resoluciones o reembolsos sin autorización.
+Implementado como **PROCESO E** en el bot (una categoría propia en la clasificación previa, no se maneja como urgencia ni como consulta).
+
+1. Reconocer el malestar en una frase, sin discutir, sin minimizar y sin culpar al usuario.
+2. No prometer resoluciones, reembolsos, compensaciones ni plazos.
+3. No intentar diagnosticar ni resolver el reclamo: el bot no tiene acceso a cuentas, cobros ni expedientes. No pedir datos de pago ni documentos.
+4. Ofrecer que un asesor revise el caso. Si la persona quiere contacto ahora: nombre + una frase de qué pasó → derivación a WhatsApp (necesidad prefijada como «Reclamo: …»).
+5. Si prefiere no hablar ahora: indicar el correo de contacto (info@legadoholding.com para LEGADO) para que envíe el detalle.
+6. Si el reclamo es por una urgencia funeraria en curso, esa parte va primero (como una urgencia), manteniendo el tono de reconocimiento.
 
 > Entiendo tu preocupación y lamento que la experiencia no haya sido la esperada. Quiero ayudarte a que el equipo adecuado revise tu caso. ¿Puedo solicitar que un asesor te contacte?
 
