@@ -42,6 +42,46 @@ function turnsToHistory(turns) {
     }));
 }
 
+/* Resumen accionable para la persona de guardia cuando Alma deriva por
+   WhatsApp. Se arma en el backend a partir de lo que ya capturamos (sin una
+   llamada extra al LLM): datos de la derivación, cobertura, atribución y los
+   últimos mensajes del usuario. Se guarda en chat_sessions.metadata.handoff_summary
+   para que el panel de sesiones lo muestre. */
+export function buildHandoffSummary({ result, history, message, lang, attribution }) {
+  const wa  = result.waHandoff || {};
+  const cov = result.coverage || null;
+  const userMsgs = [
+    ...(Array.isArray(history)
+      ? history.filter((m) => m && m.role === "user" && m.content).map((m) => m.content)
+      : []),
+    message,
+  ]
+    .filter(Boolean)
+    .slice(-3)
+    .map((m) => `  - "${String(m).slice(0, 200)}"`);
+
+  const lines = [
+    "[Resumen para el asesor — generado automáticamente por Alma]",
+    "Prioridad: alta (derivación en vivo por WhatsApp)",
+    `Idioma: ${lang}`,
+    `Nombre: ${wa.nombre || "no dado"}`,
+    `Necesidad: ${wa.necesidad || "no especificada"}`,
+  ];
+  if (cov) {
+    lines.push(
+      `Cobertura: ${
+        cov.covered
+          ? `sí — ${[cov.city, cov.state].filter(Boolean).join(", ")}`
+          : `no (${cov.reason || "sin aliado"})`
+      }`,
+    );
+  }
+  if (attribution?.codigo_vendedor) lines.push(`Vendedor (ref): ${attribution.codigo_vendedor}`);
+  else if (attribution?.canal_origen) lines.push(`Canal de origen: ${attribution.canal_origen}`);
+  lines.push("Últimos mensajes del usuario:", ...userMsgs);
+  return lines.join("\n");
+}
+
 /* Persiste un array de events de alma en chat_turns. Cada event ya trae
    role, hop, latency_ms, tool_name/args/result y error según corresponda. */
 async function persistEvents(db, sessionId, events, model) {
@@ -96,14 +136,18 @@ export async function handleChat(body, env, executionCtx) {
 
   const db = createSupabase(env);
 
-  /* 1. Cargar (o crear) la sesión. upsertSession es idempotente. */
+  /* 1. Cargar (o crear) la sesión. upsertSession es idempotente. Guardamos la
+        metadata previa para acumular el estado estructurado turno a turno
+        (updateSession reemplaza la columna JSON, no la mergea). */
   let dbHistory = [];
+  let prevMeta = {};
   try {
-    await db.upsertSession({
+    const sess = await db.upsertSession({
       session_id: sessionId,
       lang,
       mode,
     });
+    if (sess && sess.metadata && typeof sess.metadata === "object") prevMeta = sess.metadata;
     const turns = await db.listTurns(sessionId);
     dbHistory = turnsToHistory(turns);
   } catch (e) {
@@ -136,33 +180,50 @@ export async function handleChat(body, env, executionCtx) {
         metadata (JSON) con lo que se resolvió en esta sesión.               */
   const persistPromise = (async () => {
     await persistEvents(db, sessionId, result.events, result.model);
-    if (
-      result.coverage || result.handoff || result.waHandoff || result.lead ||
-      attribution?.codigo_vendedor
-    ) {
-      const meta = result.coverage?.covered
-        ? { coverage: "covered", coverage_city: result.coverage.city, coverage_state: result.coverage.state }
-        : result.coverage
-          ? { coverage: "not_covered", coverage_reason: result.coverage.reason }
-          : {};
-      if (attribution?.codigo_vendedor) meta.ref_code = attribution.codigo_vendedor;
-      if (attribution?.canal_origen)    meta.canal_origen = attribution.canal_origen;
-      if (result.handoff) {
-        meta.handoff_partner_name  = result.handoff.partnerName  || null;
-        meta.handoff_partner_phone = result.handoff.partnerPhone || null;
-      }
-      if (result.waHandoff) {
-        meta.wa_handoff_phone = result.waHandoff.phone || null;
-      }
-      if (result.lead) {
-        meta.lead_tipo        = result.lead.tipo || null;
-        meta.lead_plan_id     = result.lead.planId ?? null;
-        meta.lead_servicio_id = result.lead.servicioId ?? null;
-      }
-      await db
-        .updateSession(sessionId, { metadata: meta })
-        .catch((e) => console.warn(`[chat] updateSession(metadata) failed: ${e.message}`));
+
+    /* Estado estructurado acumulado en chat_sessions.metadata — alimenta el
+       visor de sesiones del panel y le da contexto a la persona de guardia
+       cuando hay una derivación. Se mergea sobre lo previo. */
+    const meta = { ...prevMeta };
+    meta.turn_count        = (Number(meta.turn_count) || 0) + 1;
+    meta.last_user_message = message.slice(0, 500);
+    meta.lang              = lang;
+    meta.last_activity_at  = new Date().toISOString();
+
+    if (attribution?.codigo_vendedor) meta.ref_code = attribution.codigo_vendedor;
+    if (attribution?.canal_origen)    meta.canal_origen = attribution.canal_origen;
+
+    if (result.coverage) {
+      meta.coverage = result.coverage.covered ? "covered" : "not_covered";
+      if (result.coverage.city)   meta.coverage_city   = result.coverage.city;
+      if (result.coverage.state)  meta.coverage_state  = result.coverage.state;
+      if (result.coverage.reason) meta.coverage_reason = result.coverage.reason;
     }
+    if (result.handoff) {
+      meta.handoff_partner_name  = result.handoff.partnerName  || null;
+      meta.handoff_partner_phone = result.handoff.partnerPhone || null;
+    }
+    if (result.waHandoff) {
+      meta.handoff_done     = true;
+      meta.handoff_at       = meta.handoff_at || new Date().toISOString();
+      meta.wa_handoff_phone = result.waHandoff.phone || null;
+      meta.handoff_summary  = buildHandoffSummary({ result, history, message, lang, attribution });
+    }
+    if (result.lead) {
+      meta.lead_done        = true;
+      meta.lead_at          = meta.lead_at || new Date().toISOString();
+      meta.lead_tipo        = result.lead.tipo || null;
+      meta.lead_plan_id     = result.lead.planId ?? null;
+      meta.lead_servicio_id = result.lead.servicioId ?? null;
+      /* Consentimiento: create_lead solo se llama tras la aceptación explícita
+         del usuario en el chat (PROCESO C del prompt). Dejamos constancia. */
+      meta.lead_consent     = "in_chat";
+      meta.lead_consent_at  = meta.lead_consent_at || new Date().toISOString();
+    }
+
+    await db
+      .updateSession(sessionId, { metadata: meta })
+      .catch((e) => console.warn(`[chat] updateSession(metadata) failed: ${e.message}`));
   })();
   if (executionCtx?.waitUntil) {
     executionCtx.waitUntil(persistPromise);
