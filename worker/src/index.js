@@ -16,6 +16,7 @@ import { processWizardCheckout } from "./wizard-compra.js";
 import { handleChat } from "./chat.js";
 import { handleAdmin } from "./admin.js";
 import { isValidationError } from "./errors.js";
+import { resolveTenant } from "./tenant.js";
 
 export default {
   async fetch(request, env, executionCtx) {
@@ -51,6 +52,7 @@ export default {
       return json({
         ok: true,
         service:            "legado-checkout",
+        tenant:             resolveTenant(env).id,
         env:                env.ENVIRONMENT,
         pfTokenLoaded:      !!env.PF_TOKEN,
         pfBase:             env.PF_BASE,

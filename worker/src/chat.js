@@ -20,6 +20,7 @@ import { runAlma } from "./alma.js";
 import { createSupabase } from "./supabase.js";
 import { ValidationError } from "./errors.js";
 import { sanitizeAttribution } from "./attribution.js";
+import { resolveTenant } from "./tenant.js";
 
 /* Límites duros para evitar abuso de costos (cada mensaje al chat cuesta
    tokens de OpenAI) y para mantener Supabase saludable. Si un cliente
@@ -109,6 +110,7 @@ async function persistEvents(db, sessionId, events, model) {
 }
 
 export async function handleChat(body, env, executionCtx) {
+  const { id: tenant } = resolveTenant(env);
   const sessionId = (body.sessionId || "").trim();
   const message   = (body.message || body.chatInput || "").trim();
   const lang      = (body.lang || "es").trim();
@@ -157,7 +159,7 @@ export async function handleChat(body, env, executionCtx) {
   const history = dbHistory.length > 0 ? dbHistory : fallbackHistory;
 
   console.log(
-    `[chat] session=${sessionId} hist=${history.length} (db=${dbHistory.length}, fb=${fallbackHistory.length}) msg="${message.slice(0, 80)}"`,
+    `[chat] tenant=${tenant} session=${sessionId} hist=${history.length} (db=${dbHistory.length}, fb=${fallbackHistory.length}) msg="${message.slice(0, 80)}"`,
   );
 
   /* 2. Persistir turno del usuario en background. */
@@ -185,6 +187,7 @@ export async function handleChat(body, env, executionCtx) {
        visor de sesiones del panel y le da contexto a la persona de guardia
        cuando hay una derivación. Se mergea sobre lo previo. */
     const meta = { ...prevMeta };
+    meta.tenant            = tenant;
     meta.turn_count        = (Number(meta.turn_count) || 0) + 1;
     meta.last_user_message = message.slice(0, 500);
     meta.lang              = lang;

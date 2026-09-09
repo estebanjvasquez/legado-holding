@@ -21,6 +21,12 @@ routes = [
 IN_BASE = "https://invoicing.legadoholding.com/api/v1"
 ENVIRONMENT = "dev"
 
+# Identidad del despliegue. "lh" = LEGADO Holding. Un futuro despliegue para
+# Funeraria del Zulia usará TENANT = "fdz". Lo consumen: prevision-api.js (path
+# /api/public/t/<tenant>), las líneas de log, chat_sessions.metadata.tenant y
+# (a futuro) el service.name de OpenTelemetry. Ver worker/src/tenant.js.
+TENANT = "lh"
+
 # API pública de Prevision-Funeraria (reemplaza a Invoice Ninja para el
 # wizard de planes). El token se inyecta con `wrangler secret put PF_TOKEN`.
 PF_BASE = "https://prevision-funeraria.sisteg.workers.dev"

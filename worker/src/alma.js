@@ -32,6 +32,7 @@
    ============================================================================= */
 
 import { createPF } from "./prevision-api.js";
+import { resolveTenant } from "./tenant.js";
 
 const OPENAI_BASE = "https://api.openai.com/v1/chat/completions";
 const MAX_TOOL_HOPS = 8;
@@ -673,6 +674,7 @@ export async function runAlma(input, env, executionCtx) {
     throw new Error("OPENAI_API_KEY no configurado en el Worker");
   }
   const lang  = (input.lang || "es").toLowerCase();
+  const { id: tenant } = resolveTenant(env);
   const db    = input.db;   /* puede ser cliente real o noop */
   const attribution = input.attribution || null;   /* {codigo_vendedor?, canal_origen?, ...} */
 
@@ -718,7 +720,7 @@ export async function runAlma(input, env, executionCtx) {
     emergencyPhone,
   );
   console.log(
-    `[alma] prompt_source=${promptFromDb ? "db" : "hardcoded"} len=${sysPrompt.length} has_crisis=${sysPrompt.includes("SEÑALES DE CRISIS") || sysPrompt.includes("CRISIS SIGNALS")} has_fase0=${sysPrompt.includes("FASE 0") || sysPrompt.includes("PHASE 0")} model=${model} temp=${temperature}`,
+    `[alma] tenant=${tenant} prompt_source=${promptFromDb ? "db" : "hardcoded"} len=${sysPrompt.length} has_crisis=${sysPrompt.includes("SEÑALES DE CRISIS") || sysPrompt.includes("CRISIS SIGNALS")} has_fase0=${sysPrompt.includes("FASE 0") || sysPrompt.includes("PHASE 0")} model=${model} temp=${temperature}`,
   );
 
   const messages = [

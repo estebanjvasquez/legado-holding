@@ -4,9 +4,12 @@
    de planes. Ver docs/api-publica-wizard.md para el contrato completo.
    ============================================================================= */
 
+import { resolveTenant } from "./tenant.js";
+
 export function createPF(env) {
+  const { id: tenant } = resolveTenant(env);
   const base = (env.PF_BASE || "https://prevision-funeraria.sisteg.workers.dev") +
-    "/api/public/t/lh";
+    `/api/public/t/${tenant}`;
   const token = env.PF_TOKEN;
 
   /* `auth: true` marca los endpoints server-to-server (parentescos, compras).
