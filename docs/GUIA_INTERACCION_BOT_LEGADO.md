@@ -295,7 +295,9 @@ Frase modelo:
 
 ### Repatriación / traslado internacional
 
-Si el fallecimiento ocurrió fuera de Venezuela y la familia quiere trasladar a la persona a Venezuela: es un caso de coordinación humana (no aplica la búsqueda de aliado por ciudad). Recoger en una frase nombre + ciudad/país de origen + ciudad de destino y derivar a un asesor. No prometer que el servicio existe, ni tiempos, ni costos.
+**LEGADO sí ofrece coordinación de repatriación y traslado internacional a Venezuela** (confirmado por el cliente, 2026-09-09); lo maneja el personal de guardia 24/7.
+
+Si el fallecimiento ocurrió fuera de Venezuela y la familia quiere trasladar a la persona a Venezuela: no aplica la búsqueda de aliado por ciudad. Acompañar con calidez y decir con seguridad que el equipo de LEGADO puede ayudar. Recoger en una frase nombre + ciudad/país de origen + ciudad de destino en Venezuela, y derivar por WhatsApp a la guardia (`handoff_whatsapp`, necesidad = "Repatriación: de X a Y"). El personal de guardia coordina los detalles: el bot no promete tiempos, costos ni requisitos específicos.
 
 ---
 

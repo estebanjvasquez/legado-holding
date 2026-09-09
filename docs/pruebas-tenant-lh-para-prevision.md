@@ -189,7 +189,23 @@ Stub de atribución del handoff a WhatsApp (mismo endpoint):
 
 ## Abierto
 
-*(nada abierto de este lado.)*
+### PF-8 · `whatsapp_emergencia` del tenant `lh` desactualizado — **P1**
+
+**Qué:** `GET /api/public/t/lh/servicios` devuelve `whatsapp_emergencia: "+584246950136"`.
+El cliente confirmó (2026-09-09) que la **guardia 24/7 real** de LEGADO es
+**`+584246677030`** y que ese es el número al que Alma debe derivar por WhatsApp
+(emergencias, urgencias y repatriación).
+
+**Pedido:** actualizar `whatsapp_emergencia` del tenant `lh` a `+584246677030` (panel de
+staff → configuración del tenant, o donde viva ese campo). Al hacerlo, Alma y el CTA de
+emergencia del wizard lo toman solos — `legado-holding` ya lee ese campo en vivo
+(`worker/src/alma.js` `execHandoffWhatsapp` / `execListServicios`).
+
+**Mientras tanto (lado LH):** el fallback `DEFAULT_WHATSAPP_EMERGENCIA` de `alma.js` ya
+apunta a `+584246677030` (commit pendiente), pero **si la API sigue devolviendo el número
+viejo, gana la API**. El fix real es de este lado.
+
+- [ ] `whatsapp_emergencia` del tenant `lh` = `+584246677030` en prod.
 
 ## Cerrado
 

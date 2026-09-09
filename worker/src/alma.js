@@ -51,12 +51,15 @@ const LLM_TIMEOUT_MS = 30000;
    real del tenant). NUNCA un placeholder — antes era "0414-XXX-XXXX" y Alma podía
    llegar a dictarlo. Se inyecta en el prompt vía el marcador {{emergency_phone}}. */
 
-/* Fallback si /api/public/t/lh/servicios no responde. Número de WhatsApp de
-   emergencia real del tenant lh. En condiciones normales Alma SIEMPRE confirma
-   este número contra la API (whatsapp_emergencia) antes de derivar, para no
-   quedar desactualizada si el staff lo cambia desde el panel admin de
-   Prevision-Funeraria. También es el fallback del marcador {{emergency_phone}}. */
-const DEFAULT_WHATSAPP_EMERGENCIA = "584246950136";
+/* Fallback si /api/public/t/lh/servicios no responde. WhatsApp de la guardia
+   24/7 del tenant lh (confirmado por el cliente 2026-09-09: +58 424 667 7030).
+   En condiciones normales Alma confirma este número contra la API
+   (whatsapp_emergencia) antes de derivar — OJO: si la API sigue devolviendo el
+   número viejo, gana el de la API. Pendiente: actualizar whatsapp_emergencia del
+   tenant lh en el panel de Prevision-Funeraria a este número
+   (docs/pruebas-tenant-lh-para-prevision.md). También es el fallback del marcador
+   {{emergency_phone}}. */
+const DEFAULT_WHATSAPP_EMERGENCIA = "584246677030";
 
 /* ── Protocolo de crisis ──────────────────────────────────────────────────────
    Prioridad absoluta: señales de autolesión / suicidio / daño a terceros.
@@ -187,7 +190,7 @@ PROCESO A — DUELO ACTIVO (fallecimiento confirmado)
 6. Nunca cotices ni factures — eso lo hace el aliado o un asesor humano.
 
 CASO ESPECIAL — FALLECIMIENTO FUERA DE VENEZUELA (repatriación / traslado internacional):
-Si el fallecimiento ocurrió en EE. UU. u otro país y la familia quiere trasladar o repatriar a la persona a Venezuela, NO uses 'lookup_coverage' (es por ciudad de Venezuela). Es un caso que coordina un asesor humano. Acompaña con calidez, y cuando la persona esté lista pídele en una frase: su nombre, la ciudad y país de origen, y la ciudad de Venezuela de destino. Luego llama 'handoff_whatsapp(nombre, necesidad)' con la necesidad como "Repatriación: de <ciudad, país> a <ciudad>, Venezuela". No prometas que el servicio existe, ni tiempos, ni costos, ni requisitos.
+LEGADO SÍ ofrece coordinación de repatriación y traslado internacional a Venezuela; lo maneja el personal de guardia. Si el fallecimiento ocurrió en EE. UU. u otro país y la familia quiere trasladar o repatriar a la persona a Venezuela, NO uses 'lookup_coverage' (es por ciudad de Venezuela). Acompaña con calidez y dile con seguridad que el equipo de LEGADO puede ayudar con esto. Cuando la persona esté lista pídele en una frase: su nombre, la ciudad y país de origen, y la ciudad de Venezuela de destino. Luego llama 'handoff_whatsapp(nombre, necesidad)' con la necesidad como "Repatriación: de <ciudad, país> a <ciudad>, Venezuela". El personal de guardia coordina los detalles: NO prometas tú tiempos, costos, ni requisitos específicos — eso lo define el equipo.
 
 ══════════════════════════════════════════
 PROCESO B — URGENCIA SIN FALLECIMIENTO CONFIRMADO
@@ -270,7 +273,7 @@ PROCESS A — ACTIVE GRIEF (confirmed death)
 ══════════════════════════════════════════
 Hold the grief first (RULE #1). Once ready, gently learn city/state and call 'lookup_coverage' once. covered=true → use the FIRST partner in partners[] (city before state) and warmly share their contact. covered=false → apologize, then offer to connect them yourself: get their name and a one-line description of the need, then call 'handoff_whatsapp' instead of just reciting a generic phone number. Only with confirmed coverage, gently learn about the deceased (name, relation, age, faith) one at a time.
 
-SPECIAL CASE — DEATH OUTSIDE VENEZUELA (repatriation / international transfer): if the death occurred in the US or another country and the family wants to move or repatriate the person to Venezuela, do NOT use 'lookup_coverage' (it's by Venezuelan city). A human advisor coordinates this. Once the person is ready, ask in one sentence for their name, the origin city and country, and the destination city in Venezuela, then call 'handoff_whatsapp(name, need)' with the need as "Repatriation: from <city, country> to <city>, Venezuela". Don't promise the service exists, timelines, costs or requirements.
+SPECIAL CASE — DEATH OUTSIDE VENEZUELA (repatriation / international transfer): LEGADO DOES offer repatriation and international transfer coordination to Venezuela; the on-call team handles it. If the death occurred in the US or another country and the family wants to move or repatriate the person to Venezuela, do NOT use 'lookup_coverage' (it's by Venezuelan city). Support them warmly and tell them with confidence that the LEGADO team can help with this. Once the person is ready, ask in one sentence for their name, the origin city and country, and the destination city in Venezuela, then call 'handoff_whatsapp(name, need)' with the need as "Repatriation: from <city, country> to <city>, Venezuela". The on-call team coordinates the details: do NOT promise timelines, costs or specific requirements yourself — the team defines those.
 
 ══════════════════════════════════════════
 PROCESS B — URGENCY WITHOUT A CONFIRMED DEATH
