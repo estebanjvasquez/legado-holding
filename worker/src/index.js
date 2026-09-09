@@ -11,14 +11,17 @@
      OPTIONS                   → CORS preflight
    ============================================================================= */
 
+import { instrument } from "@microlabs/otel-cf-workers";
+
 import { createPF } from "./prevision-api.js";
 import { processWizardCheckout } from "./wizard-compra.js";
 import { handleChat } from "./chat.js";
 import { handleAdmin } from "./admin.js";
 import { isValidationError } from "./errors.js";
 import { resolveTenant } from "./tenant.js";
+import { resolveOtelConfig, otelEnabled } from "./otel.js";
 
-export default {
+const handler = {
   async fetch(request, env, executionCtx) {
     const url  = new URL(request.url);
     const cors = corsFor(request, env);
@@ -106,6 +109,23 @@ export default {
         isValidation ? 400 : 500,
       );
     }
+  },
+};
+
+/* OpenTelemetry: si hay endpoint OTLP configurado (secret), servimos el handler
+   envuelto con instrument() — auto-instrumenta cada `fetch` saliente (OpenAI /
+   Prevision-Funeraria / Supabase / Stripe) como span hijo, más los spans
+   manuales de alma.js/chat.js. Sin el secret, el handler va crudo (cero
+   overhead, kill-switch). Ver worker/src/otel.js. */
+const instrumented = instrument(handler, resolveOtelConfig);
+
+export default {
+  fetch(request, env, executionCtx) {
+    return (otelEnabled(env) ? instrumented : handler).fetch(
+      request,
+      env,
+      executionCtx,
+    );
   },
 };
 

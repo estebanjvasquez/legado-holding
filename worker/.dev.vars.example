@@ -6,3 +6,9 @@ PF_TOKEN=pega-aqui-tu-token-pf_-de-pruebas
 # Necesario en local solo si vas a probar POST /chat (agente Alma):
 # OPENAI_API_KEY=sk-...
 # SUPABASE_SERVICE_ROLE_KEY=pega-aqui-tu-service-role-key
+
+# OpenTelemetry (opcional en local — normalmente NO se exporta desde dev).
+# En prod van como `wrangler secret put`. Si OTEL_EXPORTER_OTLP_ENDPOINT está
+# vacío, la instrumentación no se activa (kill-switch en src/index.js).
+# OTEL_EXPORTER_OTLP_ENDPOINT=https://api.honeycomb.io
+# OTEL_EXPORTER_OTLP_HEADERS=x-honeycomb-team=tu-ingest-key

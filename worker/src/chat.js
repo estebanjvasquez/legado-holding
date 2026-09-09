@@ -21,6 +21,7 @@ import { createSupabase } from "./supabase.js";
 import { ValidationError } from "./errors.js";
 import { sanitizeAttribution } from "./attribution.js";
 import { resolveTenant } from "./tenant.js";
+import { trace } from "@opentelemetry/api";
 
 /* Límites duros para evitar abuso de costos (cada mensaje al chat cuesta
    tokens de OpenAI) y para mantener Supabase saludable. Si un cliente
@@ -111,6 +112,7 @@ async function persistEvents(db, sessionId, events, model) {
 
 export async function handleChat(body, env, executionCtx) {
   const { id: tenant } = resolveTenant(env);
+  const otelSpan = trace.getActiveSpan();
   const sessionId = (body.sessionId || "").trim();
   const message   = (body.message || body.chatInput || "").trim();
   const lang      = (body.lang || "es").trim();
@@ -158,6 +160,17 @@ export async function handleChat(body, env, executionCtx) {
 
   const history = dbHistory.length > 0 ? dbHistory : fallbackHistory;
 
+  if (otelSpan) {
+    otelSpan.setAttributes({
+      "legado.tenant":       tenant,
+      "legado.session_id":   sessionId,
+      "legado.lang":         lang,
+      "legado.mode":         mode,
+      "legado.history_len":  history.length,
+      "legado.history_from": dbHistory.length > 0 ? "db" : "frontend",
+    });
+  }
+
   console.log(
     `[chat] tenant=${tenant} session=${sessionId} hist=${history.length} (db=${dbHistory.length}, fb=${fallbackHistory.length}) msg="${message.slice(0, 80)}"`,
   );
@@ -175,6 +188,17 @@ export async function handleChat(body, env, executionCtx) {
     env,
     executionCtx,
   );
+
+  if (otelSpan) {
+    otelSpan.setAttributes({
+      "legado.hops":     Array.isArray(result.events) ? result.events.length : 0,
+      "legado.handoff":  !!result.waHandoff,
+      "legado.lead":     !!result.lead,
+      "legado.coverage": result.coverage
+        ? (result.coverage.covered ? "covered" : "not_covered")
+        : "none",
+    });
+  }
 
   /* 4. Persistir todos los events del agente + (si aplica) cobertura/handoff
         como metadata de la sesión. Alma ya no factura, así que no hay más

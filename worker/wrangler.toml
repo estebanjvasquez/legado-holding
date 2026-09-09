@@ -1,6 +1,9 @@
 name = "legado-checkout-dev"
 main = "src/index.js"
 compatibility_date = "2026-01-01"
+# Requerido por @microlabs/otel-cf-workers (OpenTelemetry). Con compatibility_date
+# posterior a 2024-09-23 ya incluye el comportamiento de nodejs_compat_v2.
+compatibility_flags = ["nodejs_compat"]
 
 # Habilita la URL pública https://legado-checkout-dev.<subdominio>.workers.dev
 # Útil para staging/pruebas desde el celular o desde el sitio real.

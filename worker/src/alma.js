@@ -31,8 +31,14 @@
    `events` se devuelve para que chat.js los escriba en Supabase (chat_turns).
    ============================================================================= */
 
+import { trace, SpanStatusCode } from "@opentelemetry/api";
 import { createPF } from "./prevision-api.js";
 import { resolveTenant } from "./tenant.js";
+
+/* Tracer de OpenTelemetry. Si no hay SDK registrado (OTel desactivado, o
+   corriendo en tests con Node) devuelve un tracer no-op: todas las llamadas
+   de abajo son seguras y sin costo. Ver worker/src/otel.js. */
+const tracer = trace.getTracer("alma");
 
 const OPENAI_BASE = "https://api.openai.com/v1/chat/completions";
 const MAX_TOOL_HOPS = 8;
@@ -723,6 +729,16 @@ export async function runAlma(input, env, executionCtx) {
     `[alma] tenant=${tenant} prompt_source=${promptFromDb ? "db" : "hardcoded"} len=${sysPrompt.length} has_crisis=${sysPrompt.includes("SEÑALES DE CRISIS") || sysPrompt.includes("CRISIS SIGNALS")} has_fase0=${sysPrompt.includes("FASE 0") || sysPrompt.includes("PHASE 0")} model=${model} temp=${temperature}`,
   );
 
+  const runSpan = trace.getActiveSpan();
+  if (runSpan) {
+    runSpan.setAttributes({
+      "alma.tenant":        tenant,
+      "alma.lang":          lang,
+      "alma.model":         model,
+      "alma.prompt_source": promptFromDb ? "db" : "hardcoded",
+    });
+  }
+
   const messages = [
     { role: "system", content: sysPrompt },
     ...historyToMessages(input.history),
@@ -796,6 +812,9 @@ export async function runAlma(input, env, executionCtx) {
       console.log(`[alma] hop=${hop} tool=${name}`);
       const tt0 = Date.now();
       let result, toolError = null;
+      const toolSpan = tracer.startSpan(`alma.tool ${name}`, {
+        attributes: { "tool.name": name, "alma.hop": hop },
+      });
       try {
         if (name === "lookup_coverage") {
           result = await execLookupCoverage(args, env, db, emergencyPhone);
@@ -865,6 +884,14 @@ export async function runAlma(input, env, executionCtx) {
         toolError = e.message;
       }
       const toolLat = Date.now() - tt0;
+      toolSpan.setAttribute("tool.latency_ms", toolLat);
+      if (result && result.already_done) toolSpan.setAttribute("tool.already_done", true);
+      if (result && result.covered !== undefined) toolSpan.setAttribute("tool.covered", !!result.covered);
+      if (toolError) {
+        toolSpan.setAttribute("tool.error", toolError);
+        toolSpan.setStatus({ code: SpanStatusCode.ERROR, message: toolError });
+      }
+      toolSpan.end();
       out.events.push({
         role:        "tool",
         hop,
