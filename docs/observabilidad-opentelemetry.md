@@ -119,12 +119,19 @@ Construir la opción D (dashboards + alertas a mano). Es reimplementar OTel peor
 
 Orden, antes de arrancar el bot de FDZ:
 
-1. **Paso `tenant` (sin vendor, sin costo, independiente).** Añadir `tenant` (`"lh"` por
-   ahora, resuelto de la config del Worker) como campo de primera clase en:
-   - las líneas de `console.log/warn/error` de `worker/src/` (prefijo `[lh]` o campo),
-   - `chat_turns` (columna o dentro del `meta`),
-   - `chat_sessions.metadata`.
-   ~1–2 h. No necesita decisión adicional. **Se puede hacer ya.**
+1. **Paso `tenant` (sin vendor, sin costo, independiente). — ✅ HECHO (código), commit
+   `035d2df`.**
+   - `worker/src/tenant.js` → `resolveTenant(env)`, única fuente de verdad. `TENANT="lh"`
+     en `wrangler.toml`. `service.name = alma-${tenant}` listo para OTel.
+   - `prevision-api.js` arma `/api/public/t/<tenant>` desde `env.TENANT` (antes `"lh"` fijo).
+   - `chat.js` / `alma.js`: `tenant=<id>` en las líneas de log; `meta.tenant` en
+     `chat_sessions.metadata` (jsonb, sin migración).
+   - `index.js`: `tenant` en el health check.
+   - **Pendiente (opcional):** correr `worker/sql/2026-09-09-tenant-columns.sql` en Supabase
+     para tener `tenant` como columna de primera clase en `chat_sessions`/`chat_turns`
+     (hoy vive en el jsonb `metadata`). Tras correrlo, un commit chico añade `tenant` a los
+     `INSERT` de `insertTurn`/`upsertSession`.
+   - **Falta:** desplegar (`cd worker && wrangler deploy`).
 
 2. **Etapa 1 — `@microlabs/otel-cf-workers` → Honeycomb Free.** (Backend elegido por el
    usuario 2026-09-09; Grafana Cloud Free era la alternativa, se descartó por retención de
