@@ -200,6 +200,14 @@ Si agregas un archivo estático nuevo que deba publicarse, **agrégalo a esa lis
   documentación"* → subpáginas *"Registro de Proyecto — <fecha> (Legado Holding)"*.
   Cerrar cada jornada con un registro nuevo ahí.
 - **No modificar el repo `Prevision-Funeraria` desde acá.** Este repo solo consume su API.
+- **Portal del titular (cliente final) — ya existe en Prevision-Funeraria, NO se
+  construye acá.** `https://prevision-funeraria.sisteg.workers.dev/portal/?empresa=lh`
+  — login por cédula + código OTP por email; contratos, solicitudes, pago de cuotas
+  (tarjeta o manual con comprobante), adelanto de pagos, beneficiarios. Multi-tenant,
+  se rebrandea solo (`GET /api/public/t/lh/portal/marca` → "Legado Holding Inc." + logo
+  + `#263c5b`). El nav "Portal Clientes" de `index.html` ya apunta ahí (antes apuntaba
+  al login viejo de Invoice Ninja, obsoleto — commit `defb34d`, 2026-09-11). Si algo del
+  portal necesita cambiar, es trabajo de Prevision-Funeraria, no de este repo.
 
 ---
 
