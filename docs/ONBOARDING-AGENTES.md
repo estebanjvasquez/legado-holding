@@ -4,7 +4,7 @@
 > escanear el repo entero. Si algo de acá contradice al código, gana el código —
 > avísalo y corrige este archivo.
 >
-> **Última actualización: 2026-08-27.** Mantener esta fecha y el bloque
+> **Última actualización: 2026-11-17.** Mantener esta fecha y el bloque
 > "Estado actual" al día en cada cierre de jornada.
 
 ---
@@ -99,13 +99,20 @@ Navegador ──GET catálogo (CORS, sin token)──▶ prevision-funeraria.sis
 
 ---
 
-## 5. Estado actual (2026-08-27)
+## 5. Estado actual (2026-11-17)
 
 - **En producción.** `main` despliega a la **raíz** de `legadoholding.com` (antes `/v2`;
   tag de rollback `pre-prevision-funeraria-rollback`). El Worker de `api.legadoholding.com`
-  corre el código nuevo.
-- **Stripe en modo TEST.** Sin usuarios finales en producción (confirmado por el usuario).
-  Los pagos se prueban con tarjeta `4242 4242 4242 4242`.
+  corre el código nuevo. **El deploy del frontend NO es automático**: tras el push a `main`
+  hay que hacer en cPanel → Git Version Control → *Update from Remote* + *Deploy HEAD Commit*.
+- **Stripe en VIVO** (cuenta propia de Legado Holding Inc., confirmado 2026-11-17). Una
+  compra de prueba crea una compra pendiente real en Previsión.
+- **Revisión 2026-11-17 desplegada** (commits `419ebdf`, `562e68a`; Worker `85428f82` +
+  cambio de secret): reintentos de OpenAI con presupuesto de 60 s por turno y WhatsApp de
+  guardia si Alma falla; límite de `/chat` (20/min por IP, 60 mensajes por conversación);
+  historial acotado (40 turnos / 24k caracteres); timeouts a Previsión y reintento sin
+  atribución solo ante 400/422; `?ref=` validado (`js/attribution.js`) con historial de
+  toques; panel admin solo con `ADMIN_TOKEN`. Verificado en vivo.
 - **Los 4 planes tienen checkout digital.** Los "Selecto" (`esencial-selecto`,
   `vanguardia-selecto`) cobran una **cuota inicial única** (`cuota_inicial_centavos` en
   `GET /planes`): Previsión la mete como `line_item` **sin `recurring`** en el Stripe
@@ -113,7 +120,7 @@ Navegador ──GET catálogo (CORS, sin token)──▶ prevision-funeraria.sis
   Verificado end-to-end (contratos #8 y #9, 1ª factura $44,47 = $9,47 + $35).
 - **Atribución de vendedores externos (`?ref=`) + campañas (UTM)**: implementada y
   verificada de punta a punta (wizard, leads de Alma, handoff a WhatsApp). First-touch,
-  TTL 90d, `localStorage`. `js/main.js` §ATRIBUCIÓN + `worker/src/attribution.js`.
+  TTL 90d, `localStorage`. `js/attribution.js` + `worker/src/attribution.js`.
   Detalle: `docs/atribucion-vendedor-plan-legado.md`. Guía para marketing:
   `docs/campanasatribucion.md` (gitignoreada).
 - **Alma corre en OpenAI** (`gpt-5.6-luna`, swap desde Google Gemini). Clasifica cada
@@ -122,12 +129,14 @@ Navegador ──GET catálogo (CORS, sin token)──▶ prevision-funeraria.sis
 - **Páginas legales** (Términos, Privacidad) publicadas.
 
 ### Pendiente / hilos abiertos
-- **Canal entre agentes: todo cerrado.** PF-1..PF-7 y LH-1..LH-3 cerrados y verificados.
-  PF-6 (vista de staff de atribución en `/atribucion`) se cerró el 2026-08-27 — de paso,
-  Previsión encontró y corrigió que `canal_origen`/`utm_*`/`referrer_url` no se
-  propagaban al contrato (solo `vendedor_id`); migración 0035, backfill verificado en
-  prod. **Nada pendiente del lado de legado-holding.** Ver
-  `docs/pruebas-tenant-lh-para-prevision.md`.
+- **Canal entre agentes: PF-8 a PF-11 abiertos, en desarrollo en la sesión de
+  Previsión (2026-11-17).** Ver `docs/pruebas-tenant-lh-para-prevision.md`. Cuando cierren,
+  falta el lado LH:
+  - **PF-8** (número de emergencia de la API): nada que cambiar acá; verificar en vivo.
+  - **PF-9** (idempotencia): `wizard-compra.js` manda `Idempotency-Key` por intento.
+  - **PF-10** (toques): `worker/src/attribution.js` deja pasar `atribucion.toques`.
+  - **PF-11** (aliados): `lookup_coverage` usa `/aliados` de PF y se retiran
+    Aliados/Ubicaciones del panel legacy.
 - **Panel admin legacy** (`admin/` + `worker/src/admin.js`): Invoice Ninja ya no existe;
   entra solo con `ADMIN_TOKEN`. Pendiente retirarlo (aliados → `/aliados` de Previsión;
   config de Alma y conversaciones: ver plan de migración).
@@ -166,6 +175,13 @@ Navegador ──GET catálogo (CORS, sin token)──▶ prevision-funeraria.sis
 8. **No regenerar el token de API del tenant `lh`.** Invalida el `PF_TOKEN` del Worker de
    prod y rompe checkout + leads de Alma hasta correr `wrangler secret put PF_TOKEN` con
    el valor nuevo (y actualizar `.dev.vars` y el `.SECRET.md`).
+9. **Cargar secrets en Windows**: PowerShell bloquea `wrangler.ps1` → usar `wrangler.cmd`.
+   No pegar el valor en el aviso oculto de `secret put` (en 2026-11-17 el pegado falló sin
+   avisar y el secret quedó con otro valor). Pasarlo por pipe:
+   `$t | wrangler.cmd secret put ADMIN_TOKEN` (el Worker hace `trim()` del valor).
+10. **Rate Limiting de Workers es aproximado y por ubicación**: en la prueba en vivo los
+    429 empezaron unos mensajes después del umbral de 20/min. Sirve contra abuso, no es
+    una cuota exacta.
 
 ---
 
