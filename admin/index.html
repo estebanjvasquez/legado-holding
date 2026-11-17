@@ -107,135 +107,17 @@
     <header>
       <h1>LEGADO ADMIN</h1>
       <nav>
-        <button class="tab active" data-tab="locations">Ubicaciones</button>
-        <button class="tab" data-tab="partners">Aliados</button>
-        <button class="tab" data-tab="agent">Agente</button>
+        <button class="tab active" data-tab="agent">Agente</button>
         <button class="tab" data-tab="sessions">Conversaciones</button>
       </nav>
       <button id="logout-btn" class="logout">Salir</button>
     </header>
 
     <main>
-      <!-- ─── Ubicaciones ──────────────────────────────────────── -->
-      <section id="tab-locations" class="tab-content active">
-        <div class="card">
-          <h3>Agregar ubicación</h3>
-          <div class="grid-2">
-            <div>
-              <label>Estado</label>
-              <input type="text" id="loc-state" placeholder="Ej: Distrito Capital" />
-            </div>
-            <div>
-              <label>Ciudad</label>
-              <input type="text" id="loc-city" placeholder="Ej: Caracas" />
-            </div>
-          </div>
-          <label class="inline" style="margin-top: 14px;">
-            <input type="checkbox" id="loc-is-capital" /> Es capital del estado
-          </label>
-          <div style="margin-top: 14px;">
-            <button id="loc-create-btn" class="btn">Crear ubicación</button>
-            <span id="loc-create-msg" class="muted"></span>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="row-actions">
-            <h3 style="margin: 0;">Ubicaciones existentes</h3>
-            <label class="muted">Filtrar:</label>
-            <select id="loc-state-filter" style="width: auto;"></select>
-            <button id="loc-reload-btn" class="btn-secondary btn">Recargar</button>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Estado</th>
-                <th>Ciudad</th>
-                <th>Capital</th>
-                <th style="width: 180px;">Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="loc-tbody"><tr><td colspan="4" class="muted">Cargando...</td></tr></tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- ─── Aliados ──────────────────────────────────────────── -->
-      <section id="tab-partners" class="tab-content">
-        <div class="card">
-          <h3>Agregar aliado</h3>
-          <div class="grid-2">
-            <div>
-              <label>Ubicación</label>
-              <select id="p-location"></select>
-              <p class="muted" style="margin: 4px 0 0;">Si activas "cubre todo el estado", este es solo el estado de referencia.</p>
-            </div>
-            <div>
-              <label>Nombre</label>
-              <input type="text" id="p-name" placeholder="Funeraria del Zulia" />
-            </div>
-            <div>
-              <label>Código de aliado (campo "aliados" / custom_value4 en Invoice Ninja)</label>
-              <input type="text" id="p-brand" placeholder="se autogenera del nombre — puedes editarlo" />
-              <p class="muted" style="margin: 4px 0 0; font-size: 12px;">Después de crear el aliado, copia este código y pégalo en el campo "aliados" de cada producto en Invoice Ninja.</p>
-            </div>
-            <div>
-              <label>Teléfono</label>
-              <input type="text" id="p-phone" placeholder="0261-..." />
-            </div>
-            <div>
-              <label>Email</label>
-              <input type="email" id="p-email" />
-            </div>
-            <div>
-              <label>Persona de contacto</label>
-              <input type="text" id="p-contact" />
-            </div>
-          </div>
-          <label>Dirección</label>
-          <input type="text" id="p-address" />
-          <label>Servicios (separados por coma)</label>
-          <input type="text" id="p-services" placeholder="cremacion, traslado_local, velorio" />
-          <label>Notas</label>
-          <textarea id="p-notes" rows="2"></textarea>
-          <div style="margin-top: 14px; display: flex; gap: 18px; flex-wrap: wrap;">
-            <label class="inline">
-              <input type="checkbox" id="p-state-coverage" /> Cubre todo el estado
-            </label>
-            <label class="inline">
-              <input type="checkbox" id="p-active" checked /> Activo
-            </label>
-          </div>
-          <div style="margin-top: 14px;">
-            <button id="p-create-btn" class="btn">Crear aliado</button>
-            <span id="p-create-msg" class="muted"></span>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="row-actions">
-            <h3 style="margin: 0;">Aliados existentes</h3>
-            <button id="p-reload-btn" class="btn-secondary btn">Recargar</button>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Nombre</th>
-                <th>Código (cv4)</th>
-                <th>Ubicación</th>
-                <th>Cobertura</th>
-                <th>Servicios</th>
-                <th>Estado</th>
-                <th style="width: 180px;">Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="p-tbody"><tr><td colspan="7" class="muted">Cargando...</td></tr></tbody>
-          </table>
-        </div>
-      </section>
-
+      <!-- Aliados y Ubicaciones se retiraron (2026-11-17): el directorio vive en
+           Prevision-Funeraria (panel → Aliados) y Alma lo lee de su API (/aliados). -->
       <!-- ─── Agente ──────────────────────────────────────────── -->
-      <section id="tab-agent" class="tab-content">
+      <section id="tab-agent" class="tab-content active">
         <div class="card">
           <h3>Configuración del agente</h3>
           <p class="muted">
@@ -326,6 +208,6 @@
     </main>
   </div>
 
-  <script src="admin.js?v=2"></script>
+  <script src="admin.js?v=3"></script>
 </body>
 </html>

@@ -533,12 +533,10 @@ export async function buildFallbackHandoff(lang, attribution, env) {
 const normCity = (s) =>
   String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 
-/* lookup_coverage — fuente principal: directorio de aliados de Previsión
-   (GET /aliados?ciudad=, PF-11). Respaldo TEMPORAL: la tabla funeral_partners
-   de Supabase, solo si Previsión no devuelve aliados para esa ciudad o no
-   responde. Hoy Legado todavía no tiene sus aliados cargados en Previsión;
-   cuando los cargue, el respaldo deja de usarse y se retira junto con el
-   módulo Aliados/Ubicaciones del panel legacy. */
+/* lookup_coverage — directorio de aliados de Previsión (GET /aliados?ciudad=,
+   PF-11). Lo mantiene el personal en el panel de Previsión (Aliados). El
+   respaldo en Supabase (funeral_partners) se retiró el 2026-11-17, cuando
+   Legado terminó de cargar sus aliados en Previsión. */
 export async function execLookupCoverage(args, env, db, emergencyPhone) {
   const city = (args && args.city) ? String(args.city).trim() : "";
   if (!city) {
@@ -549,7 +547,7 @@ export async function execLookupCoverage(args, env, db, emergencyPhone) {
     const resp = await createPF(env).getAliados(city);
     items = Array.isArray(resp && resp.items) ? resp.items : [];
   } catch (e) {
-    console.warn(`[alma] lookup_coverage: /aliados de Previsión falló (${e.message}) — pruebo el respaldo de Supabase`);
+    console.warn(`[alma] lookup_coverage: /aliados de Previsión falló (${e.message})`);
   }
   if (items && items.length > 0) {
     const nc = normCity(city);
@@ -572,67 +570,24 @@ export async function execLookupCoverage(args, env, db, emergencyPhone) {
       partners,
     };
   }
-  const legacy = await execLookupCoverageSupabase(args, env, db, emergencyPhone);
-  console.log(`[alma] lookup_coverage source=supabase city="${city}" covered=${!!legacy.covered} (prevision=${items === null ? "error" : "vacío"})`);
-  return legacy;
-}
-
-/* Búsqueda legacy en Supabase (locations_venezuela + funeral_partners). */
-async function execLookupCoverageSupabase(args, env, db, emergencyPhone) {
-  const city = (args && args.city) ? String(args.city).trim() : "";
-  try {
-    const loc = await db.findLocationByCity(city);
-    if (!loc) {
-      return {
-        covered:         false,
-        reason:          "city_unknown",
-        emergency_phone: emergencyPhone,
-        message:         `No reconozco la ciudad "${city}". Si crees que es un error, indica el estado de Venezuela o deriva por handoff_whatsapp.`,
-      };
-    }
-    /* Buscamos en dos niveles:
-       1. Aliado directo en la ciudad.
-       2. Aliado con state_coverage=true en el mismo estado.            */
-    const directRaw = await db.listPartnersByLocation(loc.id, true);
-    const direct    = (directRaw || []).map((p) => ({ ...p, scope: "city" }));
-    const stateRaw  = await db.listStatePartners(loc.state, true);
-    const state     = (stateRaw || [])
-      .filter((p) => p.location_id !== loc.id)
-      .map((p) => ({ ...p, scope: "state" }));
-    const partners  = [...direct, ...state];
-
-    if (partners.length === 0) {
-      return {
-        covered:         false,
-        reason:          "no_active_partner",
-        location:        { state: loc.state, city: loc.city },
-        emergency_phone: emergencyPhone,
-        message:         `${loc.city}, ${loc.state} todavía no tiene un aliado funerario activo (ni a nivel ciudad ni a nivel estado). Recolecta nombre+necesidad y deriva por handoff_whatsapp.`,
-      };
-    }
-    return {
-      covered:  true,
-      location: { state: loc.state, city: loc.city, is_capital: !!loc.is_capital },
-      partners: partners.map((p) => ({
-        name:     p.name,
-        brand:    p.brand,
-        phone:    p.phone || null,   // usado para el handoff, no hay cotización/factura
-        services: p.services || [],
-        scope:    p.scope,   // 'city' = directo en la ciudad; 'state' = cubre todo el estado
-      })),
-    };
-  } catch (e) {
-    console.warn(`[alma] lookup_coverage error: ${e.message}`);
-    /* Fail-CLOSED: si no podemos verificar cobertura, NO asumimos que existe.
-       El bot debe pedir disculpas y derivar por handoff_whatsapp igual que en
-       un no_active_partner. */
+  if (items === null) {
+    /* Fail-CLOSED: si no se pudo verificar, NO asumimos cobertura. Alma se
+       disculpa y deriva por handoff_whatsapp. */
     return {
       covered:         false,
       reason:          "verification_failed",
       emergency_phone: emergencyPhone,
-      message:         `No pude verificar la cobertura en este momento por un error técnico. Recolecta nombre+necesidad y deriva por handoff_whatsapp. NO factures.`,
+      message:         "No pude verificar la cobertura en este momento por un error técnico. Recolecta nombre+necesidad y deriva por handoff_whatsapp.",
     };
   }
+  console.log(`[alma] lookup_coverage source=prevision city="${city}" aliados=0`);
+  return {
+    covered:         false,
+    reason:          "no_active_partner",
+    location:        { city, state: null },
+    emergency_phone: emergencyPhone,
+    message:         `"${city}" todavía no tiene un aliado funerario activo (ni en la ciudad ni con cobertura en su región). Recolecta nombre+necesidad y deriva por handoff_whatsapp.`,
+  };
 }
 
 async function execListPlanes(env, lang) {

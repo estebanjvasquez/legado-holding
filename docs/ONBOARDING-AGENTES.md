@@ -71,7 +71,7 @@ Navegador ──GET catálogo (CORS, sin token)──▶ prevision-funeraria.sis
 | `css/main.css` | Estilos. Marca: navy `#263c5b`, dorado `#c9a84c` (decorativo, no CTAs), fuente Inter. |
 | `gracias.html` / `cancelado.html` | `success_url` / `cancel_url` de Stripe Checkout. **Deben estar en la lista de copia de `.cpanel.yml`.** |
 | `terminos-condiciones.html` / `politica-privacidad.html` | Legales (fuentes en los `.txt` homónimos). |
-| `admin/` | Panel admin legacy (`index.html` + `admin.js`). Login con el token `ADMIN_TOKEN`. |
+| `admin/` | Panel admin legacy (`index.html` + `admin.js?v=3`): pestañas Agente y Conversaciones. Login con el token `ADMIN_TOKEN`. |
 
 ### Worker (`worker/`)
 | Archivo | Rol |
@@ -131,12 +131,13 @@ Navegador ──GET catálogo (CORS, sin token)──▶ prevision-funeraria.sis
 ### Pendiente / hilos abiertos
 - **Canal entre agentes: PF-8 a PF-11 desplegados en ambos lados (2026-11-17).** Ver
   `docs/pruebas-tenant-lh-para-prevision.md`. Queda:
-  - **Cargar los aliados de LH en Previsión** (panel de PF → *Aliados*). Hoy `/aliados`
-    devuelve `items: []` y `lookup_coverage` cae al respaldo temporal de Supabase
-    (`funeral_partners`). Con los aliados cargados: quitar ese respaldo de
-    `worker/src/alma.js` y los módulos Aliados/Ubicaciones del panel legacy.
-  - Pruebas manuales en el panel de PF: cambiar el WhatsApp de emergencia y verlo en la
-    API; ver el botón *Toques* en Atribución.
+  - Aliados: viven solo en Previsión (panel de PF → *Aliados*); Alma los lee de
+    `/aliados`. Respaldo de Supabase y pestañas Aliados/Ubicaciones del panel legacy
+    retirados 2026-11-17. WhatsApp de emergencia editable en PF verificado en vivo.
+  - **Siguiente:** PF ya guarda la configuración de Alma por empresa (Configuración ›
+    *Asistente del sitio*, `GET /api/public/t/lh/asistente`, PF `c748aee`). El Worker de
+    LH todavía NO la lee: sigue con su `OPENAI_API_KEY` y con `agent_config` de Supabase.
+    Conectarlo permite retirar la pestaña *Agente* del panel legacy.
 - **Panel admin legacy** (`admin/` + `worker/src/admin.js`): Invoice Ninja ya no existe;
   entra solo con `ADMIN_TOKEN`. Pendiente retirarlo (aliados → `/aliados` de Previsión;
   config de Alma y conversaciones: ver plan de migración).

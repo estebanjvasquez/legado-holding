@@ -8,14 +8,6 @@
 
    Rutas:
      POST   /admin/login                → { token } → { token, user }
-     GET    /admin/locations            → listar ubicaciones
-     POST   /admin/locations            → crear ubicación
-     PATCH  /admin/locations/:id        → actualizar
-     DELETE /admin/locations/:id        → eliminar
-     GET    /admin/partners             → listar aliados
-     POST   /admin/partners             → crear aliado
-     PATCH  /admin/partners/:id         → actualizar
-     DELETE /admin/partners/:id         → eliminar
      GET    /admin/config               → listar config del agente
      PUT    /admin/config               → upsert múltiple { key: value, ... }
      DELETE /admin/config/:key          → eliminar key
@@ -115,90 +107,8 @@ export async function handleAdmin(request, env, corsHeaders) {
       return json({ ok: true });
     }
 
-    /* ── Locations ────────────────────────────────────────────────────── */
-    if (path === "/admin/locations") {
-      if (method === "GET") {
-        const stateFilter = url.searchParams.get("state");
-        const data = await db.listAllLocations(stateFilter || undefined);
-        return json({ data });
-      }
-      if (method === "POST") {
-        if (!body.state || !body.city) {
-          return json({ error: "state y city son requeridos" }, 400);
-        }
-        const data = await db.createLocation({
-          state:      body.state,
-          city:       body.city,
-          is_capital: !!body.is_capital,
-        });
-        return json({ data }, 201);
-      }
-    }
-    if (path.startsWith("/admin/locations/")) {
-      const id = lastSegment();
-      if (method === "PATCH") {
-        const patch = {};
-        if (body.state      !== undefined) patch.state      = body.state;
-        if (body.city       !== undefined) patch.city       = body.city;
-        if (body.is_capital !== undefined) patch.is_capital = !!body.is_capital;
-        const data = await db.updateLocation(id, patch);
-        return json({ data });
-      }
-      if (method === "DELETE") {
-        await db.deleteLocation(id);
-        return json({ ok: true });
-      }
-    }
-
-    /* ── Partners ─────────────────────────────────────────────────────── */
-    if (path === "/admin/partners") {
-      if (method === "GET") {
-        const filter = {};
-        if (url.searchParams.get("locationId")) filter.locationId = url.searchParams.get("locationId");
-        if (url.searchParams.get("active") === "true") filter.activeOnly = true;
-        const data = await db.listAllPartners(filter);
-        return json({ data });
-      }
-      if (method === "POST") {
-        if (!body.name || !body.location_id) {
-          return json({ error: "name y location_id son requeridos" }, 400);
-        }
-        const row = {
-          location_id:    body.location_id,
-          name:           body.name,
-          brand:          body.brand || null,
-          contact_name:   body.contact_name || null,
-          phone:          body.phone || null,
-          email:          body.email || null,
-          address:        body.address || null,
-          services:       Array.isArray(body.services) ? body.services : null,
-          state_coverage: !!body.state_coverage,
-          is_active:      body.is_active === false ? false : true,
-          notes:          body.notes || null,
-        };
-        const data = await db.createPartner(row);
-        return json({ data }, 201);
-      }
-    }
-    if (path.startsWith("/admin/partners/")) {
-      const id = lastSegment();
-      if (method === "PATCH") {
-        const patch = {};
-        const allowed = [
-          "location_id","name","brand","contact_name","phone","email",
-          "address","services","state_coverage","is_active","notes",
-        ];
-        for (const k of allowed) {
-          if (body[k] !== undefined) patch[k] = body[k];
-        }
-        const data = await db.updatePartner(id, patch);
-        return json({ data });
-      }
-      if (method === "DELETE") {
-        await db.deletePartner(id);
-        return json({ ok: true });
-      }
-    }
+    /* Ubicaciones y Aliados se retiraron (2026-11-17): el directorio vive en
+       Prevision-Funeraria y Alma lo lee de GET /aliados (worker/src/alma.js). */
 
     /* ── Agent config ─────────────────────────────────────────────────── */
     if (path === "/admin/config") {

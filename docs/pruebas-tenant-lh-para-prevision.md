@@ -294,12 +294,13 @@ Proponer cómo cargar los aliados actuales de LH (los exporta LH desde Supabase)
 PF; se retira el módulo Aliados/Ubicaciones del panel legacy.
 
 - [x] Endpoint en prod, con tests (PF `bde6ffc`). Verificado por LH: 401 sin token.
-- [ ] Aliados de LH cargados en PF (hoy `items: []`).
+- [x] Aliados de LH cargados en PF (el usuario confirmó que están todos, 2026-11-17).
+  Verificado en vivo: `lookup_coverage source=prevision city="Maracaibo" aliados=2`.
 
-**Lado LH (2026-11-17):** `lookup_coverage` consulta primero `/aliados` de PF; si PF no
-devuelve aliados o no responde, usa como respaldo TEMPORAL `funeral_partners` de Supabase.
-Cuando los aliados estén cargados en PF, se quita el respaldo y el módulo
-Aliados/Ubicaciones del panel legacy.
+**Lado LH (2026-11-17):** `lookup_coverage` usa solo `/aliados` de PF (sin aliados →
+`no_active_partner`; PF caído → `verification_failed`, deriva a la guardia). Se retiró el
+respaldo de Supabase y el módulo Aliados/Ubicaciones del panel legacy. Las tablas
+`funeral_partners`/`locations_venezuela` quedan en Supabase como histórico.
 
 ## Cerrado
 

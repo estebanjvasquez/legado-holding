@@ -122,102 +122,9 @@ export function createSupabase(env) {
       return (data && data[0]) || null;
     },
 
-    /* ── locations_venezuela + funeral_partners ───────────────────────────
-       Búsqueda fuzzy por nombre de ciudad: el agente puede pasar la ciudad
-       tal como la dice el usuario ("caracas", "Maracaibo", "Pto Ordaz").
-       Usamos ilike sobre lower(city) para tolerar mayúsculas y acentos.  */
-    async findLocationByCity(city) {
-      const q = (city || "").trim();
-      if (!q) return null;
-      const path =
-        `/locations_venezuela?city=ilike.${encodeURIComponent(q)}` +
-        `&select=*&limit=1`;
-      const data = await req("GET", path);
-      if (Array.isArray(data) && data[0]) return data[0];
-      /* Segundo intento: substring match — más flexible. */
-      const path2 =
-        `/locations_venezuela?city=ilike.${encodeURIComponent("%" + q + "%")}` +
-        `&select=*&limit=1`;
-      const data2 = await req("GET", path2);
-      return (Array.isArray(data2) && data2[0]) || null;
-    },
-
-    async listPartnersByLocation(locationId, activeOnly = true) {
-      let path =
-        `/funeral_partners?location_id=eq.${encodeURIComponent(locationId)}` +
-        `&select=id,name,brand,services,phone,email,notes,state_coverage,is_active`;
-      if (activeOnly) path += `&is_active=eq.true`;
-      const data = await req("GET", path);
-      return Array.isArray(data) ? data : [];
-    },
-
-    /* Aliados con state_coverage=true en el estado dado, sin importar qué
-       ciudad específica tengan asignada. Se usa cuando una ciudad no tiene
-       aliado directo: si el estado tiene un aliado estatal, lo aplicamos. */
-    async listStatePartners(stateName, activeOnly = true) {
-      const path =
-        `/funeral_partners?state_coverage=eq.true` +
-        `&select=id,name,brand,services,phone,email,notes,state_coverage,is_active,` +
-        `location:locations_venezuela!inner(state,city)` +
-        `&location.state=eq.${encodeURIComponent(stateName)}` +
-        (activeOnly ? `&is_active=eq.true` : "");
-      const data = await req("GET", path);
-      return Array.isArray(data) ? data : [];
-    },
-
-    /* ── Admin: CRUD de locations ─────────────────────────────────────── */
-    async listAllLocations(stateFilter) {
-      let path = `/locations_venezuela?select=*&order=state.asc,city.asc`;
-      if (stateFilter) path += `&state=eq.${encodeURIComponent(stateFilter)}`;
-      const data = await req("GET", path);
-      return Array.isArray(data) ? data : [];
-    },
-    async createLocation(row) {
-      const data = await req("POST", "/locations_venezuela", [row], {
-        Prefer: "return=representation",
-      });
-      return (data && data[0]) || null;
-    },
-    async updateLocation(id, patch) {
-      const data = await req(
-        "PATCH",
-        `/locations_venezuela?id=eq.${encodeURIComponent(id)}`,
-        patch,
-        { Prefer: "return=representation" },
-      );
-      return (data && data[0]) || null;
-    },
-    async deleteLocation(id) {
-      return req("DELETE", `/locations_venezuela?id=eq.${encodeURIComponent(id)}`);
-    },
-
-    /* ── Admin: CRUD de partners ──────────────────────────────────────── */
-    async listAllPartners(filter = {}) {
-      let path = `/funeral_partners?select=*,location:locations_venezuela(state,city)&order=name.asc`;
-      if (filter.activeOnly) path += `&is_active=eq.true`;
-      if (filter.locationId)
-        path += `&location_id=eq.${encodeURIComponent(filter.locationId)}`;
-      const data = await req("GET", path);
-      return Array.isArray(data) ? data : [];
-    },
-    async createPartner(row) {
-      const data = await req("POST", "/funeral_partners", [row], {
-        Prefer: "return=representation",
-      });
-      return (data && data[0]) || null;
-    },
-    async updatePartner(id, patch) {
-      const data = await req(
-        "PATCH",
-        `/funeral_partners?id=eq.${encodeURIComponent(id)}`,
-        patch,
-        { Prefer: "return=representation" },
-      );
-      return (data && data[0]) || null;
-    },
-    async deletePartner(id) {
-      return req("DELETE", `/funeral_partners?id=eq.${encodeURIComponent(id)}`);
-    },
+    /* locations_venezuela + funeral_partners se retiraron (2026-11-17): el
+       directorio de aliados vive en Prevision-Funeraria (GET /aliados). Las
+       tablas quedan en Supabase como histórico. */
 
     /* ── Admin: agent_config (key-value) ──────────────────────────────── */
     async listAgentConfig() {
@@ -268,17 +175,6 @@ function makeNoopClient() {
     listTurns:              async () => [],
     listRecentChatTurns:    async () => [],
     insertTurn:             async () => null,
-    findLocationByCity:     async () => null,
-    listPartnersByLocation: async () => [],
-    listStatePartners:      async () => [],
-    listAllLocations:       async () => [],
-    createLocation:         async () => null,
-    updateLocation:         async () => null,
-    deleteLocation:         async () => null,
-    listAllPartners:        async () => [],
-    createPartner:          async () => null,
-    updatePartner:          async () => null,
-    deletePartner:          async () => null,
     listAgentConfig:        async () => [],
     getAgentConfigMap:      async () => ({}),
     upsertAgentConfig:      async () => null,
