@@ -136,16 +136,101 @@ function buildCompraBody(ctx, env) {
   return body;
 }
 
-/* 400/422 = Previsión rechazó los datos. Todo lo demás (5xx, 401 de token,
+/* 400/422 = Previsión rechazó los datos. Los códigos idempotencia_* NO son un
+   rechazo de los datos (conflicto de clave, clave inválida) y no deben
+   disparar el reintento sin atribución. Todo lo demás (5xx, 401 de token,
    timeout, red) es una falla del sistema, no del comprador. */
 function isValidationRejection(e) {
-  return e && (e.status === 400 || e.status === 422);
+  return !!e && (e.status === 400 || e.status === 422) &&
+    !String(e.codigo || "").startsWith("idempotencia_");
+}
+
+/* Idempotency-Key que manda el sitio (una por intento de checkout, reusada en
+   cada reintento). Formato de la API: 1-255 ASCII visibles. Si no es válida se
+   ignora (el checkout funciona igual, sin protección contra duplicados). */
+function validIdempotencyKey(k) {
+  return typeof k === "string" && /^[\x21-\x7E]{1,255}$/.test(k) ? k : null;
+}
+
+/* Mutable solo para que los tests no esperen de verdad. */
+export const _compraTiming = { enProcesoWaitMs: 2000, retryWaitMs: 1000, budgetMs: 8000 };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/* POST /compras con la clave de idempotencia. Con clave, los reintentos son
+   seguros (Previsión devuelve la misma compra), así que:
+     - 409 idempotencia_en_proceso → esperar Retry-After y reintentar (máx. 2).
+     - 5xx o error de red → un reintento (si queda tiempo).
+   Un timeout no se reintenta acá (ya se gastó el tiempo); el comprador puede
+   reenviar y el sitio reusa la misma clave. Sin clave, un solo intento. */
+async function crearCompraSegura(PF, body, key) {
+  const t0 = Date.now();
+  let enProceso = 0;
+  let transitorios = 0;
+  for (;;) {
+    try {
+      return await PF.crearCompra(body, { idempotencyKey: key || undefined });
+    } catch (e) {
+      const queda = Date.now() - t0 < _compraTiming.budgetMs;
+      if (key && e.codigo === "idempotencia_en_proceso" && enProceso < 2 && queda) {
+        enProceso++;
+        await sleep(Math.min(e.retryAfterMs ?? _compraTiming.enProcesoWaitMs, 3000));
+        continue;
+      }
+      const transitorio = (e.status >= 500) || (!e.status && !e.timeout);
+      if (key && transitorio && transitorios < 1 && queda) {
+        transitorios++;
+        console.warn(`[wizard] crearCompra falla transitoria (${e.message}) — reintento con la misma Idempotency-Key`);
+        await sleep(_compraTiming.retryWaitMs);
+        continue;
+      }
+      throw e;
+    }
+  }
+}
+
+/* Mensaje propio de Previsión (por ejemplo, cliente inactivo: "mostrar tal
+   cual" según su contrato). */
+function pfMessage(e) {
+  const b = e && e.body;
+  const m = b && (b.mensaje || b.message || b.error);
+  return typeof m === "string" && m.trim() ? m.trim().slice(0, 300) : null;
 }
 
 /* Resultado de error para el sitio. `code` le dice a index.js qué status
    devolver; el detalle técnico queda en el log, no en la respuesta. */
 function compraFailure(e) {
   console.error(`[wizard] crearCompra falló: ${e.message}`);
+  if (e && e.codigo === "idempotencia_requiere_revision") {
+    /* Se cortó durante un cobro cuyo resultado no se conoce: nunca se
+       repite solo, lo revisa el personal. */
+    return {
+      success: false,
+      code: "pf_review",
+      message: "Recibimos tu solicitud y nuestro equipo la está revisando. Te contactaremos pronto; no es necesario que la envíes de nuevo.",
+    };
+  }
+  if (e && e.codigo === "idempotencia_en_proceso") {
+    return {
+      success: false,
+      code: "pf_unavailable",
+      message: "Tu solicitud todavía se está procesando. Espera un momento e intenta de nuevo.",
+    };
+  }
+  if (e && e.codigo === "idempotencia_conflicto") {
+    return {
+      success: false,
+      code: "pf_rejected",
+      message: "Los datos de la compra cambiaron mientras se procesaba. Revisa la información e intenta de nuevo.",
+    };
+  }
+  if (e && e.status === 409) {
+    /* 409 sin código de idempotencia = cliente inactivo en la funeraria. */
+    return {
+      success: false,
+      code: "pf_rejected",
+      message: pfMessage(e) || "No pudimos procesar la compra. Por favor contacta a la funeraria.",
+    };
+  }
   if (isValidationRejection(e)) {
     return {
       success: false,
@@ -174,26 +259,27 @@ export async function processWizardCheckout(body, env) {
 
   const PF = createPF(env);
   const compraBody = buildCompraBody(ctx, env);
+  const key = validIdempotencyKey(body.idempotencyKey);
   console.log(
-    `Wizard checkout start: plan=${ctx.planSlug} email=${ctx.buyer.email} atribucion=${attributionTag(ctx.atribucion)}`,
+    `Wizard checkout start: plan=${ctx.planSlug} email=${ctx.buyer.email} atribucion=${attributionTag(ctx.atribucion)} idem=${key ? "sí" : "no"}`,
   );
 
   let result;
   try {
-    result = await PF.crearCompra(compraBody);
+    result = await crearCompraSegura(PF, compraBody, key);
   } catch (e) {
     /* La atribución NUNCA debe bloquear una venta: si Previsión RECHAZA el
        body por validación (400/422) y traía `atribucion`, reintentamos una
-       vez sin ella. Ante un 5xx, timeout o error de red NO se reintenta:
-       antes sí, y una falla pasajera bastaba para que la venta quedara sin
-       vendedor (y la primera compra podía haberse creado igual). */
+       vez sin ella. Un rechazo de validación libera la Idempotency-Key, así
+       que el reintento puede usar la misma. Ante 5xx/timeout/red no se
+       reintenta sin atribución (la venta no debe perder al vendedor). */
     if (!(compraBody.atribucion && isValidationRejection(e))) {
       return compraFailure(e);
     }
     console.warn(`[wizard] crearCompra rechazada con atribucion (${e.message}) — reintento sin atribucion (vendedor=${attributionTag(compraBody.atribucion)})`);
     const { atribucion, ...bodySinAtribucion } = compraBody;
     try {
-      result = await PF.crearCompra(bodySinAtribucion);
+      result = await crearCompraSegura(PF, bodySinAtribucion, key);
     } catch (e2) {
       return compraFailure(e2);
     }

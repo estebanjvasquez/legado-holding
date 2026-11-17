@@ -86,7 +86,7 @@ const handler = {
          presupuesto y tumbar a Alma para todos. Pasado el límite no se llama
          al LLM — se responde con el WhatsApp de guardia. */
       if (await isRateLimited(env.CHAT_IP_LIMITER, clientIp(request))) {
-        return json(fallbackChatResponse("limit", body.lang, sanitizeAttribution(body.attribution)), 429);
+        return json(await fallbackChatResponse("limit", body.lang, sanitizeAttribution(body.attribution), env), 429);
       }
       try {
         const result = await handleChat(body, env, executionCtx);
@@ -112,7 +112,11 @@ const handler = {
 
     try {
       const result = await processWizardCheckout(body, env);
-      const status = result.success ? 200 : result.code === "pf_unavailable" ? 503 : 400;
+      const status = result.success
+        ? 200
+        : result.code === "pf_unavailable" ? 503
+        : result.code === "pf_review" ? 409
+        : 400;
       return json(result, status);
     } catch (e) {
       const isValidation = isValidationError(e);

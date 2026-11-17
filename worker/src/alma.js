@@ -62,15 +62,45 @@ export const _retryTiming = { baseDelayMs: 800, maxDelayMs: 4000 };
    real del tenant). NUNCA un placeholder — antes era "0414-XXX-XXXX" y Alma podía
    llegar a dictarlo. Se inyecta en el prompt vía el marcador {{emergency_phone}}. */
 
-/* Fallback si /api/public/t/lh/servicios no responde. WhatsApp de la guardia
-   24/7 del tenant lh (confirmado por el cliente 2026-09-09: +58 424 667 7030).
-   En condiciones normales Alma confirma este número contra la API
-   (whatsapp_emergencia) antes de derivar — OJO: si la API sigue devolviendo el
-   número viejo, gana el de la API. Pendiente: actualizar whatsapp_emergencia del
-   tenant lh en el panel de Prevision-Funeraria a este número
-   (docs/pruebas-tenant-lh-para-prevision.md). También es el fallback del marcador
-   {{emergency_phone}}. */
+/* WhatsApp de la guardia 24/7. La fuente de verdad es Previsión
+   (`whatsapp_emergencia` de GET /servicios, editable por el administrador de la
+   empresa en Configuración › Empresa — PF-8, cerrado 2026-11-17). Se lee en
+   vivo con una caché corta; este número fijo es SOLO el último recurso si la
+   API no responde (o no tiene número cargado): en una emergencia es mejor un
+   número conocido que ninguno. Guardia de LEGADO confirmada por el cliente
+   2026-09-09: +58 424 667 7030. */
 const DEFAULT_WHATSAPP_EMERGENCIA = "584246677030";
+const EMERGENCY_CACHE_MS = 5 * 60 * 1000;
+let emergencyCache = null; // { phone (solo dígitos), until }
+
+/* Para los tests. */
+export function _resetEmergencyCache() {
+  emergencyCache = null;
+}
+
+/* Número de emergencia vigente, en dígitos. Nunca lanza. `maxWaitMs` acota la
+   espera (en el camino de falla de Alma no queremos sumar 10 s). */
+export async function resolveEmergencyWhatsapp(env, { maxWaitMs = 10000 } = {}) {
+  const now = Date.now();
+  if (emergencyCache && emergencyCache.until > now) return emergencyCache.phone;
+  try {
+    const pf = createPF(env);
+    const resp = await Promise.race([
+      pf.getServicios(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error(`sin respuesta en ${maxWaitMs} ms`)), maxWaitMs)),
+    ]);
+    const digits = String((resp && resp.whatsapp_emergencia) || "").replace(/[^\d]/g, "");
+    if (!digits) {
+      console.warn("[alma] la API no tiene whatsapp_emergencia cargado — uso el número de respaldo");
+      return emergencyCache ? emergencyCache.phone : DEFAULT_WHATSAPP_EMERGENCIA;
+    }
+    emergencyCache = { phone: digits, until: now + EMERGENCY_CACHE_MS };
+    return digits;
+  } catch (e) {
+    console.warn(`[alma] no se pudo leer whatsapp_emergencia (${e.message}) — uso el último conocido o el de respaldo`);
+    return emergencyCache ? emergencyCache.phone : DEFAULT_WHATSAPP_EMERGENCIA;
+  }
+}
 
 /* ── Protocolo de crisis ──────────────────────────────────────────────────────
    Prioridad absoluta: señales de autolesión / suicidio / daño a terceros.
@@ -484,24 +514,72 @@ export async function callOpenAIWithRetry(model, apiKey, payload, deadline) {
 /* WhatsApp de guardia para cuando Alma no puede responder (OpenAI caído,
    límite de uso, error interno). Usa el número fijo de la guardia — en un
    momento de falla no agregamos otra llamada de red a la API. */
-export function buildFallbackHandoff(lang, attribution) {
+export async function buildFallbackHandoff(lang, attribution, env) {
   const en = String(lang || "es").toLowerCase().startsWith("en");
   const necesidad = en
     ? "I need help (the chat could not answer)"
     : "necesito ayuda (el chat no pudo responder)";
   const vendorCode = attribution && attribution.codigo_vendedor ? attribution.codigo_vendedor : "";
   return {
-    phone: DEFAULT_WHATSAPP_EMERGENCIA,
+    /* Espera corta: si Previsión tampoco responde, sale el último número
+       conocido (caché) o el de respaldo. */
+    phone: env ? await resolveEmergencyWhatsapp(env, { maxWaitMs: 3000 }) : DEFAULT_WHATSAPP_EMERGENCIA,
     text:  buildWhatsAppText(en ? "en" : "es", "", necesidad, vendorCode, ""),
   };
 }
 
 /* ── Tool executors ──────────────────────────────────────────────────────── */
-async function execLookupCoverage(args, env, db, emergencyPhone) {
+/* Normaliza para comparar ciudades: minúsculas y sin acentos. */
+const normCity = (s) =>
+  String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+
+/* lookup_coverage — fuente principal: directorio de aliados de Previsión
+   (GET /aliados?ciudad=, PF-11). Respaldo TEMPORAL: la tabla funeral_partners
+   de Supabase, solo si Previsión no devuelve aliados para esa ciudad o no
+   responde. Hoy Legado todavía no tiene sus aliados cargados en Previsión;
+   cuando los cargue, el respaldo deja de usarse y se retira junto con el
+   módulo Aliados/Ubicaciones del panel legacy. */
+export async function execLookupCoverage(args, env, db, emergencyPhone) {
   const city = (args && args.city) ? String(args.city).trim() : "";
   if (!city) {
     return { covered: false, error: "Ciudad no proporcionada" };
   }
+  let items = null;
+  try {
+    const resp = await createPF(env).getAliados(city);
+    items = Array.isArray(resp && resp.items) ? resp.items : [];
+  } catch (e) {
+    console.warn(`[alma] lookup_coverage: /aliados de Previsión falló (${e.message}) — pruebo el respaldo de Supabase`);
+  }
+  if (items && items.length > 0) {
+    const nc = normCity(city);
+    const partners = items.map((a) => ({
+      name:     a.nombre,
+      phone:    a.telefono || null,
+      services: a.servicios || null,
+      /* 'city' = aliado en esa ciudad; 'state' = cubre toda su región. */
+      scope:    normCity(a.ciudad).includes(nc) || nc.includes(normCity(a.ciudad)) ? "city" : "state",
+    }));
+    /* La API ya ordena con los de la misma ciudad primero; lo reforzamos
+       porque el prompt usa partners[0]. */
+    partners.sort((x, y) => (x.scope === y.scope ? 0 : x.scope === "city" ? -1 : 1));
+    const first = items.find((a) => normCity(a.ciudad).includes(nc)) || items[0];
+    console.log(`[alma] lookup_coverage source=prevision city="${city}" aliados=${items.length}`);
+    return {
+      covered:  true,
+      source:   "prevision",
+      location: { city: first.ciudad || city, state: first.region || null },
+      partners,
+    };
+  }
+  const legacy = await execLookupCoverageSupabase(args, env, db, emergencyPhone);
+  console.log(`[alma] lookup_coverage source=supabase city="${city}" covered=${!!legacy.covered} (prevision=${items === null ? "error" : "vacío"})`);
+  return legacy;
+}
+
+/* Búsqueda legacy en Supabase (locations_venezuela + funeral_partners). */
+async function execLookupCoverageSupabase(args, env, db, emergencyPhone) {
+  const city = (args && args.city) ? String(args.city).trim() : "";
   try {
     const loc = await db.findLocationByCity(city);
     if (!loc) {
@@ -671,18 +749,9 @@ async function execHandoffWhatsapp(args, env, lang, attribution) {
   if (!necesidad) {
     return { ok: false, error: "Falta 'necesidad' — pregúntale en una frase qué necesita antes de derivar." };
   }
-  /* Confirmamos el WhatsApp vigente contra la API (el staff puede cambiarlo
-     desde el panel de Prevision-Funeraria) — el número fijo es solo fallback
-     si la API no responde. */
-  let phone = DEFAULT_WHATSAPP_EMERGENCIA;
-  try {
-    const pf = createPF(env);
-    const resp = await pf.getServicios();
-    if (resp && resp.whatsapp_emergencia) phone = resp.whatsapp_emergencia;
-  } catch (e) {
-    console.warn(`[alma] handoff_whatsapp: no se pudo confirmar whatsapp_emergencia, uso fallback: ${e.message}`);
-  }
-  const digits = String(phone).replace(/[^\d]/g, "");
+  /* WhatsApp vigente según Previsión (el administrador lo cambia desde su
+     panel); el número fijo es solo el último recurso. */
+  const digits = await resolveEmergencyWhatsapp(env);
   const vendorCode = attribution && attribution.codigo_vendedor ? attribution.codigo_vendedor : "";
   let vendorName = "";
   if (vendorCode) {
@@ -787,7 +856,8 @@ export async function runAlma(input, env, executionCtx) {
   /* {{emergency_phone}} del prompt: línea dedicada del staff si existe, si no el
      WhatsApp de emergencia real del tenant. Nunca un placeholder. */
   const emergencyPhone =
-    (cfg.emergency_phone && cfg.emergency_phone.trim()) || DEFAULT_WHATSAPP_EMERGENCIA;
+    (cfg.emergency_phone && cfg.emergency_phone.trim()) ||
+    (await resolveEmergencyWhatsapp(env, { maxWaitMs: 3000 }));
 
   const promptHardcoded = lang.startsWith("en") ? SYSTEM_PROMPT_EN : SYSTEM_PROMPT_ES;
   const promptKey       = lang.startsWith("en") ? "system_prompt_en" : "system_prompt_es";

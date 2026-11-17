@@ -37,7 +37,39 @@ export function sanitizeAttribution(raw) {
   const referrer = clean(raw.referrer_url, 500);
   if (referrer) out.referrer_url = referrer;
 
+  const toques = sanitizeToques(raw.toques);
+  if (toques.length) out.toques = toques;
+
   return Object.keys(out).length ? out : null;
+}
+
+const MAX_TOQUES = 10;
+const TOQUE_ESTADOS = ["valido", "invalido"];
+
+/* `atribucion.toques` (PF-10): historial de visitas del sitio, del más viejo
+   al más reciente, máximo 10. Solo auditoría — la comisión sigue saliendo de
+   `codigo_vendedor`. Un toque sin fecha válida se descarta; un campo opcional
+   inválido se omite (mismo criterio que la API, que tampoco bloquea nunca). */
+export function sanitizeToques(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  for (const t of raw.slice(-MAX_TOQUES)) {
+    if (!t || typeof t !== "object") continue;
+    const ms = Date.parse(String(t.fecha || ""));
+    if (!Number.isFinite(ms)) continue;
+    const o = { fecha: new Date(ms).toISOString() };
+    const code = String(t.codigo_vendedor || "");
+    if (/^[A-Za-z0-9]{1,20}$/.test(code)) o.codigo_vendedor = code;
+    if (TOQUE_ESTADOS.includes(t.estado)) o.estado = t.estado;
+    ["utm_source", "utm_medium", "utm_campaign"].forEach((k) => {
+      const v = clean(t[k], 100);
+      if (v) o[k] = v;
+    });
+    const canal = String(t.canal_origen || "").toLowerCase().trim();
+    if (CANAL_ENUM.includes(canal)) o.canal_origen = canal;
+    out.push(o);
+  }
+  return out;
 }
 
 /** Etiqueta corta para logs (no vuelca todo el objeto). */

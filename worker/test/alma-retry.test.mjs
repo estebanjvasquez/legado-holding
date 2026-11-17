@@ -56,11 +56,11 @@ test("sin presupuesto de tiempo no se llama a OpenAI", async () => {
   assert.equal(m.calls.length, 0);
 });
 
-test("el WhatsApp de respaldo es el de la guardia y lleva el vendedor", () => {
-  const es = buildFallbackHandoff("es", { codigo_vendedor: "MN4UYC5Y" });
+test("el WhatsApp de respaldo es el de la guardia y lleva el vendedor", async () => {
+  const es = await buildFallbackHandoff("es", { codigo_vendedor: "MN4UYC5Y" });
   assert.equal(es.phone, "584246677030");
   assert.match(es.text, /Alma/);
   assert.match(es.text, /MN4UYC5Y/);
-  const en = buildFallbackHandoff("en", null);
+  const en = await buildFallbackHandoff("en", null);
   assert.match(en.text, /^Hi/);
 });

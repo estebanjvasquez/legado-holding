@@ -38,9 +38,31 @@ const CHAT_WEBHOOK_URL =
   (typeof window !== "undefined" && window.LEGADO_CONFIG?.CHAT_API_URL) ||
   "https://api.legadoholding.com/chat";
 
-/* WhatsApp de la guardia 24/7 de LEGADO — último recurso cuando el chat no
-   responde. Mismo número que DEFAULT_WHATSAPP_EMERGENCIA en worker/src/alma.js. */
+/* WhatsApp de la guardia 24/7 de LEGADO. La fuente de verdad es Previsión
+   (`whatsapp_emergencia` de GET /servicios, editable por el administrador de la
+   empresa). Este número fijo es solo el último recurso si ni el Worker ni
+   Previsión responden. Mismo valor que DEFAULT_WHATSAPP_EMERGENCIA en
+   worker/src/alma.js. */
 const EMERGENCY_WHATSAPP_FALLBACK = "584246677030";
+
+/* Lee el número vigente directo de Previsión (endpoint público con CORS, el
+   mismo origen que el catálogo de planes). Nunca lanza. */
+async function fetchEmergencyWhatsapp() {
+  const url = PLANS_API_URL.replace(/\/planes\/?$/, "/servicios");
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 4000);
+  try {
+    const r = await fetch(url, { signal: ctrl.signal });
+    if (!r.ok) return EMERGENCY_WHATSAPP_FALLBACK;
+    const d = await r.json();
+    const digits = String((d && d.whatsapp_emergencia) || "").replace(/[^\d]/g, "");
+    return digits || EMERGENCY_WHATSAPP_FALLBACK;
+  } catch (_) {
+    return EMERGENCY_WHATSAPP_FALLBACK;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 const CHAT_TIMEOUT_MS = 75000;
 const WIZARD_TIMEOUT_MS = 30000;
 
@@ -1238,7 +1260,7 @@ async function sendChatMessage() {
     /* Ni siquiera el Worker respondió: igual le damos a la familia el
        WhatsApp de la guardia 24/7 — nunca un callejón sin salida. */
     appendWhatsAppHandoffButton(
-      EMERGENCY_WHATSAPP_FALLBACK,
+      await fetchEmergencyWhatsapp(),
       currentLang === "es"
         ? "Hola, el chat de la página no me respondió y necesito ayuda."
         : "Hi, the website chat didn't respond and I need help.",
@@ -1856,6 +1878,44 @@ function wizardBack() {
 /* ══════════════════════════════════════════════════════════════════════════
    INCLUSION DEL WEBHOOK AL FLUJO
    ══════════════════════════════════════════════════════════════════════════ */
+/* Idempotency-Key del checkout (Previsión, PF-9): UNA clave por intento de
+   compra, reutilizada en cada reenvío de los MISMOS datos — así un doble clic o
+   un reintento tras un timeout no crea otra compra ni otra sesión de Stripe.
+   Si cambia cualquier dato (plan, frecuencia, comprador, familiares,
+   atribución), es otra compra: clave nueva. Se guarda en sessionStorage para
+   sobrevivir a una recarga de la pestaña. */
+const WIZARD_IDEM_KEY = "legado_wizard_idem";
+
+function newIdempotencyKey() {
+  try {
+    if (window.crypto && typeof window.crypto.randomUUID === "function") {
+      return window.crypto.randomUUID();
+    }
+  } catch (_) {
+    /* sigue al respaldo */
+  }
+  return "lh-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2) +
+    Math.random().toString(36).slice(2);
+}
+
+function wizardIdempotencyKey(payload) {
+  const fp = JSON.stringify(payload);
+  let saved = null;
+  try {
+    saved = JSON.parse(sessionStorage.getItem(WIZARD_IDEM_KEY) || "null");
+  } catch (_) {
+    saved = null;
+  }
+  if (saved && saved.fp === fp && saved.key) return saved.key;
+  const key = newIdempotencyKey();
+  try {
+    sessionStorage.setItem(WIZARD_IDEM_KEY, JSON.stringify({ fp, key }));
+  } catch (_) {
+    /* sin storage: la clave vale solo para este envío */
+  }
+  return key;
+}
+
 async function submitWizard() {
   const payload = {
     intent:      "create_payment_intent",
@@ -1865,8 +1925,9 @@ async function submitWizard() {
     buyer:       wizardBuyer,
     family:      wizardFamily,
     attribution: getAttribution(),
-    timestamp:   new Date().toISOString(),
   };
+  payload.idempotencyKey = wizardIdempotencyKey(payload);
+  payload.timestamp = new Date().toISOString();
 
   setWizardProcessing(true);
 

@@ -50,9 +50,9 @@ const pickLang = (lang) => (String(lang || "es").toLowerCase().startsWith("en") 
 
 /* Respuesta sin pasar por OpenAI: texto + botón de WhatsApp de guardia. La
    usan el límite de uso (index.js y el tope por sesión) y la falla de Alma. */
-export function fallbackChatResponse(kind, lang, attribution) {
+export async function fallbackChatResponse(kind, lang, attribution, env) {
   const l = pickLang(lang);
-  const wa = buildFallbackHandoff(l, attribution);
+  const wa = await buildFallbackHandoff(l, attribution, env);
   return {
     output:         (kind === "limit" ? LIMIT_MSG : DEGRADED_MSG)[l],
     waHandoffPhone: wa.phone,
@@ -205,7 +205,7 @@ export async function handleChat(body, env, executionCtx) {
      de la metadata); si la BD no responde, queda solo el límite por IP. */
   if ((Number(prevMeta.turn_count) || 0) >= MAX_TURNS_PER_SESSION) {
     console.warn(`[chat] session=${sessionId} alcanzó ${MAX_TURNS_PER_SESSION} turnos — respuesta sin LLM`);
-    return fallbackChatResponse("limit", lang, attribution);
+    return await fallbackChatResponse("limit", lang, attribution, env);
   }
 
   const history = capHistory(dbHistory.length > 0 ? dbHistory : fallbackHistory);
@@ -244,7 +244,7 @@ export async function handleChat(body, env, executionCtx) {
     );
   } catch (e) {
     console.error(`[chat] Alma falló session=${sessionId}: ${e.message}`);
-    const fb = fallbackChatResponse("degraded", lang, attribution);
+    const fb = await fallbackChatResponse("degraded", lang, attribution, env);
     result = {
       output:   fb.output,
       degraded: true,

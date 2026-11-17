@@ -222,8 +222,15 @@ control y hacerlo editable en Configuración (solo `tenant_global_admin`/`super_
 formato E.164). Mientras tanto, desde `419ebdf` los caminos de FALLA de Alma (OpenAI caído,
 límite de uso) ya usan directo `+584246677030`.
 
-- [ ] `whatsapp_emergencia` del tenant `lh` = `+584246677030` en prod (`GET /servicios`).
-- [ ] Editable desde Configuración del panel de PF.
+- [x] `whatsapp_emergencia` del tenant `lh` = `+584246677030` en prod (`GET /servicios`).
+  Verificado en vivo por LH 2026-11-17 (`fdz` sigue con `+584246950136`). PF `c0b9e60`.
+- [x] Editable desde Configuración › Empresa (solo el administrador de la empresa). Falta
+  una prueba manual de punta a punta: cambiarlo en el panel y ver que la API lo refleje.
+
+**Lado LH (2026-11-17):** `worker/src/alma.js` `resolveEmergencyWhatsapp` lo lee en vivo
+(caché de 5 min); `js/main.js` lo lee directo de PF si el Worker no responde. El número
+fijo queda solo como último recurso si PF no responde o devuelve `null` (decisión LH: en
+una emergencia, mejor un número conocido que ninguno).
 
 ### PF-9 · Idempotencia en `POST /compras` — **P2**
 
@@ -240,8 +247,13 @@ pasarla a Stripe. Sin cabecera, comportamiento igual al de hoy.
 **Lado LH cuando esté:** `worker/src/wizard-compra.js` genera una clave por intento de
 compra (el navegador la conserva entre reintentos del mismo wizard).
 
-- [ ] `POST /compras` acepta `Idempotency-Key` (tests: dos llamadas iguales → una sola compra).
-- [ ] Documentado en `docs/api-publica-wizard.md` de PF.
+- [x] `POST /compras` acepta `Idempotency-Key` (PF `0cd5832`, en prod `44bf1931`).
+- [x] Documentado en `docs/api-publica-wizard.md` de PF ("Reintentos seguros").
+
+**Lado LH (2026-11-17):** el sitio genera una clave por intento (reusada si se reenvían
+los mismos datos, `sessionStorage`); el Worker la manda, reintenta con la misma clave ante
+`idempotencia_en_proceso` y ante 5xx/red, y traduce `requiere_revision` a "te
+contactaremos". No probado con una compra real (crea una compra pendiente con Stripe en vivo).
 
 ### PF-10 · Historial de toques de atribución (`atribucion.toques`) — **P2**
 
@@ -259,8 +271,11 @@ nunca bloquea la compra.
 
 **Lado LH cuando esté:** `worker/src/attribution.js` deja pasar `toques` (saneado).
 
-- [ ] `/compras` y `/solicitudes` aceptan y guardan `atribucion.toques`.
-- [ ] Visible en `/atribucion`.
+- [x] `/compras` y `/solicitudes` aceptan y guardan `atribucion.toques` (PF `bb38d59`).
+- [x] Visible en `/atribucion` (botón **Toques**). Sin verificar en navegador todavía.
+
+**Lado LH (2026-11-17):** `worker/src/attribution.js` `sanitizeToques` los deja pasar
+(fecha ISO obligatoria, máx. 10, código ≤ 20).
 
 ### PF-11 · Aliados por ciudad para el bot Alma (`GET /aliados` público con token) — **P2**
 
@@ -278,8 +293,13 @@ Proponer cómo cargar los aliados actuales de LH (los exporta LH desde Supabase)
 **Lado LH cuando esté:** `lookup_coverage` pasa a este endpoint; se cargan los aliados en
 PF; se retira el módulo Aliados/Ubicaciones del panel legacy.
 
-- [ ] Endpoint en prod, con tests (solo activos, sin campos internos, token requerido).
-- [ ] Aliados de LH cargados en PF.
+- [x] Endpoint en prod, con tests (PF `bde6ffc`). Verificado por LH: 401 sin token.
+- [ ] Aliados de LH cargados en PF (hoy `items: []`).
+
+**Lado LH (2026-11-17):** `lookup_coverage` consulta primero `/aliados` de PF; si PF no
+devuelve aliados o no responde, usa como respaldo TEMPORAL `funeral_partners` de Supabase.
+Cuando los aliados estén cargados en PF, se quita el respaldo y el módulo
+Aliados/Ubicaciones del panel legacy.
 
 ## Cerrado
 

@@ -22,8 +22,8 @@ export function createPF(env) {
      indefinidamente. Los errores llevan `status` (HTTP) o `timeout`, para que
      quien llama distinga un rechazo de validación (4xx) de una falla
      transitoria — ver el reintento sin atribución en wizard-compra.js. */
-  async function req(method, path, body, { auth = false, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
-    const headers = { Accept: "application/json" };
+  async function req(method, path, body, { auth = false, timeoutMs = DEFAULT_TIMEOUT_MS, headers: extraHeaders } = {}) {
+    const headers = { Accept: "application/json", ...(extraHeaders || {}) };
     if (auth) {
       if (!token) throw new Error("PF_TOKEN no configurado en el Worker");
       headers.Authorization = `Bearer ${token}`;
@@ -64,6 +64,12 @@ export function createPF(env) {
         typeof parsed === "object" ? JSON.stringify(parsed) : String(parsed);
       const err = new Error(`PF ${method} ${path} -> ${r.status}: ${detail}`);
       err.status = r.status;
+      /* `codigo` distingue, por ejemplo, idempotencia_en_proceso de un 409 de
+         cliente inactivo (docs/api-publica-wizard.md de Previsión). */
+      err.body = parsed && typeof parsed === "object" ? parsed : null;
+      err.codigo = err.body && typeof err.body.codigo === "string" ? err.body.codigo : null;
+      const ra = Number(r.headers.get("retry-after"));
+      if (Number.isFinite(ra) && ra >= 0) err.retryAfterMs = ra * 1000;
       throw err;
     }
     return parsed;
@@ -73,7 +79,18 @@ export function createPF(env) {
     getParentescos: () => req("GET", "/parentescos", undefined, { auth: true }),
     /* /compras crea la Checkout Session de Stripe del lado de Previsión: se le
        da más margen que a una consulta. */
-    crearCompra:     (body) => req("POST", "/compras", body, { auth: true, timeoutMs: COMPRA_TIMEOUT_MS }),
+    /* Idempotency-Key (opcional, PF-9): misma clave = misma compra; un
+       reintento no crea otra compra pendiente ni otra Checkout Session. */
+    crearCompra: (body, { idempotencyKey } = {}) =>
+      req("POST", "/compras", body, {
+        auth: true,
+        timeoutMs: COMPRA_TIMEOUT_MS,
+        headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined,
+      }),
+    /* Directorio de aliados por ciudad (PF-11) — server-to-server, con token.
+       Solo activos; `items: []` es una respuesta normal. */
+    getAliados: (ciudad) =>
+      req("GET", `/aliados?ciudad=${encodeURIComponent(String(ciudad || "").slice(0, 100))}`, undefined, { auth: true }),
     /* Resuelve un codigo_vendedor (?ref=) a su nombre para mostrarlo (handoff a
        WhatsApp, banner del sitio). Server-to-server: no expone la lista de
        vendedores al navegador. Código inválido/inactivo → { activo: false }. */
