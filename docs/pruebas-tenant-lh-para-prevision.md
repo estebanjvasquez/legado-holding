@@ -213,7 +213,73 @@ o actualizarlo directo.
 apunta a `+584246677030` (commit `29d17e6`), pero **si la API sigue devolviendo el número
 viejo, gana la API**. El fix real es de este lado.
 
+**Causa encontrada (2026-11-17, leyendo el código de PF):** el valor sale de
+`control.tenants.config_json` → `whatsappEmergencia` (`src/tenant/types.ts`, leído en
+`src/routes/servicios-publico.ts`), cargado por
+`migrations/control/0004_whatsapp_emergencia_lh.sql`. Ninguna pantalla lo edita. Pedido
+ampliado (ya enviado a la sesión de PF el 2026-11-17): corregirlo con una migración de
+control y hacerlo editable en Configuración (solo `tenant_global_admin`/`super_admin`,
+formato E.164). Mientras tanto, desde `419ebdf` los caminos de FALLA de Alma (OpenAI caído,
+límite de uso) ya usan directo `+584246677030`.
+
 - [ ] `whatsapp_emergencia` del tenant `lh` = `+584246677030` en prod (`GET /servicios`).
+- [ ] Editable desde Configuración del panel de PF.
+
+### PF-9 · Idempotencia en `POST /compras` — **P2**
+
+**Qué:** si la primera llamada a `/compras` crea la compra pero la respuesta no llega
+(timeout/red), un reintento crea una segunda compra pendiente y otra Checkout Session.
+Desde `419ebdf` el Worker de LH ya no reintenta solo ante 5xx/timeout, pero el usuario
+puede volver a enviar el wizard.
+
+**Pedido:** cabecera opcional `Idempotency-Key` en `POST /api/public/t/:slug/compras`.
+Misma clave + mismo tenant dentro de una ventana razonable → misma respuesta, sin crear
+otra compra ni otra Checkout Session; misma clave con otro body → error claro. Valorar
+pasarla a Stripe. Sin cabecera, comportamiento igual al de hoy.
+
+**Lado LH cuando esté:** `worker/src/wizard-compra.js` genera una clave por intento de
+compra (el navegador la conserva entre reintentos del mismo wizard).
+
+- [ ] `POST /compras` acepta `Idempotency-Key` (tests: dos llamadas iguales → una sola compra).
+- [ ] Documentado en `docs/api-publica-wizard.md` de PF.
+
+### PF-10 · Historial de toques de atribución (`atribucion.toques`) — **P2**
+
+**Qué:** desde `419ebdf` el sitio (`js/attribution.js`) valida el `?ref=` contra
+`/vendedores/lookup` y guarda los últimos 10 toques del visitante. Hoy el Worker los
+descarta (`sanitizeAttribution` solo deja pasar los campos que la API acepta), así que no
+se puede auditar una comisión discutida ni cambiar a futuro a last-touch/multi-touch.
+
+**Pedido:** aceptar en `POST /compras` y `POST /solicitudes` un `atribucion.toques`
+opcional: array de ≤ 10 objetos
+`{ fecha (ISO), codigo_vendedor?, estado? ("valido"|"invalido"), utm_source?, utm_medium?, utm_campaign?, canal_origen? }`.
+Guardarlo para auditoría y mostrarlo en la vista de staff `/atribucion`. **No** cambia la
+regla de comisión (sigue mandando `codigo_vendedor`, first-touch). Un `toques` malformado
+nunca bloquea la compra.
+
+**Lado LH cuando esté:** `worker/src/attribution.js` deja pasar `toques` (saneado).
+
+- [ ] `/compras` y `/solicitudes` aceptan y guardan `atribucion.toques`.
+- [ ] Visible en `/atribucion`.
+
+### PF-11 · Aliados por ciudad para el bot Alma (`GET /aliados` público con token) — **P2**
+
+**Qué:** PF ya tiene el directorio de aliados por tenant (migración 0041,
+`src/db/aliados.ts`, pantalla `aliados.html`), pero no lo expone en la API pública. Alma
+(`lookup_coverage` en `worker/src/alma.js`) sigue leyendo `funeral_partners` de Supabase,
+lo que obliga a mantener el panel legacy de LH.
+
+**Pedido:** `GET /api/public/t/:slug/aliados?ciudad=...`, server-to-server con el token
+del tenant (como `/parentescos`), reutilizando `listAliados` (ciudad + región con
+`cobertura_region`). Solo activos; devolver solo `nombre`, `ciudad`, `region`,
+`cobertura_region`, `telefono`, `servicios` (nunca `notas`, `email` ni contacto interno).
+Proponer cómo cargar los aliados actuales de LH (los exporta LH desde Supabase).
+
+**Lado LH cuando esté:** `lookup_coverage` pasa a este endpoint; se cargan los aliados en
+PF; se retira el módulo Aliados/Ubicaciones del panel legacy.
+
+- [ ] Endpoint en prod, con tests (solo activos, sin campos internos, token requerido).
+- [ ] Aliados de LH cargados en PF.
 
 ## Cerrado
 
