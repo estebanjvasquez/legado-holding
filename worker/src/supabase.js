@@ -100,6 +100,19 @@ export function createSupabase(env) {
       return Array.isArray(data) ? data : [];
     },
 
+    /* Últimos `limit` turnos conversacionales (user/model con texto), en orden
+       cronológico. Es lo que usa el chat como memoria; listTurns (sesión
+       completa, con tools) queda para el visor del panel. */
+    async listRecentChatTurns(sessionId, limit = 40) {
+      const n = Math.max(1, Math.min(200, Number(limit) || 40));
+      const path =
+        `/chat_turns?session_id=eq.${encodeURIComponent(sessionId)}` +
+        `&role=in.(user,model)&content=not.is.null` +
+        `&select=role,content,created_at&order=id.desc&limit=${n}`;
+      const data = await req("GET", path);
+      return Array.isArray(data) ? data.reverse() : [];
+    },
+
     async insertTurn(row) {
       const path = `/chat_turns`;
       const body = [row];
@@ -253,6 +266,7 @@ function makeNoopClient() {
     getSession:             async () => null,
     updateSession:          async () => null,
     listTurns:              async () => [],
+    listRecentChatTurns:    async () => [],
     insertTurn:             async () => null,
     findLocationByCity:     async () => null,
     listPartnersByLocation: async () => [],

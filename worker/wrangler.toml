@@ -17,11 +17,8 @@ routes = [
 # Variables públicas (no son secretos). Editar aquí cualquier valor que NO
 # requiera estar cifrado.
 [vars]
-# IN_BASE se mantiene SOLO para el login del panel admin (worker/src/admin.js
-# sigue autenticando staff contra Invoice Ninja) — el checkout y el bot Alma
-# ya no usan Invoice Ninja ni el secret IN_TOKEN (revocado). Ver el plan de
-# migración: docs/api-publica-wizard.md.
-IN_BASE = "https://invoicing.legadoholding.com/api/v1"
+# Invoice Ninja ya no existe (2026-11): el panel admin se autentica solo con
+# el secret ADMIN_TOKEN (worker/src/admin.js) hasta que se retire el panel.
 ENVIRONMENT = "dev"
 
 # Identidad del despliegue. "lh" = LEGADO Holding. Un futuro despliegue para
@@ -62,6 +59,26 @@ OPENAI_MODEL = "gpt-5.6-luna"
 #   cd worker && wrangler secret put SUPABASE_SERVICE_ROLE_KEY
 # Si SUPABASE_URL o el secret faltan, el chat sigue funcionando (no-op fallback).
 SUPABASE_URL = "https://naebpcyphdcopndqovie.supabase.co"
+
+# Rate Limiting de Workers (ver src/ratelimit.js). namespace_id es un entero
+# arbitrario propio de esta cuenta; period solo admite 10 o 60 segundos.
+# /chat: 20 mensajes por minuto por IP (el tope de 60 mensajes por
+# conversación vive en src/chat.js).
+[[ratelimits]]
+name = "CHAT_IP_LIMITER"
+namespace_id = "1001"
+  [ratelimits.simple]
+  limit = 20
+  period = 60
+
+# Login del panel admin: 5 intentos por minuto por IP (frena fuerza bruta
+# contra ADMIN_TOKEN).
+[[ratelimits]]
+name = "ADMIN_LOGIN_LIMITER"
+namespace_id = "1002"
+  [ratelimits.simple]
+  limit = 5
+  period = 60
 
 # Observability deshabilitado explícito. En wrangler 4.x se activaba por
 # defecto y requiere entitlement del plan; sin él el deploy fallaba con

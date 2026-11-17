@@ -52,8 +52,9 @@ Navegador ──GET catálogo (CORS, sin token)──▶ prevision-funeraria.sis
   function-calling contra OpenAI, no hay n8n).
 - **Prevision-Funeraria**: multi-tenant (Cloudflare Workers + D1). Este repo es solo
   un **consumidor** de su API pública. No se toca desde acá.
-- **Invoice Ninja**: ya NO se usa para billing. Sobrevive SOLO en `worker/src/admin.js`
-  para el login del panel admin (`env.IN_BASE`). Deuda pendiente, no bloqueante.
+- **Invoice Ninja**: ya NO existe (confirmado 2026-11-17). El panel admin entra solo con
+  el secret `ADMIN_TOKEN` (`worker/src/admin.js`); el panel es legacy y se retira cuando
+  sus módulos pasen a Prevision-Funeraria.
 
 ---
 
@@ -62,14 +63,15 @@ Navegador ──GET catálogo (CORS, sin token)──▶ prevision-funeraria.sis
 ### Frontend (raíz)
 | Archivo | Rol |
 |---|---|
-| `index.html` | Página única. `LEGADO_CONFIG` (switch dev/prod), `PLANS_API_URL` directo a Previsión, `PARENTESCOS_API_URL`/chat vía Worker. **Cache-bust `?v=N`**: `css/main.css?v=4`, `js/main.js?v=9` (independientes; líneas ~100 y ~1283). |
+| `index.html` | Página única. `LEGADO_CONFIG` (switch dev/prod), `PLANS_API_URL` directo a Previsión, `PARENTESCOS_API_URL`/chat vía Worker. **Cache-bust `?v=N`**: `css/main.css?v=4`, `js/attribution.js?v=1`, `js/main.js?v=11` (independientes; líneas ~110 y ~1358). |
+| `js/attribution.js` | Atribución de vendedor (`?ref=`): valida el código contra `/wizard/vendedor`, first-touch entre códigos válidos (TTL 90d), guarda los últimos 10 toques. Se carga antes de `main.js`; tests en `worker/test/attribution-frontend.test.mjs`. |
 | `js/main.js` | i18n, wizard de 4 pasos, UI del chat de Alma, y **§"ATRIBUCIÓN DE VENDEDOR / CANAL"** (`initAttribution`/`getAttribution`, `localStorage["legado_attribution"]`, first-touch TTL 90d). `SELECTO_CHECKOUT_ENABLED = true`, `WIZARD_ENABLED_SLUGS`. |
 | `js/wizard-generic.js` | Botones "Protege tu Legado" sin plan → scroll a la sección de planes. |
 | `js/vendor/purify.min.js` | DOMPurify (sanitiza HTML del chat). |
 | `css/main.css` | Estilos. Marca: navy `#263c5b`, dorado `#c9a84c` (decorativo, no CTAs), fuente Inter. |
 | `gracias.html` / `cancelado.html` | `success_url` / `cancel_url` de Stripe Checkout. **Deben estar en la lista de copia de `.cpanel.yml`.** |
 | `terminos-condiciones.html` / `politica-privacidad.html` | Legales (fuentes en los `.txt` homónimos). |
-| `admin/` | Panel admin (`index.html` + `admin.js`). Login de staff contra Invoice Ninja. |
+| `admin/` | Panel admin legacy (`index.html` + `admin.js`). Login con el token `ADMIN_TOKEN`. |
 
 ### Worker (`worker/`)
 | Archivo | Rol |
@@ -82,12 +84,14 @@ Navegador ──GET catálogo (CORS, sin token)──▶ prevision-funeraria.sis
 | `src/chat.js` | Handler `/chat`: sanea `attribution`, llama a `runAlma`, persiste en `chat_sessions.metadata` de Supabase. |
 | `src/attribution.js` | `sanitizeAttribution(raw)` (whitelists + límites de longitud), `attributionTag()` para logs. |
 | `src/supabase.js` | Memoria del chat. No-op si faltan `SUPABASE_URL`/secret. |
-| `src/admin.js` | Login de staff vía `IN_BASE` (Invoice Ninja). Legacy, fuera de alcance. |
+| `src/admin.js` | Panel legacy: auth solo con `ADMIN_TOKEN` (tiempo constante, login limitado a 5/min por IP). |
+| `src/ratelimit.js` | Límites de uso (bindings `CHAT_IP_LIMITER` 20/min por IP, `ADMIN_LOGIN_LIMITER` 5/min). Fail-open. El tope de 60 mensajes por conversación vive en `src/chat.js`. |
+| `test/` | Tests con `node --test` (`npm test` en `worker/`). Corren en Node, no en workerd; `test/setup.mjs` stubea `cloudflare:workers`, `caches` y `scheduler`. |
 | `src/errors.js` | Helpers de error. |
 
 ### Vars y secrets del Worker
 - **Vars** (en `wrangler.toml`, no secretas): `PF_BASE`, `SITE_BASE_URL`, `ALLOWED_ORIGINS`
-  (CSV de orígenes CORS), `OPENAI_MODEL=gpt-5.6-luna`, `SUPABASE_URL`, `IN_BASE`, `ENVIRONMENT`.
+  (CSV de orígenes CORS), `OPENAI_MODEL=gpt-5.6-luna`, `SUPABASE_URL`, `ENVIRONMENT`.
 - **Secrets** (`wrangler secret put`): `PF_TOKEN` (Bearer para `/compras`, `/parentescos`,
   `/vendedores/lookup` de Previsión), `OPENAI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
 - Local: `worker/.dev.vars` (gitignoreado). El `PF_TOKEN` de prueba está también en
@@ -124,7 +128,9 @@ Navegador ──GET catálogo (CORS, sin token)──▶ prevision-funeraria.sis
   propagaban al contrato (solo `vendedor_id`); migración 0035, backfill verificado en
   prod. **Nada pendiente del lado de legado-holding.** Ver
   `docs/pruebas-tenant-lh-para-prevision.md`.
-- **`admin.js` sigue con Invoice Ninja** — deuda técnica, no bloqueante.
+- **Panel admin legacy** (`admin/` + `worker/src/admin.js`): Invoice Ninja ya no existe;
+  entra solo con `ADMIN_TOKEN`. Pendiente retirarlo (aliados → `/aliados` de Previsión;
+  config de Alma y conversaciones: ver plan de migración).
 - **Hilo abierto**: el usuario reportó que Alma "se presenta dos veces" en su navegador,
   pese a que el fix está verificado correcto en backend y frontend. Falta confirmarlo en
   ventana de incógnito. Ver `.claude/handoff.json` → `open_thread_needs_followup`.
@@ -229,6 +235,6 @@ Si agregas un archivo estático nuevo que deba publicarse, **agrégalo a esa lis
 - El wizard o el bot Alma **sin seguir** `docs/api-publica-wizard.md` y
   `docs/GUIA_INTERACCION_BOT_LEGADO.md`.
 - El token de API del tenant `lh` (no regenerar).
-- El login de `admin.js` contra Invoice Ninja (deuda conocida, fuera de alcance).
+- El secret `ADMIN_TOKEN` del Worker: es el único acceso al panel legacy.
 - Los archivos gitignoreados de `docs/` (`*.SECRET.md`, `*.docx`, `campanasatribucion.md`,
   `cost-and-pricing.md`, `proposal-client.md`).

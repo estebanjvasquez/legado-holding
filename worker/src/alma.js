@@ -42,7 +42,18 @@ const tracer = trace.getTracer("alma");
 
 const OPENAI_BASE = "https://api.openai.com/v1/chat/completions";
 const MAX_TOOL_HOPS = 8;
-const LLM_TIMEOUT_MS = 30000;
+/* Timeout de UNA llamada a OpenAI. El turno completo (todos los hops y
+   reintentos) además tiene un presupuesto total, TURN_BUDGET_MS: sin él, 8
+   hops × 30 s dejaban al usuario esperando hasta 4 minutos. */
+const LLM_TIMEOUT_MS = 25000;
+const TURN_BUDGET_MS = 60000;
+/* Reintentos ante fallos transitorios de OpenAI (429 por tasa, 5xx, timeout,
+   error de red). Un 429 por cuota agotada (insufficient_quota) o un 4xx de
+   request NO se reintentan: fallarían igual. Si se agotan, chat.js responde
+   con el WhatsApp de guardia en vez de un error genérico. */
+const LLM_MAX_RETRIES = 2;
+/* Mutable solo para que los tests no esperen de verdad. */
+export const _retryTiming = { baseDelayMs: 800, maxDelayMs: 4000 };
 
 /* Número de ÚLTIMO recurso que Alma comparte como texto solo si handoff_whatsapp
    falla por un error técnico y no se puede ni siquiera armar el link de WhatsApp.
@@ -398,30 +409,91 @@ const TOOLS = [
 ];
 
 /* ── HTTP helper ─────────────────────────────────────────────────────────── */
-async function callOpenAI(model, apiKey, payload) {
+async function callOpenAI(model, apiKey, payload, timeoutMs = LLM_TIMEOUT_MS) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const r = await fetch(OPENAI_BASE, {
-      method:  "POST",
-      headers: {
-        "Content-Type":  "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-      },
-      body:   JSON.stringify({ model, ...payload }),
-      signal: controller.signal,
-    });
+    let r;
+    try {
+      r = await fetch(OPENAI_BASE, {
+        method:  "POST",
+        headers: {
+          "Content-Type":  "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body:   JSON.stringify({ model, ...payload }),
+        signal: controller.signal,
+      });
+    } catch (e) {
+      /* Abort (timeout) o fallo de red: ambos son transitorios. */
+      const err = new Error(
+        controller.signal.aborted
+          ? `OpenAI timeout tras ${timeoutMs} ms`
+          : `OpenAI error de red: ${e.message}`,
+      );
+      err.retryable = true;
+      throw err;
+    }
     const text = await r.text();
     let parsed = text;
     try { parsed = text ? JSON.parse(text) : null; } catch (_) { /* keep text */ }
     if (!r.ok) {
       const detail = typeof parsed === "object" ? JSON.stringify(parsed) : String(parsed);
-      throw new Error(`OpenAI ${r.status}: ${detail}`);
+      const err = new Error(`OpenAI ${r.status}: ${detail}`);
+      err.status = r.status;
+      const code = parsed && typeof parsed === "object" ? parsed.error?.code : null;
+      /* insufficient_quota llega como 429 pero no se arregla esperando. */
+      err.retryable = (r.status === 429 && code !== "insufficient_quota") || r.status >= 500;
+      const ra = Number(r.headers.get("retry-after"));
+      if (Number.isFinite(ra) && ra >= 0) err.retryAfterMs = ra * 1000;
+      throw err;
     }
     return parsed;
   } finally {
     clearTimeout(timeout);
   }
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/* callOpenAI con reintentos acotados por el presupuesto del turno (deadline,
+   epoch ms). Nunca espera más allá del deadline: si el próximo intento no
+   cabe, relanza el último error. */
+export async function callOpenAIWithRetry(model, apiKey, payload, deadline) {
+  let lastErr;
+  for (let attempt = 0; attempt <= LLM_MAX_RETRIES; attempt++) {
+    const remaining = deadline - Date.now();
+    if (remaining < 2000) {
+      throw lastErr || new Error("Presupuesto de tiempo del turno agotado");
+    }
+    try {
+      return await callOpenAI(model, apiKey, payload, Math.min(LLM_TIMEOUT_MS, remaining));
+    } catch (e) {
+      lastErr = e;
+      if (!e.retryable || attempt === LLM_MAX_RETRIES) throw e;
+      const backoff = _retryTiming.baseDelayMs * 2 ** attempt;
+      const delay = Math.min(e.retryAfterMs ?? backoff, _retryTiming.maxDelayMs);
+      if (Date.now() + delay + 2000 > deadline) throw e;
+      console.warn(`[alma] OpenAI falló (${e.message.slice(0, 120)}) — reintento ${attempt + 1}/${LLM_MAX_RETRIES} en ${delay} ms`);
+      await sleep(delay);
+    }
+  }
+  throw lastErr;
+}
+
+/* WhatsApp de guardia para cuando Alma no puede responder (OpenAI caído,
+   límite de uso, error interno). Usa el número fijo de la guardia — en un
+   momento de falla no agregamos otra llamada de red a la API. */
+export function buildFallbackHandoff(lang, attribution) {
+  const en = String(lang || "es").toLowerCase().startsWith("en");
+  const necesidad = en
+    ? "I need help (the chat could not answer)"
+    : "necesito ayuda (el chat no pudo responder)";
+  const vendorCode = attribution && attribution.codigo_vendedor ? attribution.codigo_vendedor : "";
+  return {
+    phone: DEFAULT_WHATSAPP_EMERGENCIA,
+    text:  buildWhatsAppText(en ? "en" : "es", "", necesidad, vendorCode, ""),
+  };
 }
 
 /* ── Tool executors ──────────────────────────────────────────────────────── */
@@ -754,11 +826,12 @@ export async function runAlma(input, env, executionCtx) {
     events: [],
   };
 
+  const deadline = Date.now() + TURN_BUDGET_MS;
   for (let hop = 0; hop < MAX_TOOL_HOPS; hop++) {
     const t0 = Date.now();
     let resp;
     try {
-      resp = await callOpenAI(model, apiKey, {
+      resp = await callOpenAIWithRetry(model, apiKey, {
         messages,
         tools:       TOOLS,
         temperature,
@@ -768,9 +841,12 @@ export async function runAlma(input, env, executionCtx) {
            reasoning_effort is 'none'"). Alma necesita tool-calling
            determinista en cada turno, así que forzamos 'none'. */
         reasoning_effort: "none",
-      });
+      }, deadline);
     } catch (e) {
       out.events.push({ role: "model", hop, latency_ms: Date.now() - t0, error: e.message });
+      /* chat.js persiste estos events aunque el turno falle. */
+      e.almaEvents = out.events;
+      e.almaModel  = model;
       throw e;
     }
     const latency_ms = Date.now() - t0;
@@ -779,7 +855,7 @@ export async function runAlma(input, env, executionCtx) {
     if (!choice) {
       const msg = `OpenAI sin choices: ${JSON.stringify(resp)}`;
       out.events.push({ role: "model", hop, latency_ms, error: msg });
-      throw new Error(msg);
+      throw Object.assign(new Error(msg), { almaEvents: out.events, almaModel: model });
     }
     const assistantMsg = choice.message || {};
     const toolCalls = Array.isArray(assistantMsg.tool_calls) ? assistantMsg.tool_calls : [];
@@ -914,5 +990,5 @@ export async function runAlma(input, env, executionCtx) {
 
   const msg = `Tool use no convergió en ${MAX_TOOL_HOPS} hops`;
   out.events.push({ role: "model", error: msg });
-  throw new Error(msg);
+  throw Object.assign(new Error(msg), { almaEvents: out.events, almaModel: model });
 }

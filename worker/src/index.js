@@ -15,7 +15,9 @@ import { instrument } from "@microlabs/otel-cf-workers";
 
 import { createPF } from "./prevision-api.js";
 import { processWizardCheckout } from "./wizard-compra.js";
-import { handleChat } from "./chat.js";
+import { handleChat, fallbackChatResponse } from "./chat.js";
+import { sanitizeAttribution } from "./attribution.js";
+import { clientIp, isRateLimited } from "./ratelimit.js";
 import { handleAdmin } from "./admin.js";
 import { isValidationError } from "./errors.js";
 import { resolveTenant } from "./tenant.js";
@@ -79,9 +81,16 @@ const handler = {
     }
 
     if (url.pathname === "/chat") {
+      /* Límite por IP (binding CHAT_IP_LIMITER de wrangler.toml). Cada mensaje
+         cuesta tokens de OpenAI: sin esto, cualquiera podía vaciar el
+         presupuesto y tumbar a Alma para todos. Pasado el límite no se llama
+         al LLM — se responde con el WhatsApp de guardia. */
+      if (await isRateLimited(env.CHAT_IP_LIMITER, clientIp(request))) {
+        return json(fallbackChatResponse("limit", body.lang, sanitizeAttribution(body.attribution)), 429);
+      }
       try {
         const result = await handleChat(body, env, executionCtx);
-        return json(result, 200);
+        return json(result, result.rateLimited ? 429 : 200);
       } catch (e) {
         const isValidation = isValidationError(e);
         if (!isValidation) {
@@ -95,9 +104,16 @@ const handler = {
       }
     }
 
+    /* El checkout del wizard solo vive en POST / — antes cualquier POST a
+       cualquier ruta desconocida terminaba en el checkout. */
+    if (url.pathname !== "/") {
+      return json({ success: false, message: "Not found" }, 404);
+    }
+
     try {
       const result = await processWizardCheckout(body, env);
-      return json(result, result.success ? 200 : 400);
+      const status = result.success ? 200 : result.code === "pf_unavailable" ? 503 : 400;
+      return json(result, status);
     } catch (e) {
       const isValidation = isValidationError(e);
       if (!isValidation) {
@@ -154,12 +170,15 @@ async function handleVendedorLookup(codigo, env, json) {
     const resp = await PF.getVendedor(c);
     return json({
       activo: !!(resp && resp.activo),
+      verificado: true,
       codigo: c,
       nombre: (resp && (resp.nombre || resp.nombre_completo)) || null,
     });
   } catch (e) {
+    /* verificado:false = no se pudo consultar a Previsión (no es lo mismo que
+       un código inválido). El sitio lo guarda "sin verificar" y reintenta. */
     console.warn(`Vendedor lookup error (${c}): ${e.message}`);
-    return json({ activo: false });
+    return json({ activo: false, verificado: false });
   }
 }
 

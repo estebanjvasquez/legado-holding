@@ -66,13 +66,13 @@ function formatDate(iso) {
 }
 
 /* ── Login ────────────────────────────────────────────────────────────────── */
-async function tryLogin(email, password) {
-  /* /admin/login es público y verifica creds contra IN. Devuelve token IN
-     personal del usuario + datos básicos. */
+async function tryLogin(token) {
+  /* /admin/login es público y valida el token contra el secret ADMIN_TOKEN
+     del Worker (Invoice Ninja ya no existe). */
   const r = await fetch(API_BASE + "/admin/login", {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify({ email, password }),
+    body:    JSON.stringify({ token }),
   });
   const text = await r.text();
   let body = text;
@@ -87,20 +87,19 @@ async function tryLogin(email, password) {
 }
 
 $("#login-btn").addEventListener("click", async () => {
-  const email    = ($("#login-email").value    || "").trim();
-  const password = ($("#login-password").value || "");
-  const errEl    = $("#login-error");
-  const btn      = $("#login-btn");
+  const token = ($("#login-token").value || "").trim();
+  const errEl = $("#login-error");
+  const btn   = $("#login-btn");
   errEl.classList.add("hidden");
-  if (!email || !password) {
-    errEl.textContent = "Email y contraseña son requeridos.";
+  if (!token) {
+    errEl.textContent = "El token de acceso es requerido.";
     errEl.classList.remove("hidden");
     return;
   }
   btn.disabled = true;
   try {
-    await tryLogin(email, password);
-    $("#login-password").value = "";
+    await tryLogin(token);
+    $("#login-token").value = "";
     $("#login-modal").classList.add("hidden");
     $("#app").classList.remove("hidden");
     init();
@@ -113,7 +112,7 @@ $("#login-btn").addEventListener("click", async () => {
   }
 });
 
-["#login-email", "#login-password"].forEach((sel) => {
+["#login-token"].forEach((sel) => {
   $(sel).addEventListener("keydown", (e) => {
     if (e.key === "Enter") $("#login-btn").click();
   });

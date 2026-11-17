@@ -136,6 +136,32 @@ function buildCompraBody(ctx, env) {
   return body;
 }
 
+/* 400/422 = Previsión rechazó los datos. Todo lo demás (5xx, 401 de token,
+   timeout, red) es una falla del sistema, no del comprador. */
+function isValidationRejection(e) {
+  return e && (e.status === 400 || e.status === 422);
+}
+
+/* Resultado de error para el sitio. `code` le dice a index.js qué status
+   devolver; el detalle técnico queda en el log, no en la respuesta. */
+function compraFailure(e) {
+  console.error(`[wizard] crearCompra falló: ${e.message}`);
+  if (isValidationRejection(e)) {
+    return {
+      success: false,
+      code: "pf_rejected",
+      message: "No pudimos procesar los datos de la compra. Revisa la información e intenta de nuevo.",
+    };
+  }
+  return {
+    success: false,
+    code: "pf_unavailable",
+    message: e && e.timeout
+      ? "El sistema de pagos está tardando más de lo normal. Intenta de nuevo en unos minutos."
+      : "El sistema de pagos no está disponible en este momento. Intenta de nuevo en unos minutos.",
+  };
+}
+
 export async function processWizardCheckout(body, env) {
   const ctx = normalize(body);
 
@@ -156,16 +182,20 @@ export async function processWizardCheckout(body, env) {
   try {
     result = await PF.crearCompra(compraBody);
   } catch (e) {
-    /* La atribución NUNCA debe bloquear una venta. Si el bloque `atribucion`
-       hiciera fallar la validación de la API (schema distinto al esperado),
-       reintentamos una vez sin él — se pierde el tracking de ese vendedor,
-       pero el checkout sigue. */
-    if (compraBody.atribucion) {
-      console.warn(`[wizard] crearCompra falló con atribucion (${e.message}) — reintento sin atribucion`);
-      const { atribucion, ...bodySinAtribucion } = compraBody;
+    /* La atribución NUNCA debe bloquear una venta: si Previsión RECHAZA el
+       body por validación (400/422) y traía `atribucion`, reintentamos una
+       vez sin ella. Ante un 5xx, timeout o error de red NO se reintenta:
+       antes sí, y una falla pasajera bastaba para que la venta quedara sin
+       vendedor (y la primera compra podía haberse creado igual). */
+    if (!(compraBody.atribucion && isValidationRejection(e))) {
+      return compraFailure(e);
+    }
+    console.warn(`[wizard] crearCompra rechazada con atribucion (${e.message}) — reintento sin atribucion (vendedor=${attributionTag(compraBody.atribucion)})`);
+    const { atribucion, ...bodySinAtribucion } = compraBody;
+    try {
       result = await PF.crearCompra(bodySinAtribucion);
-    } else {
-      throw e;
+    } catch (e2) {
+      return compraFailure(e2);
     }
   }
   console.log(`Compra creada: estado=${result.estado} id=${result.compra_pendiente_id}`);

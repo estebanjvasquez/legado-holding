@@ -38,6 +38,12 @@ const CHAT_WEBHOOK_URL =
   (typeof window !== "undefined" && window.LEGADO_CONFIG?.CHAT_API_URL) ||
   "https://api.legadoholding.com/chat";
 
+/* WhatsApp de la guardia 24/7 de LEGADO — último recurso cuando el chat no
+   responde. Mismo número que DEFAULT_WHATSAPP_EMERGENCIA en worker/src/alma.js. */
+const EMERGENCY_WHATSAPP_FALLBACK = "584246677030";
+const CHAT_TIMEOUT_MS = 75000;
+const WIZARD_TIMEOUT_MS = 30000;
+
 const WIZARD_WEBHOOK_URL =
   (typeof window !== "undefined" && window.LEGADO_CONFIG?.WIZARD_WEBHOOK_URL) ||
   "https://api.legadoholding.com";
@@ -56,149 +62,25 @@ const PARENTESCOS_API_URL =
   "https://api.legadoholding.com/wizard/parentescos";
 
 /* =============================================================================
-   ATRIBUCIÓN DE VENDEDOR / CANAL  (?ref=CODIGO + UTMs)
-   ─────────────────────────────────────────────────────────────────────────────
-   Legado Holding opera con vendedores externos que reparten un enlace del tipo
-   https://www.legadoholding.com?ref=MN4UYC5Y. El código tiene que sobrevivir a
-   toda la navegación y viajar en cada compra (wizard) y cada prospecto/handoff
-   (Alma) para que Prevision-Funeraria (tenant lh) atribuya la transacción al
-   vendedor. Contrato: docs/api-publica-wizard.md §"Atribución de canal / vendedor".
-
-   Modelo: FIRST-TOUCH con TTL de 90 días. El primer vendedor que trae al
-   visitante se queda con el crédito; un ?ref= posterior distinto NO lo pisa
-   mientras no venza. Sin ?ref=, se deriva canal_origen de UTMs/referrer.
+   ATRIBUCIÓN DE VENDEDOR / CANAL — la lógica vive en js/attribution.js (se
+   carga antes que este archivo). Aquí solo se arranca y se lee.
    ============================================================================= */
-const ATTRIBUTION_KEY = "legado_attribution";
-const ATTRIBUTION_TTL_MS = 90 * 24 * 60 * 60 * 1000; // 90 días
-const REF_RE = /^[A-Za-z0-9]{4,24}$/;
-const CANAL_ENUM = ["directo", "redes_sociales", "buscador", "otro"];
+const VENDEDOR_LOOKUP_URL = WIZARD_WEBHOOK_URL.replace(/\/+$/, "") + "/wizard/vendedor";
 
-function deriveCanal(utm, referrerUrl) {
-  const src = (utm.utm_source || "").toLowerCase();
-  const med = (utm.utm_medium || "").toLowerCase();
-  const blob = med + " " + src;
-  if (/(social|instagram|facebook|tiktok|whatsapp|\big\b|\bfb\b|linkedin)/.test(blob)) {
-    return "redes_sociales";
-  }
-  if (/(google|bing|yahoo|duckduckgo|search|cpc|ppc|sem|organic)/.test(blob)) {
-    return "buscador";
-  }
-  if (utm.utm_source) return "otro";
-  if (referrerUrl) {
-    try {
-      const host = new URL(referrerUrl).hostname.toLowerCase();
-      if (/(^|\.)(google|bing|yahoo|duckduckgo)\./.test(host)) return "buscador";
-      if (/(^|\.)(instagram|facebook|t\.co|twitter|x|tiktok|linkedin)\./.test(host)) {
-        return "redes_sociales";
-      }
-      return "otro";
-    } catch (_) {
-      /* referrer no parseable */
-    }
-  }
-  return "directo";
-}
-
-function readAttributionFromURL() {
-  if (typeof window === "undefined") return null;
-  let params;
-  try {
-    params = new URLSearchParams(window.location.search);
-  } catch (_) {
-    return null;
-  }
-  const rawRef = (params.get("ref") || "").trim();
-  const ref = REF_RE.test(rawRef) ? rawRef : "";
-
-  const utm = {};
-  ["utm_source", "utm_medium", "utm_campaign"].forEach((k) => {
-    const v = (params.get(k) || "").trim().slice(0, 120);
-    if (v) utm[k] = v;
-  });
-  const referrerUrl =
-    typeof document !== "undefined" ? (document.referrer || "").slice(0, 500) : "";
-
-  if (!ref && Object.keys(utm).length === 0 && !referrerUrl) return null;
-
-  const rec = {
-    v: 1,
-    ts: Date.now(),
-    landing: (window.location.pathname + window.location.search).slice(0, 300),
-    ...utm,
-  };
-  if (referrerUrl) rec.referrer_url = referrerUrl;
-  if (ref) {
-    rec.ref = ref;
-    rec.canal_origen = "vendedor"; // solo para analytics local; NO se envía a la API
-  } else {
-    rec.canal_origen = deriveCanal(utm, referrerUrl);
-  }
-  return rec;
-}
-
-function getStoredAttribution() {
-  if (typeof localStorage === "undefined") return null;
-  let raw;
-  try {
-    raw = localStorage.getItem(ATTRIBUTION_KEY);
-  } catch (_) {
-    return null;
-  }
-  if (!raw) return null;
-  let rec;
-  try {
-    rec = JSON.parse(raw);
-  } catch (_) {
-    return null;
-  }
-  if (!rec || typeof rec !== "object" || !rec.ts) return null;
-  if (Date.now() - rec.ts > ATTRIBUTION_TTL_MS) return null; // vencido
-  return rec;
-}
-
-/* Se ejecuta al cargar el script, antes de cualquier navegación por anclas. */
-function initAttribution() {
-  const fromURL = readAttributionFromURL();
-  if (!fromURL) return;
-  const stored = getStoredAttribution();
-
-  /* FIRST-TOUCH: si ya hay un ref vigente guardado, no lo pisamos aunque
-     llegue otro ?ref= distinto, ni aunque esta visita no traiga ref. Solo se
-     reemplaza cuando venció (getStoredAttribution ya devolvió null) o cuando
-     lo nuevo trae un ref y lo viejo no lo tenía (entró por UTM, ahora por
-     vendedor). */
-  if (stored && stored.ref) {
-    if (!fromURL.ref || stored.ref === fromURL.ref) return;
-    return; // conserva el primer vendedor
-  }
-
-  try {
-    localStorage.setItem(ATTRIBUTION_KEY, JSON.stringify(fromURL));
-  } catch (_) {
-    /* storage lleno/bloqueado — se ignora, la compra igual funciona */
-  }
-}
-
-/* Bloque `atribucion` listo para el payload de compra/lead/chat, o {} si no
-   hay nada que atribuir. Nunca lanza. Cuando hay vendedor NO mandamos
-   canal_origen (la API lo infiere del código; evita un enum no soportado). */
 function getAttribution() {
-  const rec = getStoredAttribution();
-  if (!rec) return {};
-  const out = {};
-  if (rec.ref) {
-    out.codigo_vendedor = rec.ref;
-  } else if (rec.canal_origen && CANAL_ENUM.includes(rec.canal_origen)) {
-    out.canal_origen = rec.canal_origen;
+  try {
+    return (window.LegadoAttribution && window.LegadoAttribution.get()) || {};
+  } catch (_) {
+    return {};
   }
-  ["utm_source", "utm_medium", "utm_campaign"].forEach((k) => {
-    if (rec[k]) out[k] = rec[k];
-  });
-  if (rec.referrer_url) out.referrer_url = rec.referrer_url;
-  return out;
 }
 
-initAttribution();
+try {
+  window.LegadoAttribution &&
+    window.LegadoAttribution.init({ lookupUrl: VENDEDOR_LOOKUP_URL }).catch(() => {});
+} catch (_) {
+  /* la atribución nunca debe romper el sitio */
+}
 
 /* =============================================================================
    i18n / LANG — Diccionario bilingüe ES / EN
@@ -1306,9 +1188,14 @@ async function sendChatMessage() {
        actual NO va aquí (recién se hizo push) — va en `message`. Tope de 20
        turnos previos para no inflar el request en conversaciones largas. */
     const history = chatMessages.slice(-21, -1);
+    /* El Worker corta cada turno a los ~60 s (TURN_BUDGET_MS en alma.js);
+       este tope solo cubre que el Worker mismo no responda. */
+    const ctrl = new AbortController();
+    const chatTimer = setTimeout(() => ctrl.abort(), CHAT_TIMEOUT_MS);
     const resp = await fetch(CHAT_WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: ctrl.signal,
       body: JSON.stringify({
         sessionId:   chatSessionId,
         message:     text,
@@ -1317,7 +1204,7 @@ async function sendChatMessage() {
         history,
         attribution: getAttribution(),
       }),
-    });
+    }).finally(() => clearTimeout(chatTimer));
     removeTypingIndicator();
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok && !data.output) {
@@ -1348,6 +1235,14 @@ async function sendChatMessage() {
     );
     chatMessages.push({ role: "assistant", content: err });
     appendChatBubble("assistant", err);
+    /* Ni siquiera el Worker respondió: igual le damos a la familia el
+       WhatsApp de la guardia 24/7 — nunca un callejón sin salida. */
+    appendWhatsAppHandoffButton(
+      EMERGENCY_WHATSAPP_FALLBACK,
+      currentLang === "es"
+        ? "Hola, el chat de la página no me respondió y necesito ayuda."
+        : "Hi, the website chat didn't respond and I need help.",
+    );
   } finally {
     chatLoading = false;
     updateChatUI();
@@ -1976,14 +1871,25 @@ async function submitWizard() {
   setWizardProcessing(true);
 
   try {
+    /* Sin tope, si el Worker o Previsión se colgaban el spinner no terminaba
+       nunca. El Worker ya corta /compras a los 20 s; esto cubre al Worker. */
+    const ctrl = new AbortController();
+    const wizTimer = setTimeout(() => ctrl.abort(), WIZARD_TIMEOUT_MS);
     const resp = await fetch(WIZARD_WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
-    });
+      signal: ctrl.signal,
+    }).finally(() => clearTimeout(wizTimer));
 
     const data = await resp.json().catch(() => null);
-    if (!resp.ok) throw new Error((data && (data.message || data.mensaje)) || "HTTP " + resp.status);
+    if (!resp.ok) {
+      const err = new Error((data && (data.message || data.mensaje)) || "HTTP " + resp.status);
+      /* pf_rejected / pf_unavailable traen un mensaje pensado para el usuario
+         (worker/src/wizard-compra.js). */
+      if (data && data.code && data.message) err.userMessage = data.message;
+      throw err;
+    }
 
     setWizardProcessing(false);
 
@@ -2000,11 +1906,20 @@ async function submitWizard() {
   } catch (e) {
     console.error("Webhook error:", e);
     setWizardProcessing(false);
-    showWizardError(
-      currentLang === "es"
-        ? "Error de conexión. Por favor intenta de nuevo."
-        : "Connection error. Please try again.",
-    );
+    /* Los mensajes del Worker están en español; en inglés se usan textos
+       propios según el caso. */
+    const timedOut = e && e.name === "AbortError";
+    let msg;
+    if (currentLang === "es") {
+      msg = timedOut
+        ? "El sistema está tardando más de lo normal. Intenta de nuevo en unos minutos."
+        : e.userMessage || "Error de conexión. Por favor intenta de nuevo.";
+    } else {
+      msg = timedOut
+        ? "The system is taking longer than usual. Please try again in a few minutes."
+        : "Connection error. Please try again.";
+    }
+    showWizardError(msg);
   }
 }
 
