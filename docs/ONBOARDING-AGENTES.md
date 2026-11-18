@@ -63,7 +63,7 @@ Navegador ──GET catálogo (CORS, sin token)──▶ app.previsionfuneraria.
 ### Frontend (raíz)
 | Archivo | Rol |
 |---|---|
-| `index.html` | Página única. `LEGADO_CONFIG` (switch dev/prod), `PLANS_API_URL` directo a Previsión, `PARENTESCOS_API_URL`/chat vía Worker. **Cache-bust `?v=N`**: `css/main.css?v=4`, `js/attribution.js?v=1`, `js/main.js?v=14` (independientes; líneas ~110 y ~1358). |
+| `index.html` | Página única. `LEGADO_CONFIG` (switch dev/prod), `PLANS_API_URL` directo a Previsión, `PARENTESCOS_API_URL`/chat vía Worker. **Cache-bust `?v=N`**: `css/main.css?v=4`, `js/attribution.js?v=1`, `js/main.js?v=15` (independientes; líneas ~110 y ~1358). |
 | `js/attribution.js` | Atribución de vendedor (`?ref=`): valida el código contra `/wizard/vendedor`, first-touch entre códigos válidos (TTL 90d), guarda los últimos 10 toques. Se carga antes de `main.js`; tests en `worker/test/attribution-frontend.test.mjs`. |
 | `js/main.js` | i18n, wizard de 4 pasos, UI del chat de Alma, y **§"ATRIBUCIÓN DE VENDEDOR / CANAL"** (`initAttribution`/`getAttribution`, `localStorage["legado_attribution"]`, first-touch TTL 90d). `SELECTO_CHECKOUT_ENABLED = true`, `WIZARD_ENABLED_SLUGS`. |
 | `js/wizard-generic.js` | Botones "Protege tu Legado" sin plan → scroll a la sección de planes. |
@@ -71,6 +71,7 @@ Navegador ──GET catálogo (CORS, sin token)──▶ app.previsionfuneraria.
 | `css/main.css` | Estilos. Marca: navy `#263c5b`, dorado `#c9a84c` (decorativo, no CTAs), fuente Inter. |
 | `gracias.html` / `cancelado.html` | `success_url` / `cancel_url` de Stripe Checkout. **Deben estar en la lista de copia de `.cpanel.yml`.** |
 | `terminos-condiciones.html` / `politica-privacidad.html` | Legales (fuentes en los `.txt` homónimos). |
+| `.htaccess` | Cabeceras de seguridad (HSTS, X-Frame-Options, nosniff, Referrer/Permissions-Policy, CSP mínima aplicada + CSP completa en `Report-Only`), `Options -Indexes` y bloqueo de archivos internos. Lo copia `.cpanel.yml` y **reemplaza** el `.htaccess` del servidor. |
 
 ### Worker (`worker/`)
 | Archivo | Rol |
@@ -82,7 +83,7 @@ Navegador ──GET catálogo (CORS, sin token)──▶ app.previsionfuneraria.
 | `src/alma.js` | Agente Alma: loop OpenAI, tools (`list_planes`, `list_servicios`, `lookup_coverage`, `handoff_whatsapp`, `create_lead`). **No cotiza ni factura.** Inyecta la atribución en los executores (Alma no la ve). |
 | `src/chat.js` | Handler `/chat`: sanea `attribution` e historial (memoria = lo que manda el navegador, 40 turnos), aplica el tope de mensajes por conversación (`turn` del frontend vs. `parametros.max_mensajes_por_conversacion` de PF, 60 por defecto), llama a `runAlma` y registra cada derivación a WhatsApp en PF (`POST /solicitudes`, resumen en `mensaje`). |
 | `src/attribution.js` | `sanitizeAttribution(raw)` (whitelists + límites de longitud), `attributionTag()` para logs. |
-| `src/ratelimit.js` | Límite de uso (binding `CHAT_IP_LIMITER` 20/min por IP). Fail-open. |
+| `src/ratelimit.js` | Límites por IP (fail-open): `CHAT_IP_LIMITER` 20/min, `CHECKOUT_IP_LIMITER` 10/min (POST /), `LOOKUP_IP_LIMITER` 60/min (`/wizard/parentescos`, `/wizard/vendedor`, ambos con caché edge). `workers_dev = false`: el Worker solo responde en `api.legadoholding.com`. |
 | `test/` | Tests con `node --test` (`npm test` en `worker/`). Corren en Node, no en workerd; `test/setup.mjs` stubea `cloudflare:workers`, `caches` y `scheduler`. |
 | `src/errors.js` | Helpers de error. |
 
@@ -147,6 +148,17 @@ Navegador ──GET catálogo (CORS, sin token)──▶ app.previsionfuneraria.
   navegador; tope por conversación → configurable en PF (*Asistente del sitio › Límites*). Las transcripciones completas (`chat_turns`) **ya no se guardan**
   (decisión pendiente: vista de conversaciones en PF). Los datos de Supabase eran de
   prueba y no se migraron.
+- **Auditoría de carga/seguridad (2026-11-18)** — aplicado: límites por IP en checkout y
+  consultas, caché edge de parentescos/vendedor, health mínimo, errores genéricos al
+  navegador, sin orígenes localhost en prod, `workers_dev = false`, un solo reintento ante
+  429 de OpenAI, deduplicación de `/asistente` y `/servicios` en vuelo, emails
+  enmascarados en logs, timeout del wizard 50 s, aviso+reintento si parentescos falla,
+  se quitó `lead_abandoned`, `.htaccess`. **Pendiente (usuario):** repo de GitHub
+  público → volverlo privado; Turnstile en el wizard (crear widget en Cloudflare);
+  Cache Rule para el HTML en Cloudflare; confirmar límites de OpenAI (Settings ›
+  Limits); pasar la CSP de Report-Only a aplicada tras revisar la consola; caché
+  de `/planes`/`/servicios` del lado de Previsión; respaldo de atribución para
+  Safari (borra `localStorage` a los 7 días sin interacción).
 - **Hilo abierto**: el usuario reportó que Alma "se presenta dos veces" en su navegador,
   pese a que el fix está verificado correcto en backend y frontend. Falta confirmarlo en
   ventana de incógnito. Ver `.claude/handoff.json` → `open_thread_needs_followup`.

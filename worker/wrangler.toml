@@ -5,9 +5,10 @@ compatibility_date = "2026-01-01"
 # posterior a 2024-09-23 ya incluye el comportamiento de nodejs_compat_v2.
 compatibility_flags = ["nodejs_compat"]
 
-# Habilita la URL pública https://legado-checkout-dev.<subdominio>.workers.dev
-# Útil para staging/pruebas desde el celular o desde el sitio real.
-workers_dev = true
+# URL pública *.workers.dev deshabilitada: el Worker solo responde en
+# api.legadoholding.com, así las reglas de firewall / rate limiting de la zona
+# no se pueden saltar entrando por workers.dev. Para pruebas, `wrangler dev`.
+workers_dev = false
 
 routes = [
   { pattern = "api.legadoholding.com/*", zone_name = "legadoholding.com" }
@@ -43,7 +44,9 @@ SITE_BASE_URL = "https://www.legadoholding.com"
 # Allow-Origin y el navegador bloquea la lectura. Usa "*" para abrir todo
 # (NO recomendado en prod). Requests sin Origin (curl/PowerShell) pasan
 # siempre porque no son sujetas a CORS.
-ALLOWED_ORIGINS = "https://legadoholding.com,https://www.legadoholding.com,http://localhost:5500,http://127.0.0.1:5500,http://localhost:8000,http://127.0.0.1:8000,http://localhost:8080,http://127.0.0.1:8080"
+# Solo producción. Los orígenes localhost para desarrollo van en worker/.dev.vars
+# (ver .dev.vars.example), que `wrangler dev` usa en lugar de este valor.
+ALLOWED_ORIGINS = "https://legadoholding.com,https://www.legadoholding.com"
 
 # Modelo de OpenAI que ejecuta el agente Alma directamente en el Worker.
 # Ya no se llama a n8n: el loop de function calling vive en src/alma.js.
@@ -61,6 +64,24 @@ name = "CHAT_IP_LIMITER"
 namespace_id = "1001"
   [ratelimits.simple]
   limit = 20
+  period = 60
+
+# POST / (checkout del wizard): 10 intentos por minuto por IP. Cada uno crea una
+# compra pendiente en Previsión y una sesión de pago de Stripe.
+[[ratelimits]]
+name = "CHECKOUT_IP_LIMITER"
+namespace_id = "1002"
+  [ratelimits.simple]
+  limit = 10
+  period = 60
+
+# GET /wizard/parentescos y /wizard/vendedor: 60 por minuto por IP. Consultan
+# a Previsión con el token (además van con caché en el edge).
+[[ratelimits]]
+name = "LOOKUP_IP_LIMITER"
+namespace_id = "1003"
+  [ratelimits.simple]
+  limit = 60
   period = 60
 
 # Observability deshabilitado explícito. En wrangler 4.x se activaba por

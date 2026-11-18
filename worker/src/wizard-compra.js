@@ -14,6 +14,14 @@ import { createPF } from "./prevision-api.js";
 import { ValidationError } from "./errors.js";
 import { sanitizeAttribution, attributionTag } from "./attribution.js";
 
+/* Para logs: "an***@gmail.com" — suficiente para ubicar un caso sin dejar el
+   correo completo en el log. */
+export function maskEmail(email) {
+  const [user, domain] = String(email || "").split("@");
+  if (!domain) return "***";
+  return `${user.slice(0, 2)}***@${domain}`;
+}
+
 function sanitizeText(s, maxLen = 200) {
   if (s === null || s === undefined) return "";
   return String(s)
@@ -261,7 +269,7 @@ export async function processWizardCheckout(body, env) {
   const compraBody = buildCompraBody(ctx, env);
   const key = validIdempotencyKey(body.idempotencyKey);
   console.log(
-    `Wizard checkout start: plan=${ctx.planSlug} email=${ctx.buyer.email} atribucion=${attributionTag(ctx.atribucion)} idem=${key ? "sí" : "no"}`,
+    `Wizard checkout start: plan=${ctx.planSlug} email=${maskEmail(ctx.buyer.email)} atribucion=${attributionTag(ctx.atribucion)} idem=${key ? "sí" : "no"}`,
   );
 
   let result;

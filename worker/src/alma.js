@@ -52,6 +52,10 @@ const TURN_BUDGET_MS = 60000;
    request NO se reintentan: fallarían igual. Si se agotan, chat.js responde
    con el WhatsApp de guardia en vez de un error genérico. */
 const LLM_MAX_RETRIES = 2;
+/* Un 429 por tasa significa que la cuenta de OpenAI está saturada: con muchos
+   usuarios a la vez, 2 reintentos por llamada triplican la carga justo cuando
+   sobra. Se reintenta UNA vez y luego se cae al WhatsApp de guardia. */
+const LLM_MAX_RETRIES_429 = 1;
 /* Mutable solo para que los tests no esperen de verdad. */
 export const _retryTiming = { baseDelayMs: 800, maxDelayMs: 4000 };
 
@@ -76,13 +80,27 @@ let emergencyCache = null; // { phone (solo dígitos), until }
 /* Para los tests. */
 export function _resetEmergencyCache() {
   emergencyCache = null;
+  emergencyInflight = null;
 }
 
 /* Número de emergencia vigente, en dígitos. Nunca lanza. `maxWaitMs` acota la
    espera (en el camino de falla de Alma no queremos sumar 10 s). */
-export async function resolveEmergencyWhatsapp(env, { maxWaitMs = 10000 } = {}) {
+/* Consultas en vuelo: si llegan muchos turnos a la vez a un isolate recién
+   creado, todos esperan la MISMA llamada a Previsión en vez de lanzar una
+   cada uno (ráfaga sobre la API y su base de datos). */
+let emergencyInflight = null;
+let asistenteInflight = null;
+
+export function resolveEmergencyWhatsapp(env, { maxWaitMs = 10000 } = {}) {
+  if (emergencyCache && emergencyCache.until > Date.now()) return Promise.resolve(emergencyCache.phone);
+  if (!emergencyInflight) {
+    emergencyInflight = fetchEmergencyWhatsapp(env, maxWaitMs).finally(() => { emergencyInflight = null; });
+  }
+  return emergencyInflight;
+}
+
+async function fetchEmergencyWhatsapp(env, maxWaitMs) {
   const now = Date.now();
-  if (emergencyCache && emergencyCache.until > now) return emergencyCache.phone;
   try {
     const pf = createPF(env);
     const resp = await Promise.race([
@@ -113,11 +131,19 @@ let asistenteCache = null; // { cfg, until }
 
 export function _resetAsistenteCache() {
   asistenteCache = null;
+  asistenteInflight = null;
 }
 
-export async function resolveAsistente(env) {
+export function resolveAsistente(env) {
+  if (asistenteCache && asistenteCache.until > Date.now()) return Promise.resolve(asistenteCache.cfg);
+  if (!asistenteInflight) {
+    asistenteInflight = fetchAsistente(env).finally(() => { asistenteInflight = null; });
+  }
+  return asistenteInflight;
+}
+
+async function fetchAsistente(env) {
   const now = Date.now();
-  if (asistenteCache && asistenteCache.until > now) return asistenteCache.cfg;
   try {
     const resp = await createPF(env).getAsistente();
     const cfg = resp && typeof resp === "object" ? resp : null;
@@ -587,6 +613,7 @@ export async function callOpenAIWithRetry(model, apiKey, payload, deadline) {
     } catch (e) {
       lastErr = e;
       if (!e.retryable || attempt === LLM_MAX_RETRIES) throw e;
+      if (e.status === 429 && attempt >= LLM_MAX_RETRIES_429) throw e;
       const backoff = _retryTiming.baseDelayMs * 2 ** attempt;
       const delay = Math.min(e.retryAfterMs ?? backoff, _retryTiming.maxDelayMs);
       if (Date.now() + delay + 2000 > deadline) throw e;

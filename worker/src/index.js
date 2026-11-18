@@ -37,22 +37,23 @@ const handler = {
     }
 
     if (request.method === "GET") {
-      if (url.pathname === "/wizard/parentescos") {
-        return await handleParentescos(env, json);
+      if (url.pathname === "/wizard/parentescos" || url.pathname === "/wizard/vendedor") {
+        /* Ambas consultan a Previsión con el token: sin límite, cualquiera
+           podía usarlas para martillar la API (y su base de datos). */
+        if (await isRateLimited(env.LOOKUP_IP_LIMITER, clientIp(request))) {
+          return json({ success: false, message: "Demasiadas consultas. Intenta de nuevo en un minuto." }, 429);
+        }
+        return url.pathname === "/wizard/parentescos"
+          ? await handleParentescos(env, json, url)
+          : await handleVendedorLookup(url.searchParams.get("codigo"), env, json, url);
       }
-      if (url.pathname === "/wizard/vendedor") {
-        return await handleVendedorLookup(url.searchParams.get("codigo"), env, json);
-      }
+      /* Health público mínimo: sin orígenes, modelo ni estado de secretos
+         (eso se revisa con `wrangler secret list` / `wrangler tail`). */
       return json({
-        ok: true,
-        service:            "legado-checkout",
-        tenant:             resolveTenant(env).id,
-        env:                env.ENVIRONMENT,
-        pfTokenLoaded:      !!env.PF_TOKEN,
-        pfBase:             env.PF_BASE,
-        openaiConfigured:   !!env.OPENAI_API_KEY,
-        openaiModel:        env.OPENAI_MODEL || "gpt-5.6-luna",
-        allowedOrigins:     getAllowedOrigins(env),
+        ok:      true,
+        service: "legado-checkout",
+        tenant:  resolveTenant(env).id,
+        ready:   !!(env.PF_TOKEN && env.OPENAI_API_KEY),
       });
     }
 
@@ -84,8 +85,9 @@ const handler = {
           console.error("Chat error:", e.message);
           if (e.stack) console.error(e.stack);
         }
+        /* El detalle técnico queda en el log; al navegador solo lo genérico. */
         return json(
-          { output: "", error: e.message },
+          { output: "", error: isValidation ? e.message : "Error interno" },
           isValidation ? 400 : 500,
         );
       }
@@ -95,6 +97,18 @@ const handler = {
        cualquier ruta desconocida terminaba en el checkout. */
     if (url.pathname !== "/") {
       return json({ success: false, message: "Not found" }, 404);
+    }
+
+    /* Límite por IP del checkout (binding CHECKOUT_IP_LIMITER). Cada compra
+       crea una compra pendiente en Previsión y una sesión de pago de Stripe:
+       sin límite, un script podía generar miles. Un comprador real reintenta
+       pocas veces (y reusa su Idempotency-Key). */
+    if (await isRateLimited(env.CHECKOUT_IP_LIMITER, clientIp(request))) {
+      return json({
+        success: false,
+        code: "rate_limited",
+        message: "Demasiados intentos seguidos. Espera un minuto e intenta de nuevo.",
+      }, 429);
     }
 
     try {
@@ -112,7 +126,10 @@ const handler = {
         if (e.stack) console.error(e.stack);
       }
       return json(
-        { success: false, message: e.message },
+        {
+          success: false,
+          message: isValidation ? e.message : "No pudimos procesar la compra. Intenta de nuevo en unos minutos.",
+        },
         isValidation ? 400 : 500,
       );
     }
@@ -138,14 +155,50 @@ export default {
 
 /* /parentescos exige token server-to-server (nunca en el navegador) — el
    wizard lo llama vía este proxy para poblar el <select> de familiares. */
-async function handleParentescos(env, json) {
+/* Caché en el edge (Cache API de la zona api.legadoholding.com; en workers.dev
+   es un no-op). Los parentescos casi nunca cambian y la consulta de vendedor
+   se repite cuando un vendedor reparte su enlace en un grupo: así no llega
+   una consulta a Previsión por cada visitante. Si la caché falla, se sigue
+   sin ella. */
+const PARENTESCOS_TTL_S = 600;
+const VENDEDOR_TTL_S    = 300;
+
+function edgeCache() {
+  return typeof caches !== "undefined" && caches.default ? caches.default : null;
+}
+function cacheKey(url, path) {
+  return new Request(`${url.origin}/__cache/${path}`);
+}
+async function cacheGet(url, path) {
+  const c = edgeCache();
+  if (!c) return null;
+  try {
+    const hit = await c.match(cacheKey(url, path));
+    return hit ? await hit.json() : null;
+  } catch (_) { return null; }
+}
+async function cachePut(url, path, data, ttlS) {
+  const c = edgeCache();
+  if (!c) return;
+  try {
+    await c.put(cacheKey(url, path), new Response(JSON.stringify(data), {
+      headers: { "Content-Type": "application/json", "Cache-Control": `max-age=${ttlS}` },
+    }));
+  } catch (_) { /* sin caché */ }
+}
+
+async function handleParentescos(env, json, url) {
+  const path = `parentescos/${resolveTenant(env).id}`;
+  const cached = await cacheGet(url, path);
+  if (cached) return json(cached);
   try {
     const PF = createPF(env);
     const resp = await PF.getParentescos();
+    await cachePut(url, path, resp, PARENTESCOS_TTL_S);
     return json(resp);
   } catch (e) {
     console.error("Parentescos error:", e.message);
-    return json({ success: false, message: e.message }, 500);
+    return json({ success: false, message: "Catálogo no disponible" }, 503);
   }
 }
 
@@ -153,18 +206,24 @@ async function handleParentescos(env, json) {
    mostrarlo en el sitio ("te atiende por recomendación de X"). El token vive
    solo en el Worker; el navegador nunca ve la lista de vendedores. Código
    inválido/inactivo → { activo: false } (nunca error). */
-async function handleVendedorLookup(codigo, env, json) {
+async function handleVendedorLookup(codigo, env, json, url) {
   const c = (codigo || "").replace(/[^A-Za-z0-9]/g, "").slice(0, 24);
   if (c.length < 4) return json({ activo: false });
+  const path = `vendedor/${resolveTenant(env).id}/${c}`;
+  const cached = await cacheGet(url, path);
+  if (cached) return json(cached);
   try {
     const PF = createPF(env);
     const resp = await PF.getVendedor(c);
-    return json({
+    /* Solo se cachea una respuesta verificada (un error de Previsión no). */
+    const out = {
       activo: !!(resp && resp.activo),
       verificado: true,
       codigo: c,
       nombre: (resp && (resp.nombre || resp.nombre_completo)) || null,
-    });
+    };
+    await cachePut(url, path, out, VENDEDOR_TTL_S);
+    return json(out);
   } catch (e) {
     /* verificado:false = no se pudo consultar a Previsión (no es lo mismo que
        un código inválido). El sitio lo guarda "sin verificar" y reintenta. */

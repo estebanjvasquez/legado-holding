@@ -165,7 +165,7 @@ export async function handleChat(body, env, executionCtx) {
   }
 
   console.log(
-    `[chat] tenant=${tenant} session=${sessionId} turn=${turn}/${maxTurns} hist=${history.length} msg="${message.slice(0, 80)}"`,
+    `[chat] tenant=${tenant} session=${sessionId} turn=${turn}/${maxTurns} hist=${history.length} len=${message.length}`,
   );
 
   /* Si Alma falla (OpenAI caído tras los reintentos, error interno), el

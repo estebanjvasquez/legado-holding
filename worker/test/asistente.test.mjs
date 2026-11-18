@@ -122,3 +122,15 @@ test("sin ninguna clave → error claro (chat.js responde con el WhatsApp de gua
   m = mockFetch([[isAsistente, () => jsonResponse({ configurado: false })]]);
   await assert.rejects(runAlma({ message: "hola", lang: "es" }, { ...ENV, OPENAI_API_KEY: "" }), /Sin clave de OpenAI/);
 });
+
+test("muchos turnos a la vez comparten UNA consulta a /asistente (sin ráfaga a Previsión)", async () => {
+  const { resolveAsistente: ra, _resetAsistenteCache: reset } = await import("../src/alma.js");
+  reset();
+  const { mockFetch: mf, jsonResponse: jr } = await import("./helpers.mjs");
+  const mm = mf([[(u) => u.endsWith("/asistente"), () => new Promise((r) => setTimeout(() => r(jr({ configurado: true })), 20))]]);
+  try {
+    const out = await Promise.all(Array.from({ length: 50 }, () => ra({ PF_TOKEN: "t", PF_BASE: "https://pf.test" })));
+    assert.equal(mm.calls.length, 1);
+    assert.ok(out.every((c) => c && c.configurado));
+  } finally { mm.restore(); reset(); }
+});

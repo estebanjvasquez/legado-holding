@@ -2,7 +2,8 @@
    Límites de uso (Rate Limiting de Workers, bindings en wrangler.toml).
 
    - CHAT_IP_LIMITER:        mensajes a /chat por IP (20 por minuto).
-   - ADMIN_LOGIN_LIMITER:    intentos de login del panel por IP (5 por minuto).
+   - CHECKOUT_IP_LIMITER:    POST / (checkout del wizard) por IP (10 por minuto).
+   - LOOKUP_IP_LIMITER:      GET /wizard/parentescos y /wizard/vendedor (60 por minuto).
 
    El límite de Cloudflare es aproximado y por ubicación del edge — sirve para
    frenar abuso, no como cuota exacta.

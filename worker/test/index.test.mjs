@@ -41,3 +41,35 @@ test("el panel admin legacy ya no existe: /admin/* responde 404", async () => {
   const r = await worker.fetch(post("/admin/login", { token: "x" }), { ADMIN_TOKEN: "x" }, ctx);
   assert.equal(r.status, 404);
 });
+
+test("checkout sobre el límite por IP: 429 sin llamar a Previsión", async () => {
+  m = mockFetch([[() => true, () => { throw new Error("no debería llamar a nadie"); }]]);
+  const r = await worker.fetch(post("/", { intent: "create_payment_intent" }), { CHECKOUT_IP_LIMITER: limiter(false), PF_TOKEN: "t" }, ctx);
+  assert.equal(r.status, 429);
+  const d = await r.json();
+  assert.equal(d.code, "rate_limited");
+  assert.ok(d.message);
+});
+
+test("consultas /wizard/* sobre el límite por IP: 429 sin llamar a Previsión", async () => {
+  m = mockFetch([[() => true, () => { throw new Error("no debería llamar a nadie"); }]]);
+  for (const path of ["/wizard/parentescos", "/wizard/vendedor?codigo=AB12CD34"]) {
+    const r = await worker.fetch(new Request(`https://api.test${path}`, { headers: { "CF-Connecting-IP": "1.2.3.4" } }), { LOOKUP_IP_LIMITER: limiter(false), PF_TOKEN: "t" }, ctx);
+    assert.equal(r.status, 429, path);
+  }
+});
+
+test("health público no expone orígenes, modelo ni estado de secretos", async () => {
+  const r = await worker.fetch(new Request("https://api.test/"), { PF_TOKEN: "t", OPENAI_API_KEY: "k", ALLOWED_ORIGINS: "https://x" }, ctx);
+  const d = await r.json();
+  assert.equal(d.ok, true);
+  assert.equal(d.ready, true);
+  for (const k of ["allowedOrigins", "openaiModel", "pfTokenLoaded", "pfBase", "openaiConfigured"]) assert.equal(d[k], undefined, k);
+});
+
+test("un error de Previsión en parentescos no se reenvía al navegador", async () => {
+  m = mockFetch([[(u) => u.includes("/parentescos"), () => jsonResponse({ detalle: "SQLITE_BUSY interno" }, 500)]]);
+  const r = await worker.fetch(new Request("https://api.test/wizard/parentescos"), { PF_TOKEN: "t", PF_BASE: "https://pf.test" }, ctx);
+  assert.equal(r.status, 503);
+  assert.doesNotMatch(await r.text(), /SQLITE_BUSY/);
+});

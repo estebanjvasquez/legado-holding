@@ -64,7 +64,10 @@ async function fetchEmergencyWhatsapp() {
   }
 }
 const CHAT_TIMEOUT_MS = 75000;
-const WIZARD_TIMEOUT_MS = 30000;
+/* Peor caso del Worker: /compras con un reintento (~2 × 20 s) más el reintento
+   sin atribución. Con 30 s el navegador cortaba antes que el Worker y mostraba
+   error aunque la compra sí se hubiera creado. */
+const WIZARD_TIMEOUT_MS = 50000;
 
 const WIZARD_WEBHOOK_URL =
   (typeof window !== "undefined" && window.LEGADO_CONFIG?.WIZARD_WEBHOOK_URL) ||
@@ -722,6 +725,9 @@ let wizardBuyer = {
 };
 let wizardFamily = [];
 let wizardParentescos = [];
+/* true si el último intento de cargar parentescos falló (se muestra aviso con
+   botón de reintento en el paso "Familia" en vez de un selector vacío). */
+let wizardParentescosError = false;
 let revealObserver = null;
 
 /* =============================================================================
@@ -1344,32 +1350,19 @@ async function loadParentescos() {
     if (!resp.ok) throw new Error("HTTP " + resp.status);
     const data = await resp.json();
     wizardParentescos = Array.isArray(data.items) ? data.items : [];
-    if (wizardOpen && wizardStep === 1) renderWizardStep();
+    wizardParentescosError = wizardParentescos.length === 0;
   } catch (e) {
     console.warn("Parentescos no disponibles:", e.message);
+    wizardParentescosError = true;
   }
+  if (wizardOpen && wizardStep === 1) renderWizardStep();
 }
 
 function closeWizard() {
-  if (!wizardSubmitted && wizardBuyer.name) {
-    const payload = {
-      intent:      "lead_abandoned",
-      plan:        wizardSelectedPlan,
-      paymentType: wizardPaymentType,
-      buyer:       wizardBuyer,
-      family:      wizardFamily,
-      step:        wizardStep,
-      timestamp:   new Date().toISOString(),
-    };
-    try {
-      fetch(WIZARD_WEBHOOK_URL, {
-        method:    "POST",
-        headers:   { "Content-Type": "application/json" },
-        body:      JSON.stringify(payload),
-        keepalive: true,
-      }).catch(() => {});
-    } catch (_) {}
-  }
+  /* Antes se enviaban aquí los datos del formulario a medio llenar
+     ("lead_abandoned"): el Worker los rechazaba (400) y además viajaban datos
+     personales sin consentimiento. Se quitó; si se quiere recuperar
+     abandonos, hacerlo con consentimiento explícito vía POST /solicitudes. */
   wizardOpen = false;
   $("#wizard-overlay").classList.add("hidden");
 }
@@ -1621,6 +1614,17 @@ function renderStep1() {
 
   return `
     <p style="color:var(--muted-foreground);font-size:0.875rem;margin-bottom:1.25rem">${t("wiz_family_hint")}</p>
+    ${
+      wizardParentescosError && wizardParentescos.length === 0
+        ? `<div class="wizard-error" style="margin-bottom:1rem">${
+            currentLang === "es"
+              ? "No pudimos cargar la lista de parentescos. Revisa tu conexión e intenta de nuevo."
+              : "We couldn't load the relationship list. Check your connection and try again."
+          }<div style="margin-top:0.5rem"><button class="btn-outline" id="btn-retry-parentescos">${
+            currentLang === "es" ? "Reintentar" : "Retry"
+          }</button></div></div>`
+        : ""
+    }
     <div id="family-cards">${cards}</div>
     ${
       wizardFamily.length < 6
@@ -1774,6 +1778,10 @@ function bindWizardStepEvents() {
         if (input.dataset.field === "parentescoId") renderWizardStep();
         updateWizardFooter();
       });
+    });
+    $("#btn-retry-parentescos")?.addEventListener("click", () => {
+      wizardParentescosError = false;
+      loadParentescos();
     });
     $("#btn-add-family")?.addEventListener("click", () => {
       if (wizardFamily.length < 6) {
@@ -1977,11 +1985,11 @@ async function submitWizard() {
     let msg;
     if (currentLang === "es") {
       msg = timedOut
-        ? "El sistema está tardando más de lo normal. Intenta de nuevo en unos minutos."
+        ? "El sistema está tardando más de lo normal. Tu solicitud pudo haberse registrado: si vuelves a intentarlo con los mismos datos no se creará un cobro duplicado."
         : e.userMessage || "Error de conexión. Por favor intenta de nuevo.";
     } else {
       msg = timedOut
-        ? "The system is taking longer than usual. Please try again in a few minutes."
+        ? "The system is taking longer than usual. Your request may have gone through: retrying with the same details will not create a duplicate charge."
         : "Connection error. Please try again.";
     }
     showWizardError(msg);

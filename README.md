@@ -26,7 +26,7 @@ propio que también sirve de proxy autenticado para el bot "Alma".
                 ▼                             ▼
    ┌─────────────────────────────┐  ┌────────────────────────────┐
    │ prevision-funeraria         │  │  api.legadoholding.com     │
-   │ .sisteg.workers.dev         │  │  Cloudflare Worker         │
+   │ app.previsionfuneraria.com  │  │  Cloudflare Worker         │
    │ /api/public/t/lh/planes     │  │  (JS + secrets PF_TOKEN,   │
    │ (catálogo de planes)        │  │   OPENAI_API_KEY, etc.)    │
    └─────────────────────────────┘  └─────────────┬──────────────┘
@@ -37,7 +37,7 @@ propio que también sirve de proxy autenticado para el bot "Alma".
                           ▼                          ▼
           ┌────────────────────────────┐  ┌──────────────────┐
           │ prevision-funeraria         │  │ OpenAI API        │
-          │ .sisteg.workers.dev         │  │ (sin base de      │
+          │ app.previsionfuneraria.com  │  │ (sin base de      │
           │ /compras, /parentescos,     │  │  datos propia)    │
           │ /solicitudes, /asistente,   │  │                   │
           │ /aliados                    │  │                   │
@@ -295,9 +295,10 @@ de planes deben mostrar precios reales (no los de respaldo).
 
 | Método | Ruta | Función | Cuerpo |
 |---|---|---|---|
-| `GET` | `/` | Health check + diagnóstico de config (secrets cargados, orígenes permitidos) | — |
-| `GET` | `/wizard/parentescos` | Proxy autenticado al catálogo de parentescos de Prevision-Funeraria | — |
-| `POST` | `/` | Checkout del wizard (`processWizardCheckout`, ver 6.3) | JSON con `intent`, `plan`, `planId`, `paymentType`, `buyer`, `family` |
+| `GET` | `/` | Health check público mínimo (`ready` = secrets cargados; sin detalle de config) | — |
+| `GET` | `/wizard/parentescos` | Proxy autenticado al catálogo de parentescos de Prevision-Funeraria (caché edge 10 min, `LOOKUP_IP_LIMITER` 60/min por IP) | — |
+| `GET` | `/wizard/vendedor?codigo=` | Resuelve un `?ref=` a nombre de vendedor (caché edge 5 min, `LOOKUP_IP_LIMITER`) | — |
+| `POST` | `/` | Checkout del wizard (`processWizardCheckout`, ver 6.3; `CHECKOUT_IP_LIMITER` 10/min por IP → 429 `rate_limited`) | JSON con `intent`, `plan`, `planId`, `paymentType`, `buyer`, `family` |
 | `POST` | `/chat` | Proxy al agente Alma (handoff, sin cotizar ni facturar) | JSON del turno de chat |
 | `OPTIONS` | `*` | Preflight CORS | — |
 
@@ -307,19 +308,8 @@ de planes deben mostrar precios reales (no los de respaldo).
 {
   "ok": true,
   "service": "legado-checkout",
-  "env": "dev",
-  "pfTokenLoaded": true,
-  "pfBase": "https://app.previsionfuneraria.com",
-  "openaiConfigured": true,
-  "openaiModel": "gpt-5.6-luna",
-  "allowedOrigins": [
-    "https://legadoholding.com",
-    "https://www.legadoholding.com",
-    "http://localhost:5500",
-    "http://127.0.0.1:5500",
-    "http://localhost:8000",
-    "http://127.0.0.1:8000"
-  ]
+  "tenant": "lh",
+  "ready": true
 }
 ```
 
@@ -532,9 +522,9 @@ Pasos definidos en [js/main.js](js/main.js), función `openWizard(planId)`
 
 Al confirmar el paso final, `submitWizard()` hace `POST` al Worker
 (`intent: "create_payment_intent"`), que responde con el `link_de_cobro` de
-Stripe Checkout para redirigir al comprador. El cierre prematuro del wizard
-envía `intent: "lead_abandoned"` con `keepalive: true` (fire-and-forget; no
-bloquea al usuario, y hoy no se persiste en ningún lado — ver sección 12).
+Stripe Checkout para redirigir al comprador. Cerrar el wizard a medias ya no
+envía nada (antes mandaba `lead_abandoned` con datos personales sin
+consentimiento y el Worker lo descartaba).
 
 ---
 
@@ -558,7 +548,6 @@ wrangler deploy
 Salida esperada:
 ```
 Published legado-checkout-dev (X sec)
-  https://legado-checkout-dev.<tu-subdominio>.workers.dev
   api.legadoholding.com/*
 Current Deployment ID: <uuid>
 ```
@@ -718,7 +707,7 @@ no son afectadas y siguen funcionando.
 |---|---|---|
 | Alma se presenta dos veces (reporte del usuario) | Media | Fix verificado correcto en backend y frontend; falta que el usuario confirme en ventana de incógnito. Ver `.claude/handoff.json` → `open_thread_needs_followup`. |
 | Cuenta Stripe de producción de LH pendiente | Alta (negocio, no de código) | KYC/verificación de Legado Holding Inc. sin completar; todo cobro hoy es en modo test de Stripe. Bloqueo externo, no de este repo. |
-| Worker `lead_abandoned` no se persiste | Media | El frontend envía el evento fire-and-forget pero el Worker no lo guarda. Para CRM: añadir lógica de log en el Worker o enviar a un endpoint de marketing. |
+| Recuperación de wizards abandonados | Baja | Se quitó el envío `lead_abandoned` (datos sin consentimiento). Si se quiere, hacerlo con consentimiento explícito vía `POST /solicitudes`. |
 | Sin tests automatizados | Media | No hay unit tests del checkout. Considerar Vitest + `@cloudflare/vitest-pool-workers`. |
 | Sin banner de consentimiento granular por región | Baja | El banner de cookies (ver `initCookieConsent()` en `js/main.js`) es binario aceptar/rechazar; no diferencia por jurisdicción (auditoría de marca §8.2). |
 | Sin JSON-LD `LocalBusiness`/`FAQPage`/`BreadcrumbList` | Baja | Solo se agregó `Organization` y `Service` porque el sitio no tiene dirección física verificable ni sección de FAQ visible que los respalde. Añadir cuando exista ese contenido. |

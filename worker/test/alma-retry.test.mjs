@@ -18,10 +18,10 @@ test("un 429 transitorio se reintenta y el turno termina bien", async () => {
   assert.equal(m.calls.length, 2);
 });
 
-test("tres 429 seguidos: 1 intento + 2 reintentos y luego error", async () => {
+test("429 seguidos: 1 intento + 1 solo reintento (no amplifica la saturación) y luego error", async () => {
   m = mockFetch([[isOpenAI, () => jsonResponse({ error: {} }, 429)]]);
   await assert.rejects(callOpenAIWithRetry("m", "k", {}, far()), /OpenAI 429/);
-  assert.equal(m.calls.length, 3);
+  assert.equal(m.calls.length, 2);
 });
 
 test("un 5xx se reintenta", async () => {

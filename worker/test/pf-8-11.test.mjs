@@ -189,3 +189,9 @@ test("PF-9: rechazo por atribución (400) reintenta sin ella con la misma clave"
   assert.equal(c[1].body.atribucion, undefined);
   assert.equal(c[1].init.headers["Idempotency-Key"], KEY);
 });
+
+test("maskEmail: el log no lleva el correo completo", async () => {
+  const { maskEmail } = await import("../src/wizard-compra.js");
+  assert.equal(maskEmail("ana.perez@gmail.com"), "an***@gmail.com");
+  assert.equal(maskEmail(""), "***");
+});
