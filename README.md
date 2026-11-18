@@ -3,8 +3,8 @@
 > **Actualizado 2026-08-27.** Este repo migró de Invoice Ninja a la API pública
 > de **Prevision-Funeraria** (repo separado `estebanjvasquez/Prevision-Funeraria`,
 > tenant `lh`). Ver `CLAUDE.md` y `docs/api-publica-wizard.md` para el contrato
-> completo. El login del panel admin (`worker/src/admin.js`) es la única parte
-> que sigue hablando con Invoice Ninja — deuda pendiente, no bloqueante.
+> completo. Desde 2026-11-18 ya no hay Invoice Ninja, Supabase ni panel admin
+> propio: lo administrativo (y la configuración de Alma) vive en Previsión.
 >
 > **Para retomar el proyecto rápido:** empieza por `docs/ONBOARDING-AGENTES.md`
 > (panorama + estado + gotchas). Este README es la referencia profunda.
@@ -31,16 +31,17 @@ propio que también sirve de proxy autenticado para el bot "Alma".
    │ (catálogo de planes)        │  │   OPENAI_API_KEY, etc.)    │
    └─────────────────────────────┘  └─────────────┬──────────────┘
                                                     │
-                          ┌─────────────────────────┼─────────────────────┐
-                          │ Authorization: Bearer    │ OpenAI (Alma)       │ IN_BASE (solo
-                          │ PF_TOKEN                 │                     │ login admin)
-                          ▼                          ▼                     ▼
-          ┌────────────────────────────┐  ┌──────────────────┐  ┌─────────────────────┐
-          │ prevision-funeraria         │  │ OpenAI API        │  │ invoicing.legado-    │
-          │ .sisteg.workers.dev         │  │ + Supabase        │  │ holding.com          │
-          │ /api/public/t/lh/compras,   │  │ (memoria de chat) │  │ Invoice Ninja v5      │
-          │ /parentescos, /solicitudes  │  │                   │  │ (solo auth de staff) │
-          └────────────────────────────┘  └──────────────────┘  └─────────────────────┘
+                          ┌─────────────────────────┤
+                          │ Authorization: Bearer    │ OpenAI (Alma)
+                          │ PF_TOKEN                 │
+                          ▼                          ▼
+          ┌────────────────────────────┐  ┌──────────────────┐
+          │ prevision-funeraria         │  │ OpenAI API        │
+          │ .sisteg.workers.dev         │  │ (sin base de      │
+          │ /compras, /parentescos,     │  │  datos propia)    │
+          │ /solicitudes, /asistente,   │  │                   │
+          │ /aliados                    │  │                   │
+          └────────────────────────────┘  └──────────────────┘
 ```
 
 > Sitio estático puro: sin Node.js, sin bundler, sin framework. Lo único
@@ -97,9 +98,8 @@ propio que también sirve de proxy autenticado para el bot "Alma".
 | 1 | **Frontend estático** | Sitio público, wizard, render de planes | HTML + CSS + JS plano servido por Apache |
 | 2 | **Cloudflare Worker** (`api.legadoholding.com`) | Orquesta el checkout server-to-server, proxy autenticado de parentescos, y corre el agente "Alma" (OpenAI) | JavaScript en V8 (Cloudflare Workers) |
 | 3 | **Prevision-Funeraria** (repo separado) | Multi-tenant: catálogo de planes/servicios, clientes, contratos, cobro con Stripe, leads públicos (`/solicitudes`) | Cloudflare Workers + D1 (`prevision-funeraria.sisteg.workers.dev`) |
-| 4 | **OpenAI + Supabase** | Motor conversacional de Alma y persistencia de sesiones/turnos de chat | OpenAI API (`gpt-5.6-luna`) + Supabase (Postgres) |
-| 5 | **Invoice Ninja v5** | Solo autenticación de staff para el panel admin de este sitio (`worker/src/admin.js`) | Auto-hospedado en `invoicing.legadoholding.com` |
-| 6 | **Cloudflare DNS** | Administra `legadoholding.com` y bind del subdominio `api.` al Worker | Cloudflare |
+| 4 | **OpenAI** | Motor conversacional de Alma. Su configuración (modelo, prompts, clave, tope de mensajes) la edita el administrador en Previsión (*Asistente del sitio*); prospectos y derivaciones quedan como solicitudes en Previsión. La memoria de la conversación la manda el navegador. | OpenAI API (`gpt-5.6-luna`) |
+| 5 | **Cloudflare DNS** | Administra `legadoholding.com` y bind del subdominio `api.` al Worker | Cloudflare |
 
 ### Flujo completo de una compra
 
@@ -170,8 +170,8 @@ legado-holding/
         ├── wizard-compra.js         ← orquestador del checkout (reemplaza pipeline.js)
         ├── chat.js                  ← endpoint /chat, delega en alma.js
         ├── alma.js                  ← agente OpenAI: catálogo (planes/servicios), handoff por WhatsApp o registro de prospecto (ya no cotiza/factura)
-        ├── supabase.js              ← persistencia de sesiones/turnos de chat
-        ├── admin.js                 ← login del panel admin (todavía vía Invoice Ninja, IN_BASE)
+        ├── attribution.js           ← saneo de la atribución de vendedor/canal (?ref=, UTM)
+        ├── ratelimit.js             ← límite de /chat por IP
         └── errors.js                ← ValidationError / isValidationError
 ```
 
@@ -194,8 +194,7 @@ Lo que **NO** se commitea (ver `.gitignore`):
 | Worker tooling | Wrangler 3+ | CLI oficial de Cloudflare |
 | Catálogo y checkout | API pública de Prevision-Funeraria (tenant `lh`) | Contrato en `docs/api-publica-wizard.md` |
 | Cobro con tarjeta | Stripe Checkout (orquestado por Prevision-Funeraria) | Cuenta de producción de LH pendiente (KYC); hoy en modo test |
-| Chat / IA | OpenAI (`OPENAI_MODEL`, default `gpt-5.6-luna`) + Supabase (memoria de sesión) | Implementado en `worker/src/alma.js` |
-| Facturación de staff | Invoice Ninja v5 (self-hosted) | Solo login del panel admin, vía `IN_BASE` |
+| Chat / IA | OpenAI (config desde Previsión `GET /asistente`; respaldo `OPENAI_MODEL`, default `gpt-5.6-luna`) | Implementado en `worker/src/alma.js` |
 | DNS y CDN | Cloudflare | Zone: `legadoholding.com` |
 | Hosting frontend | Apache | Sirve los archivos estáticos del repo |
 | Hosting Worker | Cloudflare edge | Despliegue con `wrangler deploy` |
@@ -301,7 +300,6 @@ de planes deben mostrar precios reales (no los de respaldo).
 | `POST` | `/` | Checkout del wizard (`processWizardCheckout`, ver 6.3) | JSON con `intent`, `plan`, `planId`, `paymentType`, `buyer`, `family` |
 | `POST` | `/chat` | Proxy al agente Alma (handoff, sin cotizar ni facturar) | JSON del turno de chat |
 | `OPTIONS` | `*` | Preflight CORS | — |
-| `/admin/*` | (todos) | Panel admin del sitio (login todavía vía Invoice Ninja) | Ver `worker/src/admin.js` |
 
 #### Respuesta de `GET /`
 
@@ -314,8 +312,6 @@ de planes deben mostrar precios reales (no los de respaldo).
   "pfBase": "https://prevision-funeraria.sisteg.workers.dev",
   "openaiConfigured": true,
   "openaiModel": "gpt-5.6-luna",
-  "supabaseConfigured": true,
-  "supabaseUrl": "https://naebpcyphdcopndqovie.supabase.co",
   "allowedOrigins": [
     "https://legadoholding.com",
     "https://www.legadoholding.com",
@@ -377,10 +373,8 @@ incluyendo los otros `estado` posibles (`pendiente`, `confirmada`), en
 |---|---|---|
 | `PF_BASE` | `https://prevision-funeraria.sisteg.workers.dev` | Base URL de la API de Prevision-Funeraria |
 | `SITE_BASE_URL` | `https://www.legadoholding.com` | Usada para armar `success_url`/`cancel_url` del checkout con Stripe |
-| `IN_BASE` | `https://invoicing.legadoholding.com/api/v1` | Solo para el login de staff del panel admin |
 | `ENVIRONMENT` | `dev` | Etiqueta de entorno; aparece en el health check |
-| `OPENAI_MODEL` | `gpt-5.6-luna` | Modelo que ejecuta el agente Alma |
-| `SUPABASE_URL` | (URL del proyecto) | Memoria de sesión y logs de turnos del chat |
+| `OPENAI_MODEL` | `gpt-5.6-luna` | Modelo de respaldo de Alma (manda el de Previsión si está cargado) |
 | `ALLOWED_ORIGINS` | (lista CSV) | Orígenes permitidos por CORS |
 
 #### Secrets (cifrados en Cloudflare, no se commitean)
@@ -388,12 +382,12 @@ incluyendo los otros `estado` posibles (`pendiente`, `confirmada`), en
 | Secret | Función | Cómo se configura |
 |---|---|---|
 | `PF_TOKEN` | Token de API de Prevision-Funeraria (tenant `lh`) | `wrangler secret put PF_TOKEN` |
-| `OPENAI_API_KEY` | API key de OpenAI para el agente Alma | `wrangler secret put OPENAI_API_KEY` |
-| `SUPABASE_SERVICE_ROLE_KEY` | Escritura en Supabase (chat_sessions/chat_turns) | `wrangler secret put SUPABASE_SERVICE_ROLE_KEY` — opcional, el chat sigue funcionando sin esto (no-op fallback) |
+| `OPENAI_API_KEY` | Clave de OpenAI de respaldo para Alma (la principal se carga en Previsión › *Asistente del sitio*) | `wrangler secret put OPENAI_API_KEY` |
 
-> `IN_TOKEN` fue revocado: el checkout y Alma ya no lo usan. Solo el login
-> del panel admin sigue contra Invoice Ninja, con las credenciales que el
-> propio staff ingresa (no un secret del Worker).
+> Invoice Ninja, Supabase y el panel admin legacy (`admin/`) se retiraron
+> (2026-11-18); sus secrets (`IN_TOKEN`, `SUPABASE_SERVICE_ROLE_KEY`,
+> `ADMIN_TOKEN`, `GEMINI_API_KEY`) se borraron del Worker. Lo administrativo
+> vive en el panel de Prevision-Funeraria.
 
 ### 6.3 Checkout del wizard, paso a paso
 
@@ -554,7 +548,7 @@ Desde `worker/`:
 # Solo una vez por secret: subir a Cloudflare
 wrangler secret put PF_TOKEN
 wrangler secret put OPENAI_API_KEY
-wrangler secret put SUPABASE_SERVICE_ROLE_KEY   # opcional
+
 # (pega el valor cuando pida "Enter a secret value:")
 
 # Cada vez que cambies código o config
@@ -685,7 +679,7 @@ Luego `wrangler deploy`. Sin espacios entre comas.
 
 ### Lo que NUNCA debe estar en el repo
 
-- El valor real de `PF_TOKEN`, `OPENAI_API_KEY` o `SUPABASE_SERVICE_ROLE_KEY`
+- El valor real de `PF_TOKEN` u `OPENAI_API_KEY`
   (en cualquier archivo).
 - Credenciales de Cloudflare (`wrangler login` las guarda en
   `%USERPROFILE%\.wrangler\`, fuera del repo).
@@ -696,7 +690,7 @@ Luego `wrangler deploy`. Sin espacios entre comas.
 
 1. **Inmediatamente**: regenerar el token en el panel admin de
    Prevision-Funeraria (para `PF_TOKEN`) o en el proveedor correspondiente
-   (OpenAI para `OPENAI_API_KEY`, Supabase para `SUPABASE_SERVICE_ROLE_KEY`).
+   (OpenAI para `OPENAI_API_KEY`).
 2. Actualizar el secret en Cloudflare: `wrangler secret put <NOMBRE>`.
 3. Actualizar `worker/.dev.vars` local.
 4. Limpiar el historial de PowerShell:
@@ -724,8 +718,6 @@ no son afectadas y siguen funcionando.
 |---|---|---|
 | Alma se presenta dos veces (reporte del usuario) | Media | Fix verificado correcto en backend y frontend; falta que el usuario confirme en ventana de incógnito. Ver `.claude/handoff.json` → `open_thread_needs_followup`. |
 | Cuenta Stripe de producción de LH pendiente | Alta (negocio, no de código) | KYC/verificación de Legado Holding Inc. sin completar; todo cobro hoy es en modo test de Stripe. Bloqueo externo, no de este repo. |
-| Login del panel admin sigue en Invoice Ninja | Baja | `worker/src/admin.js` autentica staff contra `IN_BASE`. Deuda de migración, no bloqueante — ver `CLAUDE.md`. |
-| Sin idempotencia en checkout | Media | Doble click en "Confirmar" puede crear dos compras pendientes. Mitigar con un `Idempotency-Key` (uuid del wizard) en el Worker. |
 | Worker `lead_abandoned` no se persiste | Media | El frontend envía el evento fire-and-forget pero el Worker no lo guarda. Para CRM: añadir lógica de log en el Worker o enviar a un endpoint de marketing. |
 | Sin tests automatizados | Media | No hay unit tests del checkout. Considerar Vitest + `@cloudflare/vitest-pool-workers`. |
 | Sin banner de consentimiento granular por región | Baja | El banner de cookies (ver `initCookieConsent()` en `js/main.js`) es binario aceptar/rechazar; no diferencia por jurisdicción (auditoría de marca §8.2). |
@@ -764,8 +756,8 @@ legado-holding/
     │   ├── wizard-compra.js
     │   ├── chat.js
     │   ├── alma.js
-    │   ├── supabase.js
-    │   ├── admin.js
+    │   ├── attribution.js
+    │   ├── ratelimit.js
     │   └── errors.js
     └── wrangler.toml
 ```
