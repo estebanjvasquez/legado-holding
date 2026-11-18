@@ -728,6 +728,12 @@ let wizardParentescos = [];
 /* true si el último intento de cargar parentescos falló (se muestra aviso con
    botón de reintento en el paso "Familia" en vez de un selector vacío). */
 let wizardParentescosError = false;
+/* Código de asesor del paso 0 (respaldo del enlace ?ref=). estado:
+   "" (vacío) | "short" | "checking" | "valido" | "invalido" | "error" (no se
+   pudo verificar: se envía igual). locked = vino por enlace y ya está validado
+   (first-touch: el comprador no lo reemplaza). */
+let wizardAsesor = { code: "", estado: "", nombre: null, locked: false };
+let wizardAsesorTimer = null;
 let revealObserver = null;
 
 /* =============================================================================
@@ -1334,9 +1340,88 @@ function openWizard(planId) {
     zip: "",
   };
   wizardFamily = [];
+  initWizardAsesor();
   $("#wizard-overlay").classList.remove("hidden");
   renderWizardContent();
   loadParentescos();
+}
+
+/* ── Código de asesor ──────────────────────────────────────────────────────
+   Si el comprador llegó por el enlace de un vendedor (ya validado), se muestra
+   quién lo atiende y no se puede cambiar. Si no, puede escribir el código que
+   le dio su asesor (aleatorio o personalizado); se valida contra Previsión y
+   se guarda como atribución "manual" (js/attribution.js → setManual). */
+function initWizardAsesor() {
+  let cur = null;
+  try { cur = window.LegadoAttribution && window.LegadoAttribution.current(); } catch (_) {}
+  clearTimeout(wizardAsesorTimer);
+  if (cur && cur.ref_estado === "valido" && cur.fuente !== "manual") {
+    wizardAsesor = { code: cur.ref, estado: "valido", nombre: null, locked: true };
+  } else if (cur && cur.ref) {
+    wizardAsesor = { code: cur.ref, estado: "checking", nombre: null, locked: false };
+  } else {
+    wizardAsesor = { code: "", estado: "", nombre: null, locked: false };
+  }
+  /* Trae el nombre (y valida un código que no estaba confirmado). */
+  if (wizardAsesor.code) checkWizardAsesor(wizardAsesor.code);
+}
+
+async function checkWizardAsesor(code) {
+  let res = { estado: "error", nombre: null };
+  try {
+    if (window.LegadoAttribution) res = await window.LegadoAttribution.lookupCode(code, VENDEDOR_LOOKUP_URL);
+  } catch (_) {}
+  if (wizardAsesor.code !== code) return; // el comprador ya escribió otra cosa
+  if (wizardAsesor.locked) {
+    /* Código de enlace ya validado: solo nos interesa el nombre. */
+    if (res.estado === "valido") wizardAsesor.nombre = res.nombre;
+  } else {
+    wizardAsesor.estado = res.estado;
+    wizardAsesor.nombre = res.nombre;
+  }
+  renderWizardAsesorStatus();
+  updateWizardFooter();
+}
+
+function wizardAsesorStatusHTML() {
+  const es = currentLang === "es";
+  const a = wizardAsesor;
+  const who = escapeHTML(a.nombre || a.code);
+  switch (a.estado) {
+    case "valido":
+      return `<span style="color:#15803d">✓ ${es ? "Te atiende" : "Your advisor"}: <strong>${who}</strong></span>`;
+    case "checking":
+      return es ? "Verificando código…" : "Checking code…";
+    case "short":
+      return `<span class="form-error">${es ? "El código tiene al menos 4 caracteres." : "Codes have at least 4 characters."}</span>`;
+    case "invalido":
+      return `<span class="form-error">${es ? "No encontramos ese código. Revísalo o déjalo en blanco." : "We couldn't find that code. Check it or leave it blank."}</span>`;
+    case "error":
+      return es ? "No pudimos verificar el código ahora; lo enviaremos igual con tu compra." : "We couldn't verify the code right now; we'll send it with your purchase anyway.";
+    default:
+      return es ? "Si un asesor te recomendó, escribe su código (opcional)." : "If an advisor referred you, enter their code (optional).";
+  }
+}
+
+function renderWizardAsesorStatus() {
+  const el = $("#asesor-status");
+  if (el) el.innerHTML = wizardAsesorStatusHTML();
+}
+
+/* Al pasar del paso 0: guarda (o quita) el código manual. Nunca toca un
+   código de enlace validado. */
+function applyWizardAsesor() {
+  const A = window.LegadoAttribution;
+  if (!A || wizardAsesor.locked) return;
+  try {
+    if (wizardAsesor.code && (wizardAsesor.estado === "valido" || wizardAsesor.estado === "error")) {
+      A.setManual(wizardAsesor.code, wizardAsesor.estado === "valido" ? "valido" : "sin_verificar");
+    } else if (!wizardAsesor.code) {
+      A.clearManual();
+    }
+  } catch (_) {
+    /* la atribución nunca debe bloquear la compra */
+  }
 }
 
 /* Catálogo de parentescos — server-to-server vía nuestro Worker (el token
@@ -1536,6 +1621,16 @@ function renderStep0() {
       </div>
       <div class="form-group"><label class="form-label">${currentLang === "es" ? "Código Postal (ZIP)" : "ZIP Code"}</label>
         <input class="form-input" id="wf-zip" type="text" value="${escapeHTML(b.zip)}" placeholder="33101" maxlength="10"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">${currentLang === "es" ? "Código de asesor" : "Advisor code"}</label>
+        ${
+          wizardAsesor.locked
+            ? ""
+            : `<input class="form-input" id="wf-asesor" type="text" value="${escapeHTML(wizardAsesor.code)}" placeholder="${currentLang === "es" ? "Opcional" : "Optional"}" maxlength="20" autocomplete="off" spellcheck="false">`
+        }
+        <div id="asesor-status" style="font-size:0.8125rem;margin-top:0.35rem;color:var(--muted-foreground)">${wizardAsesorStatusHTML()}</div>
+      </div>
     </div>`;
 }
 
@@ -1761,6 +1856,22 @@ function bindWizardStepEvents() {
         });
       },
     );
+    const asesorEl = $("#wf-asesor");
+    asesorEl?.addEventListener("input", () => {
+      const code = asesorEl.value.replace(/[^A-Za-z0-9]/g, "").slice(0, 20);
+      if (code !== asesorEl.value) asesorEl.value = code;
+      clearTimeout(wizardAsesorTimer);
+      wizardAsesor.code = code;
+      wizardAsesor.nombre = null;
+      if (!code) wizardAsesor.estado = "";
+      else if (code.length < 4) wizardAsesor.estado = "short";
+      else {
+        wizardAsesor.estado = "checking";
+        wizardAsesorTimer = setTimeout(() => checkWizardAsesor(code), 600);
+      }
+      renderWizardAsesorStatus();
+      updateWizardFooter();
+    });
   }
   if (wizardStep === 1) {
     $$(".family-remove-btn").forEach((btn) => {
@@ -1833,7 +1944,11 @@ function canWizardNext() {
       b.email &&
       b.birthDate &&
       b.zip &&
-      validateAge(b.birthDate, maxAge)
+      validateAge(b.birthDate, maxAge) &&
+      /* Código de asesor: opcional, pero si se escribió no puede quedar a
+         medio verificar ni inválido (un error de tipeo le quitaba la venta al
+         asesor). Si Previsión no responde ("error") se deja seguir. */
+      !["short", "checking", "invalido"].includes(wizardAsesor.estado)
     );
   }
   if (wizardStep === 1) {
@@ -1873,6 +1988,7 @@ function updateWizardFooter() {
 function wizardNext() {
   if (!canWizardNext()) return;
   if (wizardStep < 3) {
+    if (wizardStep === 0) applyWizardAsesor();
     wizardStep++;
     renderWizardContent();
   } else {

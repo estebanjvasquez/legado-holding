@@ -103,3 +103,51 @@ test("storage bloqueado: nunca lanza", async () => {
   await visit(s, "?ref=GOOD1234", { lookup: async () => "valido" });
   assert.deepEqual(A.get({ storage: s }), {});
 });
+
+test("código manual del wizard: se guarda si no hay enlace validado y viaja en la compra", () => {
+  const s = memStorage();
+  assert.equal(A.setManual("MARIAP2026", "valido", { storage: s }), true);
+  assert.equal(A.get({ storage: s }).codigo_vendedor, "MARIAP2026");
+  assert.equal(A.current({ storage: s }).fuente, "manual");
+  assert.equal(A.get({ storage: s }).toques.at(-1).codigo_vendedor, "MARIAP2026");
+});
+
+test("código manual NUNCA desplaza a un código de enlace ya validado (first-touch)", async () => {
+  const s = memStorage();
+  await visit(s, "?ref=GOOD1234", { lookup: lookupFrom({ GOOD1234: "valido" }) });
+  assert.equal(A.setManual("OTRO5678", "valido", { storage: s }), false);
+  assert.equal(A.get({ storage: s }).codigo_vendedor, "GOOD1234");
+  assert.equal(A.clearManual({ storage: s }), false, "tampoco se puede borrar");
+});
+
+test("código manual reemplaza a uno de enlace que nunca se pudo verificar", async () => {
+  const s = memStorage();
+  await visit(s, "?ref=NOVERIF1", { lookup: async () => "error" });
+  assert.equal(A.setManual("MARIAP2026", "valido", { storage: s }), true);
+  assert.equal(A.get({ storage: s }).codigo_vendedor, "MARIAP2026");
+});
+
+test("borrar el código manual devuelve el canal anterior", async () => {
+  const s = memStorage();
+  await visit(s, "?utm_source=instagram&utm_medium=social");
+  A.setManual("MARIAP2026", "sin_verificar", { storage: s });
+  assert.equal(A.clearManual({ storage: s }), true);
+  const out = A.get({ storage: s });
+  assert.equal(out.codigo_vendedor, undefined);
+  assert.equal(out.canal_origen, "redes_sociales");
+});
+
+test("formato del código: 4 a 20 letras/números", () => {
+  const s = memStorage();
+  assert.equal(A.setManual("ABC", "valido", { storage: s }), false);
+  assert.equal(A.setManual("A".repeat(21), "valido", { storage: s }), false);
+  assert.equal(A.setManual("MARIA-P", "valido", { storage: s }), false);
+  assert.equal(A.setManual("A".repeat(20), "valido", { storage: s }), true);
+});
+
+test("lookupCode devuelve estado y nombre del vendedor", async () => {
+  const fetchFn = async () => ({ ok: true, json: async () => ({ activo: true, verificado: true, nombre: "María Pérez" }) });
+  assert.deepEqual(await A.lookupCode("MARIAP2026", "https://api.test/wizard/vendedor", { fetchFn }), { estado: "valido", nombre: "María Pérez" });
+  const down = async () => ({ ok: false });
+  assert.equal((await A.lookupCode("MARIAP2026", "https://api.test/wizard/vendedor", { fetchFn: down })).estado, "error");
+});

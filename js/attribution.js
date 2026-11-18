@@ -28,7 +28,9 @@
 
   const KEY = "legado_attribution";
   const TTL_MS = 90 * 24 * 60 * 60 * 1000; // 90 días
-  const REF_RE = /^[A-Za-z0-9]{4,24}$/;
+  /* 4–20 letras/números: mismo formato que acepta Previsión para códigos
+     aleatorios o personalizados (ej. MARIAP2026). */
+  const REF_RE = /^[A-Za-z0-9]{4,20}$/;
   const CANAL_ENUM = ["directo", "redes_sociales", "buscador", "otro"];
   const MAX_TOQUES = 10;
   const LOOKUP_TIMEOUT_MS = 5000;
@@ -188,22 +190,31 @@
   }
 
   function makeLookup(lookupUrl, fetchFn) {
+    const detail = makeLookupDetail(lookupUrl, fetchFn);
     return async function lookup(code) {
-      if (!lookupUrl || typeof fetchFn !== "function") return "error";
+      return (await detail(code)).estado;
+    };
+  }
+
+  /* Igual que lookup pero devuelve también el nombre del vendedor:
+     { estado: "valido" | "invalido" | "error", nombre }. */
+  function makeLookupDetail(lookupUrl, fetchFn) {
+    return async function lookupDetail(code) {
+      if (!lookupUrl || typeof fetchFn !== "function") return { estado: "error", nombre: null };
       const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
       const timer = ctrl ? setTimeout(() => ctrl.abort(), LOOKUP_TIMEOUT_MS) : null;
       try {
         const r = await fetchFn(`${lookupUrl}?codigo=${encodeURIComponent(code)}`, {
           signal: ctrl ? ctrl.signal : undefined,
         });
-        if (!r.ok) return "error";
+        if (!r.ok) return { estado: "error", nombre: null };
         const d = await r.json();
-        if (d && d.activo) return "valido";
+        if (d && d.activo) return { estado: "valido", nombre: d.nombre || null };
         /* verificado:false = el Worker no pudo consultar a Previsión. */
-        if (d && d.verificado === false) return "error";
-        return "invalido";
+        if (d && d.verificado === false) return { estado: "error", nombre: null };
+        return { estado: "invalido", nombre: null };
       } catch (_) {
-        return "error";
+        return { estado: "error", nombre: null };
       } finally {
         if (timer) clearTimeout(timer);
       }
@@ -276,6 +287,60 @@
     return out;
   }
 
-  const api = { init, get, _internals: { readFromURL, applyTouch, validate, load, KEY, TTL_MS, MAX_TOQUES } };
+  /* Código vigente (para mostrarlo en el wizard), o null. */
+  function current(opts) {
+    const d = { ...defaultDeps(), ...(opts || {}) };
+    const rec = load(d.storage, d.now);
+    if (!rec || !rec.ref) return null;
+    return { ref: rec.ref, ref_estado: rec.ref_estado, fuente: rec.fuente || "enlace" };
+  }
+
+  /* Código de asesor escrito a mano por el comprador en el wizard (respaldo
+     para cuando el enlace ?ref= se perdió: otro dispositivo, Safari borra el
+     localStorage a los 7 días sin interacción, etc.).
+     Regla: NUNCA desplaza a un código de enlace ya validado (first-touch).
+     `estado`: "valido" (Previsión lo confirmó) o "sin_verificar" (no se pudo
+     consultar; viaja igual y Previsión ignora un código inválido).
+     Devuelve true si quedó guardado. */
+  function setManual(code, estado, opts) {
+    const d = { ...defaultDeps(), ...(opts || {}) };
+    if (!REF_RE.test(String(code || ""))) return false;
+    let rec = load(d.storage, d.now);
+    if (rec && rec.ref && rec.ref_estado === "valido" && rec.fuente !== "manual") return false;
+    if (!rec) rec = { v: 2, ts: d.now, toques: [] };
+    const st = estado === "valido" ? "valido" : "sin_verificar";
+    rec.ref = code;
+    rec.ref_estado = st;
+    if (rec.fuente !== "manual") rec.canal_previo = rec.canal_origen || "directo";
+    rec.fuente = "manual";
+    rec.canal_origen = "vendedor";
+    delete rec.ref_pendiente;
+    rec.toques.push({ ts: d.now, ref: code, canal_origen: "vendedor", estado: st === "valido" ? "valido" : undefined, manual: true });
+    if (rec.toques.length > MAX_TOQUES) rec.toques = rec.toques.slice(-MAX_TOQUES);
+    save(d.storage, rec);
+    return true;
+  }
+
+  /* Quita un código manual (el comprador borró el campo). Nunca toca un código
+     que vino por enlace. */
+  function clearManual(opts) {
+    const d = { ...defaultDeps(), ...(opts || {}) };
+    const rec = load(d.storage, d.now);
+    if (!rec || rec.fuente !== "manual") return false;
+    delete rec.ref;
+    delete rec.ref_estado;
+    delete rec.fuente;
+    rec.canal_origen = rec.canal_previo || "directo";
+    delete rec.canal_previo;
+    save(d.storage, rec);
+    return true;
+  }
+
+  function lookupCode(code, lookupUrl, opts) {
+    const d = { ...defaultDeps(), ...(opts || {}) };
+    return makeLookupDetail(lookupUrl, d.fetchFn)(code);
+  }
+
+  const api = { init, get, current, setManual, clearManual, lookupCode, _internals: { readFromURL, applyTouch, validate, load, KEY, TTL_MS, MAX_TOQUES, REF_RE } };
   root.LegadoAttribution = api;
 })(typeof window !== "undefined" ? window : globalThis);

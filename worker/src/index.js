@@ -162,6 +162,9 @@ export default {
    sin ella. */
 const PARENTESCOS_TTL_S = 600;
 const VENDEDOR_TTL_S    = 300;
+/* Un código no encontrado se cachea poco: si el administrador acaba de crear
+   un código personalizado, tiene que funcionar casi enseguida. */
+const VENDEDOR_MISS_TTL_S = 60;
 
 function edgeCache() {
   return typeof caches !== "undefined" && caches.default ? caches.default : null;
@@ -207,8 +210,8 @@ async function handleParentescos(env, json, url) {
    solo en el Worker; el navegador nunca ve la lista de vendedores. Código
    inválido/inactivo → { activo: false } (nunca error). */
 async function handleVendedorLookup(codigo, env, json, url) {
-  const c = (codigo || "").replace(/[^A-Za-z0-9]/g, "").slice(0, 24);
-  if (c.length < 4) return json({ activo: false });
+  const c = (codigo || "").replace(/[^A-Za-z0-9]/g, "");
+  if (c.length < 4 || c.length > 20) return json({ activo: false, verificado: true });
   const path = `vendedor/${resolveTenant(env).id}/${c}`;
   const cached = await cacheGet(url, path);
   if (cached) return json(cached);
@@ -222,7 +225,7 @@ async function handleVendedorLookup(codigo, env, json, url) {
       codigo: c,
       nombre: (resp && (resp.nombre || resp.nombre_completo)) || null,
     };
-    await cachePut(url, path, out, VENDEDOR_TTL_S);
+    await cachePut(url, path, out, out.activo ? VENDEDOR_TTL_S : VENDEDOR_MISS_TTL_S);
     return json(out);
   } catch (e) {
     /* verificado:false = no se pudo consultar a Previsión (no es lo mismo que

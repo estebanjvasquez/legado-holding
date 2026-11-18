@@ -23,8 +23,10 @@ export function sanitizeAttribution(raw) {
 
   const out = {};
 
-  const code = String(raw.codigo_vendedor || "").replace(/[^A-Za-z0-9]/g, "").slice(0, 24);
-  if (code.length >= 4) out.codigo_vendedor = code;
+  /* 4–20 letras/números (aleatorio o personalizado). Un código más largo se
+     descarta en vez de recortarse: recortado sería OTRO código. */
+  const code = String(raw.codigo_vendedor || "").replace(/[^A-Za-z0-9]/g, "");
+  if (code.length >= 4 && code.length <= 20) out.codigo_vendedor = code;
 
   const canal = String(raw.canal_origen || "").toLowerCase().trim();
   if (CANAL_ENUM.includes(canal)) out.canal_origen = canal;

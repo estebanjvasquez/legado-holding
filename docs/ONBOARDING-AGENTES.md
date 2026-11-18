@@ -63,7 +63,7 @@ Navegador ──GET catálogo (CORS, sin token)──▶ app.previsionfuneraria.
 ### Frontend (raíz)
 | Archivo | Rol |
 |---|---|
-| `index.html` | Página única. `LEGADO_CONFIG` (switch dev/prod), `PLANS_API_URL` directo a Previsión, `PARENTESCOS_API_URL`/chat vía Worker. **Cache-bust `?v=N`**: `css/main.css?v=4`, `js/attribution.js?v=1`, `js/main.js?v=15` (independientes; líneas ~110 y ~1358). |
+| `index.html` | Página única. `LEGADO_CONFIG` (switch dev/prod), `PLANS_API_URL` directo a Previsión, `PARENTESCOS_API_URL`/chat vía Worker. **Cache-bust `?v=N`**: `css/main.css?v=4`, `js/attribution.js?v=2`, `js/main.js?v=16` (independientes; líneas ~110 y ~1358). |
 | `js/attribution.js` | Atribución de vendedor (`?ref=`): valida el código contra `/wizard/vendedor`, first-touch entre códigos válidos (TTL 90d), guarda los últimos 10 toques. Se carga antes de `main.js`; tests en `worker/test/attribution-frontend.test.mjs`. |
 | `js/main.js` | i18n, wizard de 4 pasos, UI del chat de Alma, y **§"ATRIBUCIÓN DE VENDEDOR / CANAL"** (`initAttribution`/`getAttribution`, `localStorage["legado_attribution"]`, first-touch TTL 90d). `SELECTO_CHECKOUT_ENABLED = true`, `WIZARD_ENABLED_SLUGS`. |
 | `js/wizard-generic.js` | Botones "Protege tu Legado" sin plan → scroll a la sección de planes. |
@@ -169,6 +169,11 @@ Navegador ──GET catálogo (CORS, sin token)──▶ app.previsionfuneraria.
 
 ## 6. Gotchas que cuestan horas
 
+0. **Desplegar el Worker SIEMPRE con `npx wrangler deploy --config wrangler.toml` desde `worker/`**
+   (o `npm run deploy`). Un `wrangler deploy` en la raíz del repo auto-genera un
+   `wrangler.jsonc` que publica TODA la carpeta (incluido `.git`) como sitio estático en
+   `workers.dev` (pasó el 2026-11-18 → Worker `legado-holding`, hay que borrarlo); y si ese
+   `wrangler.jsonc` queda en la raíz, Wrangler lo toma aunque se ejecute desde `worker/`.
 1. **Caché del edge de Cloudflare (~4h) para `css`/`js`.** Cada cambio a `css/main.css`
    o `js/main.js` necesita subir el `?v=N` correspondiente en `index.html` (líneas ~100
    y ~1283, son independientes). Verificar cache-miss real:

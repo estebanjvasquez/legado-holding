@@ -73,3 +73,9 @@ test("un error de Previsión en parentescos no se reenvía al navegador", async 
   assert.equal(r.status, 503);
   assert.doesNotMatch(await r.text(), /SQLITE_BUSY/);
 });
+
+test("vendedor: un código de más de 20 caracteres no se recorta (sería otro código)", async () => {
+  m = mockFetch([[() => true, () => { throw new Error("no debería consultar a Previsión"); }]]);
+  const r = await worker.fetch(new Request(`https://api.test/wizard/vendedor?codigo=${"A".repeat(21)}`), { PF_TOKEN: "t" }, ctx);
+  assert.equal((await r.json()).activo, false);
+});
