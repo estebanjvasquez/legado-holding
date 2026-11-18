@@ -134,10 +134,15 @@ Navegador ──GET catálogo (CORS, sin token)──▶ prevision-funeraria.sis
   - Aliados: viven solo en Previsión (panel de PF → *Aliados*); Alma los lee de
     `/aliados`. Respaldo de Supabase y pestañas Aliados/Ubicaciones del panel legacy
     retirados 2026-11-17. WhatsApp de emergencia editable en PF verificado en vivo.
-  - **Siguiente:** PF ya guarda la configuración de Alma por empresa (Configuración ›
-    *Asistente del sitio*, `GET /api/public/t/lh/asistente`, PF `c748aee`). El Worker de
-    LH todavía NO la lee: sigue con su `OPENAI_API_KEY` y con `agent_config` de Supabase.
-    Conectarlo permite retirar la pestaña *Agente* del panel legacy.
+  - **Configuración de Alma desde PF** (Configuración › *Asistente del sitio*,
+    `GET /api/public/t/lh/asistente`): el Worker la lee (`resolveAsistente` /
+    `resolveAlmaConfig` en `worker/src/alma.js`, caché en memoria 5 min, última conocida
+    si PF cae). Precedencia por campo: PF → `agent_config` (Supabase) → código/env. Si
+    `proveedor` no es `openai`, se usa el respaldo (Alma solo implementa OpenAI). Si OpenAI
+    rechaza (4xx) la clave/modelo de PF, el turno reintenta una vez con
+    `OPENAI_API_KEY`/`OPENAI_MODEL` del Worker. El protocolo de crisis se antepone siempre.
+    Log por turno: `cfg_source=… key_source=… prompt_source=prevision|db|hardcoded`.
+    Cuando los prompts vivan en PF, se puede retirar la pestaña *Agente* del panel legacy.
 - **Panel admin legacy** (`admin/` + `worker/src/admin.js`): Invoice Ninja ya no existe;
   entra solo con `ADMIN_TOKEN`. Pendiente retirarlo (aliados → `/aliados` de Previsión;
   config de Alma y conversaciones: ver plan de migración).

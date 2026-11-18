@@ -102,6 +102,81 @@ export async function resolveEmergencyWhatsapp(env, { maxWaitMs = 10000 } = {}) 
   }
 }
 
+/* ── Configuración del asistente desde Previsión ─────────────────────────────
+   El administrador de la empresa edita modelo, temperatura, prompts, teléfono y
+   clave de API en Previsión (Configuración › Asistente del sitio, GET
+   /asistente). Caché en memoria del isolate (nunca KV ni logs: trae la clave
+   descifrada). Si Previsión no responde se usa la última conocida; si nunca
+   respondió, null → runAlma cae a agent_config / al código. */
+const ASISTENTE_CACHE_MS = 5 * 60 * 1000;
+let asistenteCache = null; // { cfg, until }
+
+export function _resetAsistenteCache() {
+  asistenteCache = null;
+}
+
+export async function resolveAsistente(env) {
+  const now = Date.now();
+  if (asistenteCache && asistenteCache.until > now) return asistenteCache.cfg;
+  try {
+    const resp = await createPF(env).getAsistente();
+    const cfg = resp && typeof resp === "object" ? resp : null;
+    asistenteCache = { cfg, until: now + ASISTENTE_CACHE_MS };
+    return cfg;
+  } catch (e) {
+    console.warn(`[alma] no se pudo leer /asistente de Previsión (${String(e.message).slice(0, 160)}) — uso la última conocida o el respaldo`);
+    return asistenteCache ? asistenteCache.cfg : null;
+  }
+}
+
+const str = (v) => (typeof v === "string" ? v.trim() : "");
+
+/* Resuelve la configuración efectiva del turno. Precedencia por campo:
+   Previsión → agent_config (Supabase, legacy) → código/env. `fallback` es la
+   clave+modelo propios del Worker, para reintentar si OpenAI rechaza la
+   clave o el modelo cargados en Previsión. Exportada para los tests. */
+export function resolveAlmaConfig(pf, cfg, env) {
+  const envModel = str(env.OPENAI_MODEL) || "gpt-5.6-luna";
+  let legacyModel = str(cfg.model);
+  if (/^gemini/i.test(legacyModel)) {
+    /* agent_config.model quedó con un valor de la era Gemini — usarlo rompe
+       el chat entero contra OpenAI. Se ignora (queda el log). */
+    console.warn(`[alma] agent_config.model="${legacyModel}" es un modelo de Gemini obsoleto — ignorando.`);
+    legacyModel = "";
+  }
+
+  let usePF = !!(pf && pf.configurado);
+  if (usePF && pf.proveedor && pf.proveedor !== "openai") {
+    /* Alma solo implementa OpenAI. Un proveedor distinto en Previsión no puede
+       dejar al sitio sin bot: se usa el respaldo y queda el aviso. */
+    console.warn(`[alma] Previsión pide proveedor="${pf.proveedor}" y Alma solo implementa OpenAI — uso la configuración de respaldo del Worker.`);
+    usePF = false;
+  }
+  const p = usePF ? pf : {};
+
+  const fallback = { apiKey: str(env.OPENAI_API_KEY), model: legacyModel || envModel };
+  const primary = {
+    apiKey: str(p.api_key) || fallback.apiKey,
+    model:  str(p.modelo) || fallback.model,
+  };
+
+  const tNum = (v) => (v === null || v === undefined || v === "" ? NaN : Number(v));
+  const temperature = [tNum(p.temperatura), tNum(cfg.temperature)].find(Number.isFinite) ?? 0.3;
+
+  return {
+    source: usePF ? "prevision" : "respaldo",
+    keySource: str(p.api_key) ? "prevision" : "worker",
+    primary,
+    fallback: (fallback.apiKey && (fallback.apiKey !== primary.apiKey || fallback.model !== primary.model)) ? fallback : null,
+    temperature,
+    prompts: {
+      es: str(p.prompt_es) ? { text: str(p.prompt_es), source: "prevision" } : str(cfg.system_prompt_es) ? { text: str(cfg.system_prompt_es), source: "db" } : null,
+      en: str(p.prompt_en) ? { text: str(p.prompt_en), source: "prevision" } : str(cfg.system_prompt_en) ? { text: str(cfg.system_prompt_en), source: "db" } : null,
+    },
+    emergencyPhone: str(p.telefono_emergencia) || str(cfg.emergency_phone) || null,
+  };
+}
+
 /* ── Protocolo de crisis ──────────────────────────────────────────────────────
    Prioridad absoluta: señales de autolesión / suicidio / daño a terceros.
    Se ANTEPONE al system prompt en runAlma() SIEMPRE — venga el prompt del
@@ -774,60 +849,49 @@ function historyToMessages(history) {
 
 /* ── Entry point ─────────────────────────────────────────────────────────── */
 export async function runAlma(input, env, executionCtx) {
-  const apiKey = (env.OPENAI_API_KEY || "").trim();
-  if (!apiKey) {
-    throw new Error("OPENAI_API_KEY no configurado en el Worker");
-  }
   const lang  = (input.lang || "es").toLowerCase();
   const { id: tenant } = resolveTenant(env);
   const db    = input.db;   /* puede ser cliente real o noop */
   const attribution = input.attribution || null;   /* {codigo_vendedor?, canal_origen?, ...} */
 
-  /* Config dinámica: leemos agent_config en runtime. Si la BD está caída o
-     una key está vacía, caemos al valor hard-coded de este archivo / al
-     environment variable. Esto permite al admin editar prompt/modelo sin
-     redeploy, pero el código siempre tiene un fallback funcional.            */
-  let cfg = {};
-  try {
-    cfg = await db.getAgentConfigMap();
-  } catch (e) {
-    console.warn(`[alma] no se pudo leer agent_config: ${e.message}`);
+  /* Config dinámica, en paralelo: la de Previsión (fuente principal) y
+     agent_config de Supabase (legacy, respaldo por campo). Si ambas faltan,
+     queda lo hard-coded de este archivo / env: siempre hay un fallback. */
+  const [pfAsistente, cfg] = await Promise.all([
+    resolveAsistente(env),
+    db.getAgentConfigMap().catch((e) => {
+      console.warn(`[alma] no se pudo leer agent_config: ${e.message}`);
+      return {};
+    }),
+  ]);
+  const conf = resolveAlmaConfig(pfAsistente, cfg || {}, env);
+  let { apiKey, model } = conf.primary;
+  if (!apiKey) {
+    throw new Error("Sin clave de OpenAI: ni en Previsión (Asistente del sitio) ni OPENAI_API_KEY en el Worker");
   }
-
-  let model = (cfg.model && cfg.model.trim()) || env.OPENAI_MODEL || "gpt-5.6-luna";
-  if (/^gemini/i.test(model)) {
-    /* agent_config.model quedó con un valor de la era Gemini (editado desde
-       el panel admin antes de este cambio de proveedor) — usarlo tal cual
-       rompe el chat entero contra la API de OpenAI. Ignorarlo y caer al
-       default es más seguro que fallar 100% de las conversaciones; igual
-       queda el log para que el admin lo corrija desde el panel. */
-    console.warn(`[alma] agent_config.model="${model}" es un modelo de Gemini obsoleto (Alma ahora llama a OpenAI) — ignorando, actualízalo desde el panel admin.`);
-    model = env.OPENAI_MODEL || "gpt-5.6-luna";
-  }
-  const temperature = (() => {
-    const t = parseFloat(cfg.temperature);
-    return Number.isFinite(t) ? t : 0.3;
-  })();
-  /* {{emergency_phone}} del prompt: línea dedicada del staff si existe, si no el
-     WhatsApp de emergencia real del tenant. Nunca un placeholder. */
+  const temperature = conf.temperature;
+  /* {{emergency_phone}} del prompt: línea del bot (Previsión / agent_config) si
+     existe, si no el WhatsApp de emergencia real del tenant. Nunca un placeholder. */
   const emergencyPhone =
-    (cfg.emergency_phone && cfg.emergency_phone.trim()) ||
-    (await resolveEmergencyWhatsapp(env, { maxWaitMs: 3000 }));
+    conf.emergencyPhone || (await resolveEmergencyWhatsapp(env, { maxWaitMs: 3000 }));
 
   const promptHardcoded = lang.startsWith("en") ? SYSTEM_PROMPT_EN : SYSTEM_PROMPT_ES;
-  const promptKey       = lang.startsWith("en") ? "system_prompt_en" : "system_prompt_es";
-  const promptFromDb    = (cfg[promptKey] || "").trim();
-  /* El protocolo de crisis se antepone SIEMPRE — venga el prompt del hardcoded
-     o de un override en agent_config — para que un cambio desde el panel admin
-     no pueda quitarlo (decisión #1, docs/plan-bot-alma-funeraria-del-zulia.md). */
+  const promptOverride  = lang.startsWith("en") ? conf.prompts.en : conf.prompts.es;
+  const promptSource    = promptOverride ? promptOverride.source : "hardcoded";
+  /* El protocolo de crisis se antepone SIEMPRE — venga el prompt del código,
+     de Previsión o de agent_config — para que un cambio desde un panel no
+     pueda quitarlo (decisión #1, docs/plan-bot-alma-funeraria-del-zulia.md). */
   const crisisPreamble = lang.startsWith("en") ? CRISIS_PREAMBLE_EN : CRISIS_PREAMBLE_ES;
-  const sysPrompt = (crisisPreamble + "\n\n" + (promptFromDb || promptHardcoded)).replace(
+  const sysPrompt = (crisisPreamble + "\n\n" + (promptOverride ? promptOverride.text : promptHardcoded)).replace(
     /\{\{\s*emergency_phone\s*\}\}/g,
     emergencyPhone,
   );
   console.log(
-    `[alma] tenant=${tenant} prompt_source=${promptFromDb ? "db" : "hardcoded"} len=${sysPrompt.length} has_crisis=${sysPrompt.includes("SEÑALES DE CRISIS") || sysPrompt.includes("CRISIS SIGNALS")} has_fase0=${sysPrompt.includes("FASE 0") || sysPrompt.includes("PHASE 0")} model=${model} temp=${temperature}`,
+    `[alma] tenant=${tenant} cfg_source=${conf.source} key_source=${conf.keySource} prompt_source=${promptSource} len=${sysPrompt.length} has_crisis=${sysPrompt.includes("SEÑALES DE CRISIS") || sysPrompt.includes("CRISIS SIGNALS")} has_fase0=${sysPrompt.includes("FASE 0") || sysPrompt.includes("PHASE 0")} model=${model} temp=${temperature}`,
   );
+  /* Si OpenAI rechaza la clave o el modelo de Previsión (clave revocada,
+     modelo retirado, cuota agotada), se reintenta UNA vez con los del Worker. */
+  let fallback = conf.fallback;
 
   const runSpan = trace.getActiveSpan();
   if (runSpan) {
@@ -835,7 +899,8 @@ export async function runAlma(input, env, executionCtx) {
       "alma.tenant":        tenant,
       "alma.lang":          lang,
       "alma.model":         model,
-      "alma.prompt_source": promptFromDb ? "db" : "hardcoded",
+      "alma.prompt_source": promptSource,
+      "alma.cfg_source":    conf.source,
     });
   }
 
@@ -855,18 +920,31 @@ export async function runAlma(input, env, executionCtx) {
   for (let hop = 0; hop < MAX_TOOL_HOPS; hop++) {
     const t0 = Date.now();
     let resp;
+    const payload = {
+      messages,
+      tools:       TOOLS,
+      temperature,
+      /* gpt-5.6-luna es un modelo "reasoning": /v1/chat/completions
+         rechaza function tools junto a su reasoning_effort por defecto
+         (400 "Function tools ... are not supported ... unless
+         reasoning_effort is 'none'"). Alma necesita tool-calling
+         determinista en cada turno, así que forzamos 'none'. */
+      reasoning_effort: "none",
+    };
     try {
-      resp = await callOpenAIWithRetry(model, apiKey, {
-        messages,
-        tools:       TOOLS,
-        temperature,
-        /* gpt-5.6-luna es un modelo "reasoning": /v1/chat/completions
-           rechaza function tools junto a su reasoning_effort por defecto
-           (400 "Function tools ... are not supported ... unless
-           reasoning_effort is 'none'"). Alma necesita tool-calling
-           determinista en cada turno, así que forzamos 'none'. */
-        reasoning_effort: "none",
-      }, deadline);
+      try {
+        resp = await callOpenAIWithRetry(model, apiKey, payload, deadline);
+      } catch (e) {
+        /* Rechazo definitivo (4xx: clave inválida, modelo inexistente, cuota)
+           con la config de Previsión → una vez con la del Worker. */
+        if (!fallback || e.retryable || !e.status) throw e;
+        console.warn(`[alma] OpenAI rechazó la config de Previsión (model=${model}, ${String(e.message).slice(0, 120)}) — reintento con la del Worker (model=${fallback.model})`);
+        out.events.push({ role: "model", hop, latency_ms: Date.now() - t0, error: e.message, fallback: true });
+        ({ apiKey, model } = fallback);
+        out.model = model;
+        fallback = null;
+        resp = await callOpenAIWithRetry(model, apiKey, payload, deadline);
+      }
     } catch (e) {
       out.events.push({ role: "model", hop, latency_ms: Date.now() - t0, error: e.message });
       /* chat.js persiste estos events aunque el turno falle. */

@@ -94,6 +94,11 @@ export function createPF(env) {
     /* Resuelve un codigo_vendedor (?ref=) a su nombre para mostrarlo (handoff a
        WhatsApp, banner del sitio). Server-to-server: no expone la lista de
        vendedores al navegador. Código inválido/inactivo → { activo: false }. */
+    /* Configuración del bot del sitio (Configuración › Asistente del sitio en
+       Previsión). Trae la api_key DESCIFRADA: solo server-to-server, nunca
+       reenviarla al navegador ni loguearla. Timeout corto: está en el camino
+       de cada turno de chat y hay respaldo si no responde. */
+    getAsistente: () => req("GET", "/asistente", undefined, { auth: true, timeoutMs: 3000 }),
     getVendedor: (codigo) =>
       req("GET", `/vendedores/lookup?codigo=${encodeURIComponent(codigo)}`, undefined, { auth: true }),
     /* Catálogo público — lo usa el agente Alma para informar sin inventar
