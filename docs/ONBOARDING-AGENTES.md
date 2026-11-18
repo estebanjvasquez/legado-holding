@@ -39,7 +39,7 @@ o **archivo histórico** (ver §9).
 ## 3. Arquitectura en 6 líneas
 
 ```
-Navegador ──GET catálogo (CORS, sin token)──▶ prevision-funeraria.sisteg.workers.dev /api/public/t/lh/planes
+Navegador ──GET catálogo (CORS, sin token)──▶ app.previsionfuneraria.com /api/public/t/lh/planes
    │
    ├─ wizard: POST /  ─────────▶ Worker (api.legadoholding.com) ──Bearer PF_TOKEN──▶ Previsión POST /compras ──▶ Stripe Checkout
    │                                                                                   (webhook firmado → contrato activo)
@@ -63,7 +63,7 @@ Navegador ──GET catálogo (CORS, sin token)──▶ prevision-funeraria.sis
 ### Frontend (raíz)
 | Archivo | Rol |
 |---|---|
-| `index.html` | Página única. `LEGADO_CONFIG` (switch dev/prod), `PLANS_API_URL` directo a Previsión, `PARENTESCOS_API_URL`/chat vía Worker. **Cache-bust `?v=N`**: `css/main.css?v=4`, `js/attribution.js?v=1`, `js/main.js?v=13` (independientes; líneas ~110 y ~1358). |
+| `index.html` | Página única. `LEGADO_CONFIG` (switch dev/prod), `PLANS_API_URL` directo a Previsión, `PARENTESCOS_API_URL`/chat vía Worker. **Cache-bust `?v=N`**: `css/main.css?v=4`, `js/attribution.js?v=1`, `js/main.js?v=14` (independientes; líneas ~110 y ~1358). |
 | `js/attribution.js` | Atribución de vendedor (`?ref=`): valida el código contra `/wizard/vendedor`, first-touch entre códigos válidos (TTL 90d), guarda los últimos 10 toques. Se carga antes de `main.js`; tests en `worker/test/attribution-frontend.test.mjs`. |
 | `js/main.js` | i18n, wizard de 4 pasos, UI del chat de Alma, y **§"ATRIBUCIÓN DE VENDEDOR / CANAL"** (`initAttribution`/`getAttribution`, `localStorage["legado_attribution"]`, first-touch TTL 90d). `SELECTO_CHECKOUT_ENABLED = true`, `WIZARD_ENABLED_SLUGS`. |
 | `js/wizard-generic.js` | Botones "Protege tu Legado" sin plan → scroll a la sección de planes. |
@@ -217,7 +217,7 @@ Si agregas un archivo estático nuevo que deba publicarse, **agrégalo a esa lis
 
 ## 8. Contratos externos y coordinación
 
-- **API de Prevision-Funeraria**: base `https://prevision-funeraria.sisteg.workers.dev`,
+- **API de Prevision-Funeraria**: base `https://app.previsionfuneraria.com`,
   tenant `lh`, prefijo `/api/public/t/lh/`. Contrato completo en
   `docs/api-publica-wizard.md`. **No inventar campos ni endpoints.**
 - **Canal entre agentes**: `docs/pruebas-tenant-lh-para-prevision.md` es bidireccional.
@@ -229,7 +229,7 @@ Si agregas un archivo estático nuevo que deba publicarse, **agrégalo a esa lis
   Cerrar cada jornada con un registro nuevo ahí.
 - **No modificar el repo `Prevision-Funeraria` desde acá.** Este repo solo consume su API.
 - **Portal del titular (cliente final) — ya existe en Prevision-Funeraria, NO se
-  construye acá.** `https://prevision-funeraria.sisteg.workers.dev/portal/?empresa=lh`
+  construye acá.** `https://app.previsionfuneraria.com/portal/?empresa=lh`
   — login por cédula + código OTP por email; contratos, solicitudes, pago de cuotas
   (tarjeta o manual con comprobante), adelanto de pagos, beneficiarios. Multi-tenant,
   se rebrandea solo (`GET /api/public/t/lh/portal/marca` → "Legado Holding Inc." + logo

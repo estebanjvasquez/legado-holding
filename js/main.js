@@ -74,7 +74,7 @@ const WIZARD_WEBHOOK_URL =
    navegador (sin token, CORS abierto para legadoholding.com). */
 const PLANS_API_URL =
   (typeof window !== "undefined" && window.LEGADO_CONFIG?.PLANS_API_URL) ||
-  "https://prevision-funeraria.sisteg.workers.dev/api/public/t/lh/planes";
+  "https://app.previsionfuneraria.com/api/public/t/lh/planes";
 
 /* Catálogo de parentescos — exige token server-to-server, pasa por nuestro
    Worker (worker/src/index.js → GET /wizard/parentescos). Se usa para poblar

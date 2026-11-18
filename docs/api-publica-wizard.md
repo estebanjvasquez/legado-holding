@@ -20,7 +20,7 @@ wizard de compra o las tarjetas de planes/servicios del sitio de Legado Holding.
 
 | Dato | Valor |
 |---|---|
-| Base URL (producción, hoy) | `https://prevision-funeraria.sisteg.workers.dev` |
+| Base URL (producción, hoy) | `https://app.previsionfuneraria.com` |
 | Base URL (local, `wrangler dev`) | `http://127.0.0.1:8787` |
 | Slug del tenant Legado Holding | `lh` |
 | Slug del tenant Funeraria del Zulia | `fdz` |
@@ -71,7 +71,7 @@ mismo.
 
 ## Base URL y resolución de tenant
 
-`https://prevision-funeraria.sisteg.workers.dev/api/public/t/:slug/...` — `:slug` es
+`https://app.previsionfuneraria.com/api/public/t/:slug/...` — `:slug` es
 `fdz` o `lh`. Cuando haya dominio propio configurado (`control.tenants.dominio`), también
 resuelve por hostname real; hasta entonces, el prefijo `/t/:slug` es el mecanismo que
 funciona. Todos los ejemplos de este documento usan esa URL — cambiala si vas a probar
@@ -105,12 +105,12 @@ con la cookie de sesión que devuelve `/api/auth/login`:
 
 ```bash
 # 1) Login como staff -- guarda la cookie de sesión en un archivo
-curl -s -c cookies.txt -X POST https://prevision-funeraria.sisteg.workers.dev/api/auth/login \
+curl -s -c cookies.txt -X POST https://app.previsionfuneraria.com/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"tu-email@previsionfuneraria.com","password":"tu-contraseña"}'
 
 # 2) Generar el token de API para el tenant lh (o fdz)
-curl -s -b cookies.txt -X POST https://prevision-funeraria.sisteg.workers.dev/api/t/lh/config/api-token/regenerar
+curl -s -b cookies.txt -X POST https://app.previsionfuneraria.com/api/t/lh/config/api-token/regenerar
 # {"token":"pf_04eca327bb9e...", "prefix":"pf_04eca327", "created_at":"..."}
 ```
 
@@ -183,7 +183,7 @@ wizard arme el `<select>` de parentesco con las reglas de validación correctas 
 mandar la compra.
 
 ```bash
-curl -s https://prevision-funeraria.sisteg.workers.dev/api/public/t/lh/parentescos \
+curl -s https://app.previsionfuneraria.com/api/public/t/lh/parentescos \
   -H "Authorization: Bearer pf_..."
 ```
 
@@ -345,7 +345,7 @@ Ver "Generar el token" arriba. De acá en adelante, `$TOKEN` es ese valor.
 
 ```bash
 export TOKEN="pf_..."
-export BASE="https://prevision-funeraria.sisteg.workers.dev"
+export BASE="https://app.previsionfuneraria.com"
 ```
 
 ### Paso 1 — catálogo público (sin token, así lo va a llamar el sitio)

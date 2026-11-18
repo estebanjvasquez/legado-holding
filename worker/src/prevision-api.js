@@ -11,7 +11,7 @@ const COMPRA_TIMEOUT_MS  = 20000;
 
 export function createPF(env) {
   const { id: tenant } = resolveTenant(env);
-  const base = (env.PF_BASE || "https://prevision-funeraria.sisteg.workers.dev") +
+  const base = (env.PF_BASE || "https://app.previsionfuneraria.com") +
     `/api/public/t/${tenant}`;
   const token = env.PF_TOKEN;
 

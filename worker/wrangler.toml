@@ -27,7 +27,7 @@ TENANT = "lh"
 
 # API pública de Prevision-Funeraria (reemplaza a Invoice Ninja para el
 # wizard de planes). El token se inyecta con `wrangler secret put PF_TOKEN`.
-PF_BASE = "https://prevision-funeraria.sisteg.workers.dev"
+PF_BASE = "https://app.previsionfuneraria.com"
 
 # Base pública del sitio — se usa para armar success_url/cancel_url del
 # checkout con tarjeta (Stripe Checkout) al llamar POST /compras. Este mismo

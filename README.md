@@ -81,7 +81,7 @@ propio que también sirve de proxy autenticado para el bot "Alma".
 | Dominio público | `legadoholding.com` (despliega a la raíz; `/v2` quedó atrás, tag `pre-prevision-funeraria-rollback` para revertir) |
 | Subdominio del Worker | `api.legadoholding.com` |
 | Worker (nombre interno) | `legado-checkout-dev` |
-| API de catálogo/checkout | Prevision-Funeraria, `https://prevision-funeraria.sisteg.workers.dev`, tenant `lh` |
+| API de catálogo/checkout | Prevision-Funeraria, `https://app.previsionfuneraria.com`, tenant `lh` |
 | Invoice Ninja | `invoicing.legadoholding.com` — solo login de staff del panel admin |
 | Idiomas | Español / Inglés (toggle en la barra de navegación) |
 | Pagos | Stripe Checkout (vía Prevision-Funeraria); cuenta de producción de LH pendiente — hoy corre en modo test |
@@ -97,7 +97,7 @@ propio que también sirve de proxy autenticado para el bot "Alma".
 |---|---|---|---|
 | 1 | **Frontend estático** | Sitio público, wizard, render de planes | HTML + CSS + JS plano servido por Apache |
 | 2 | **Cloudflare Worker** (`api.legadoholding.com`) | Orquesta el checkout server-to-server, proxy autenticado de parentescos, y corre el agente "Alma" (OpenAI) | JavaScript en V8 (Cloudflare Workers) |
-| 3 | **Prevision-Funeraria** (repo separado) | Multi-tenant: catálogo de planes/servicios, clientes, contratos, cobro con Stripe, leads públicos (`/solicitudes`) | Cloudflare Workers + D1 (`prevision-funeraria.sisteg.workers.dev`) |
+| 3 | **Prevision-Funeraria** (repo separado) | Multi-tenant: catálogo de planes/servicios, clientes, contratos, cobro con Stripe, leads públicos (`/solicitudes`) | Cloudflare Workers + D1 (`app.previsionfuneraria.com`) |
 | 4 | **OpenAI** | Motor conversacional de Alma. Su configuración (modelo, prompts, clave, tope de mensajes) la edita el administrador en Previsión (*Asistente del sitio*); prospectos y derivaciones quedan como solicitudes en Previsión. La memoria de la conversación la manda el navegador. | OpenAI API (`gpt-5.6-luna`) |
 | 5 | **Cloudflare DNS** | Administra `legadoholding.com` y bind del subdominio `api.` al Worker | Cloudflare |
 
@@ -271,7 +271,7 @@ En la consola del navegador (F12):
 
 ```js
 window.LEGADO_CONFIG
-// debe imprimir { WIZARD_WEBHOOK_URL: "http://localhost:8787", PLANS_API_URL: "https://prevision-funeraria.sisteg.workers.dev/api/public/t/lh/planes", PARENTESCOS_API_URL: "http://localhost:8787/wizard/parentescos", CHAT_API_URL: "http://localhost:8787/chat" }
+// debe imprimir { WIZARD_WEBHOOK_URL: "http://localhost:8787", PLANS_API_URL: "https://app.previsionfuneraria.com/api/public/t/lh/planes", PARENTESCOS_API_URL: "http://localhost:8787/wizard/parentescos", CHAT_API_URL: "http://localhost:8787/chat" }
 ```
 
 Nota: `PLANS_API_URL` siempre apunta directo a Prevision-Funeraria (catálogo
@@ -309,7 +309,7 @@ de planes deben mostrar precios reales (no los de respaldo).
   "service": "legado-checkout",
   "env": "dev",
   "pfTokenLoaded": true,
-  "pfBase": "https://prevision-funeraria.sisteg.workers.dev",
+  "pfBase": "https://app.previsionfuneraria.com",
   "openaiConfigured": true,
   "openaiModel": "gpt-5.6-luna",
   "allowedOrigins": [
@@ -371,7 +371,7 @@ incluyendo los otros `estado` posibles (`pendiente`, `confirmada`), en
 
 | Variable | Default | Función |
 |---|---|---|
-| `PF_BASE` | `https://prevision-funeraria.sisteg.workers.dev` | Base URL de la API de Prevision-Funeraria |
+| `PF_BASE` | `https://app.previsionfuneraria.com` | Base URL de la API de Prevision-Funeraria |
 | `SITE_BASE_URL` | `https://www.legadoholding.com` | Usada para armar `success_url`/`cancel_url` del checkout con Stripe |
 | `ENVIRONMENT` | `dev` | Etiqueta de entorno; aparece en el health check |
 | `OPENAI_MODEL` | `gpt-5.6-luna` | Modelo de respaldo de Alma (manda el de Previsión si está cargado) |
@@ -453,7 +453,7 @@ Definida en [index.html](index.html). Conmuta dev/prod por hostname:
       : "https://api.legadoholding.com",
     // Catálogo público: siempre directo a Prevision-Funeraria, no cambia por entorno
     PLANS_API_URL:
-      "https://prevision-funeraria.sisteg.workers.dev/api/public/t/lh/planes",
+      "https://app.previsionfuneraria.com/api/public/t/lh/planes",
     PARENTESCOS_API_URL: __isDev
       ? "http://localhost:8787/wizard/parentescos"
       : "https://api.legadoholding.com/wizard/parentescos",
@@ -585,7 +585,7 @@ Ya está configurado:
 Invoke-RestMethod -Uri https://api.legadoholding.com -Method GET
 
 # Catálogo de planes (directo a Prevision-Funeraria, sin pasar por el Worker)
-(Invoke-RestMethod -Uri https://prevision-funeraria.sisteg.workers.dev/api/public/t/lh/planes).items.Count
+(Invoke-RestMethod -Uri https://app.previsionfuneraria.com/api/public/t/lh/planes).items.Count
 
 # Logs en vivo del Worker
 wrangler tail
@@ -662,7 +662,7 @@ Luego `wrangler deploy`. Sin espacios entre comas.
 
 | Causa probable | Diagnóstico | Solución |
 |---|---|---|
-| `GET /planes` falla o no responde | Network del navegador, status del request a `prevision-funeraria.sisteg.workers.dev` | Confirmar que Prevision-Funeraria está arriba; no depende de este Worker |
+| `GET /planes` falla o no responde | Network del navegador, status del request a `app.previsionfuneraria.com` | Confirmar que Prevision-Funeraria está arriba; no depende de este Worker |
 | Plan sin `mostrar_web=true` | El plan no aparece en la respuesta de `/planes` | Publicarlo desde el panel admin del tenant `lh` |
 | Slug no reconocido en el frontend | Consola del navegador imprime "Plan X no devuelto por la API" | Añadir el slug a `PLAN_GROUPS` en `js/main.js` |
 
@@ -785,7 +785,7 @@ $URL = "https://api.legadoholding.com"
 Invoke-RestMethod -Uri $URL -Method GET                       # health
 
 # Catálogo (directo a Prevision-Funeraria, sin token)
-Invoke-RestMethod -Uri "https://prevision-funeraria.sisteg.workers.dev/api/public/t/lh/planes" -Method GET
+Invoke-RestMethod -Uri "https://app.previsionfuneraria.com/api/public/t/lh/planes" -Method GET
 
 # Checkout end-to-end (PowerShell) — usa un planId real del catálogo de arriba
 $payload = @{
