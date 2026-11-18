@@ -84,17 +84,19 @@ test("una derivación a WhatsApp queda registrada en Previsión con el resumen, 
   assert.match(sol[0].body.mensaje, /Derivación urgente a WhatsApp/);
   assert.match(sol[0].body.mensaje, /traslado urgente en Mérida/);
   assert.match(sol[0].body.mensaje, /necesito ayuda ya/);
-  assert.ok(sol[0].body.mensaje.length <= 500);
+  assert.ok(sol[0].body.mensaje.length <= 2000);
+  assert.equal(sol[0].body.origen, "derivacion_whatsapp");
+  assert.equal(sol[0].body.consentimiento, undefined);
   assert.equal(sol[0].body.atribucion, undefined);
 });
 
-test("el resumen de la derivación nunca pasa de 500 caracteres y conserva los datos clave", () => {
+test("el resumen de la derivación nunca pasa de 2000 caracteres y conserva los datos clave", () => {
   const s = buildHandoffSummary({
-    result: { waHandoff: { necesidad: "x".repeat(400) }, coverage: { covered: false, reason: "no_active_partner" } },
-    history: Array.from({ length: 5 }, () => ({ role: "user", content: "y".repeat(300) })),
+    result: { waHandoff: { necesidad: "x".repeat(3000) }, coverage: { covered: false, reason: "no_active_partner" } },
+    history: Array.from({ length: 10 }, () => ({ role: "user", content: "y".repeat(3000) })),
     message: "z".repeat(300), lang: "es", attribution: { codigo_vendedor: "AB12CD34" },
   });
-  assert.ok(s.length <= 500);
+  assert.ok(s.length <= 2000, String(s.length));
   assert.match(s, /Cobertura: no/);
   assert.match(s, /AB12CD34/);
 });
@@ -107,7 +109,7 @@ test("el historial que va a OpenAI respeta el tope de caracteres", () => {
   assert.equal(capped.at(-1), big.at(-1), "conserva los turnos más recientes");
 });
 
-test("el prospecto (create_lead) lleva la constancia de consentimiento dentro del tope de 500", async () => {
+test("el prospecto (create_lead) lleva el consentimiento estructurado y no es derivación", async () => {
   let n = 0;
   const args = { tipo: "plan", plan_id: 2, nombres: "Ana", apellidos: "Pérez", telefono: "+13055550000", mensaje: "m".repeat(600) };
   m = mockFetch([
@@ -122,6 +124,9 @@ test("el prospecto (create_lead) lleva la constancia de consentimiento dentro de
   await c.done();
   const sol = m.calls.filter((x) => isSolicitudes(x.url));
   assert.equal(sol.length, 1, "solo el prospecto, no una derivación");
-  assert.match(sol[0].body.mensaje, /\[Consentimiento: aceptado en el chat del sitio \(Alma\), \d{4}-/);
-  assert.ok(sol[0].body.mensaje.length <= 500);
+  assert.equal(sol[0].body.consentimiento.canal, "chat_sitio");
+  assert.ok(!Number.isNaN(Date.parse(sol[0].body.consentimiento.aceptado_en)));
+  assert.ok(Date.parse(sol[0].body.consentimiento.aceptado_en) <= Date.now(), "nunca en el futuro");
+  assert.equal(sol[0].body.origen, undefined, "prospecto = origen por defecto");
+  assert.equal(sol[0].body.mensaje.length, 600, "mensaje del usuario completo, sin texto agregado");
 });

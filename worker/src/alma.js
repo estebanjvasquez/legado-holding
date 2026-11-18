@@ -765,17 +765,20 @@ function buildWhatsAppText(lang, nombre, necesidad, vendorCode, vendorName) {
 export async function registerHandoffSolicitud(env, { nombre, resumen, attribution }) {
   const parts = String(nombre || "").trim().split(/\s+/).filter(Boolean);
   const body = {
+    /* Fuera del embudo de venta en Previsión (filtro "Derivaciones urgentes a
+       WhatsApp"); sin esto entraría como prospecto. */
+    origen:    "derivacion_whatsapp",
     nombres:   (parts[0] || "Contacto").slice(0, 60),
     apellidos: (parts.slice(1).join(" ") || "(por WhatsApp)").slice(0, 60),
     /* `telefono` en /solicitudes tope 20 chars — el número real llega por
        WhatsApp; el staff concilia con la conversación usando el `mensaje`. */
     telefono:  "por WhatsApp",
-    mensaje:   String(resumen || "").slice(0, 500),
+    mensaje:   String(resumen || "").slice(0, 2000),
   };
   if (attribution) body.atribucion = attribution;
   try {
     const resp = await createPF(env).crearSolicitud(body);
-    console.log(`[alma] derivación registrada en Previsión solicitud=${resp?.id ?? resp?.solicitud_id ?? "?"}`);
+    console.log(`[alma] derivación registrada en Previsión solicitud=${resp?.solicitud_id ?? resp?.id ?? "?"} origen=${resp?.origen ?? "?"}`);
     return true;
   } catch (e) {
     console.warn(`[alma] no se pudo registrar la derivación en Previsión: ${e.message}`);
@@ -821,13 +824,12 @@ async function execCreateLead(args, env, attribution) {
   }
   const body = { tipo, nombres, apellidos, telefono };
   if (a.email)   body.email   = String(a.email).trim();
-  /* Constancia de consentimiento: create_lead solo se llama tras el "sí"
-     explícito del usuario en el chat (PROCESO C del prompt). Antes vivía en
-     chat_sessions (Supabase); ahora va con el prospecto, en Previsión. Se
-     reserva su espacio dentro del tope de 500 de `mensaje`. */
-  const consent = `[Consentimiento: aceptado en el chat del sitio (Alma), ${new Date().toISOString()}]`;
-  const userMsg = a.mensaje ? String(a.mensaje).trim().slice(0, 500 - consent.length - 1) : "";
-  body.mensaje = userMsg ? `${userMsg}\n${consent}` : consent;
+  if (a.mensaje) body.mensaje = String(a.mensaje).trim().slice(0, 2000);
+  /* Constancia de consentimiento estructurada (contrato de Previsión
+     2026-11-18): create_lead solo se llama tras el "sí" explícito del usuario
+     en el chat (PROCESO C del prompt). Si el cliente se crea a partir de la
+     solicitud, Previsión lo registra como consentimiento otorgado. */
+  body.consentimiento = { canal: "chat_sitio", aceptado_en: new Date().toISOString() };
   /* Atribución de vendedor/canal (?ref=) — el prospecto tiene que quedar
      asociado al vendedor que trajo al visitante. */
   if (attribution) body.atribucion = attribution;

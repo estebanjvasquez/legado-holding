@@ -141,12 +141,12 @@ Navegador ──GET catálogo (CORS, sin token)──▶ prevision-funeraria.sis
     Log por turno: `cfg_source=… key_source=… prompt_source=prevision|hardcoded`.
 - **Panel admin legacy y Supabase retirados (2026-11-18).** Lo que guardaba
   `chat_sessions` quedó así: derivaciones a WhatsApp → siempre una solicitud en PF con
-  el resumen para el asesor; prospectos → solicitud en PF con la constancia de
-  consentimiento en `mensaje`; memoria → historial del navegador; tope por conversación
-  → configurable en PF. Las transcripciones completas (`chat_turns`) **ya no se guardan**
+  `origen: "derivacion_whatsapp"` (fuera del embudo de venta) y el resumen para el asesor
+  en `mensaje` (≤ 2000); prospectos → solicitud en PF con
+  `consentimiento: { canal: "chat_sitio", aceptado_en }`; memoria → historial del
+  navegador; tope por conversación → configurable en PF (*Asistente del sitio › Límites*). Las transcripciones completas (`chat_turns`) **ya no se guardan**
   (decisión pendiente: vista de conversaciones en PF). Los datos de Supabase eran de
-  prueba y no se migraron. Pendiente en PF: distinguir derivación de prospecto y campo
-  de consentimiento (prompt entregado al usuario).
+  prueba y no se migraron.
 - **Hilo abierto**: el usuario reportó que Alma "se presenta dos veces" en su navegador,
   pese a que el fix está verificado correcto en backend y frontend. Falta confirmarlo en
   ventana de incógnito. Ver `.claude/handoff.json` → `open_thread_needs_followup`.

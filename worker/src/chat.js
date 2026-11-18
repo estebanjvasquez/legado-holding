@@ -81,14 +81,16 @@ export function turnNumber(body, history) {
 
 /* Resumen accionable para la persona de guardia cuando Alma deriva por
    WhatsApp. Se arma sin llamada extra al LLM a partir de lo ya capturado. Va
-   como `mensaje` de la solicitud en Previsión (tope 500 caracteres): primero
+   como `mensaje` de la solicitud en Previsión (tope 2000 caracteres): primero
    los datos clave, al final los últimos mensajes del usuario (se recortan). */
+const SUMMARY_MAX = 2000;
 export function buildHandoffSummary({ result, history, message, lang, attribution }) {
   const wa  = result.waHandoff || {};
   const cov = result.coverage || null;
   const lines = [
     "[Derivación urgente a WhatsApp — Alma]",
-    `Necesidad: ${String(wa.necesidad || "no especificada").slice(0, 150)}`,
+    `Nombre: ${String(wa.nombre || "no dado").slice(0, 120)}`,
+    `Necesidad: ${String(wa.necesidad || "no especificada").slice(0, 400)}`,
   ];
   if (cov) {
     lines.push(`Cobertura: ${
@@ -105,8 +107,8 @@ export function buildHandoffSummary({ result, history, message, lang, attributio
   const userMsgs = [
     ...(Array.isArray(history) ? history.filter((m) => m && m.role === "user" && m.content).map((m) => m.content) : []),
     message,
-  ].filter(Boolean).slice(-3).map((m) => `- "${String(m).slice(0, 120)}"`);
-  return `${head}\nÚltimos mensajes:\n${userMsgs.join("\n")}`.slice(0, 500);
+  ].filter(Boolean).slice(-5).map((m) => `- "${String(m).slice(0, 250)}"`);
+  return `${head}\nÚltimos mensajes del usuario:\n${userMsgs.join("\n")}`.slice(0, SUMMARY_MAX);
 }
 
 export async function handleChat(body, env, executionCtx) {
