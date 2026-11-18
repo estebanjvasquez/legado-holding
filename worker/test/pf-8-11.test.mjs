@@ -47,16 +47,12 @@ test("PF-8: whatsapp_emergencia null → número de respaldo (nunca sin número 
 
 /* ── PF-11: aliados ─────────────────────────────────────────────────────── */
 
-/* La BD ya no participa de lookup_coverage: si alguien la consultara, el
-   test falla. */
-const noDb = new Proxy({}, { get: (_, k) => () => { throw new Error(`no debería consultar Supabase (${String(k)})`); } });
-
 test("PF-11: aliados de Previsión → cubierto, los de la ciudad primero, con token", async () => {
   m = mockFetch([[isAliados, () => jsonResponse({ items: [
     { nombre: "Cobertura Zulia", ciudad: "Cabimas", region: "Zulia", cobertura_region: true, telefono: "+582640000002", servicios: null },
     { nombre: "Funeraria Centro", ciudad: "Maracaibo", region: "Zulia", cobertura_region: false, telefono: "+582610000001", servicios: "Velación" },
   ] })]]);
-  const r = await execLookupCoverage({ city: "maracaibo" }, ENV, noDb, "584246677030");
+  const r = await execLookupCoverage({ city: "maracaibo" }, ENV, "584246677030");
   assert.equal(r.covered, true);
   assert.equal(r.source, "prevision");
   assert.equal(r.partners[0].name, "Funeraria Centro");
@@ -69,7 +65,7 @@ test("PF-11: aliados de Previsión → cubierto, los de la ciudad primero, con t
 
 test("PF-11: Previsión sin aliados → no cubierto (sin consultar Supabase), para derivar a la guardia", async () => {
   m = mockFetch([[isAliados, () => jsonResponse({ items: [] })]]);
-  const r = await execLookupCoverage({ city: "Ciudad Rara" }, ENV, noDb, "584246677030");
+  const r = await execLookupCoverage({ city: "Ciudad Rara" }, ENV, "584246677030");
   assert.equal(r.covered, false);
   assert.equal(r.reason, "no_active_partner");
   assert.equal(r.emergency_phone, "584246677030");
@@ -77,7 +73,7 @@ test("PF-11: Previsión sin aliados → no cubierto (sin consultar Supabase), pa
 
 test("PF-11: Previsión caída → falla cerrado (verification_failed), no asume cobertura", async () => {
   m = mockFetch([[isAliados, () => jsonResponse({}, 500)]]);
-  const r = await execLookupCoverage({ city: "Maracaibo" }, ENV, noDb, "584246677030");
+  const r = await execLookupCoverage({ city: "Maracaibo" }, ENV, "584246677030");
   assert.equal(r.covered, false);
   assert.equal(r.reason, "verification_failed");
 });

@@ -43,7 +43,10 @@ es un modelo "reasoning" que en `/v1/chat/completions` rechaza (400) function to
 junto a su `reasoning_effort` por defecto — el código fuerza `reasoning_effort: "none"`
 en cada llamada porque Alma depende de tool-calling en casi todos los turnos.
 `worker/src/invoiceninja.js` y `worker/src/emergency.js` fueron
-eliminados. La única parte de este repo que sigue hablando con Invoice Ninja es el
+eliminados. **2026-11-18:** se retiraron también Supabase y el panel admin legacy
+(`admin/`, `worker/src/admin.js`, `worker/src/supabase.js`); la config de Alma viene de
+PF (`GET /asistente`) y las derivaciones/prospectos quedan como solicitudes en PF — ver
+`docs/ONBOARDING-AGENTES.md`. Lo que sigue en este párrafo sobre el panel es histórico. La única parte de este repo que sigue hablando con Invoice Ninja es el
 login del panel admin (`worker/src/admin.js`, via `env.IN_BASE`) — deuda pendiente, no
 bloqueante.
 

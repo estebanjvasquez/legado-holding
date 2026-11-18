@@ -17,13 +17,11 @@ routes = [
 # Variables públicas (no son secretos). Editar aquí cualquier valor que NO
 # requiera estar cifrado.
 [vars]
-# Invoice Ninja ya no existe (2026-11): el panel admin se autentica solo con
-# el secret ADMIN_TOKEN (worker/src/admin.js) hasta que se retire el panel.
 ENVIRONMENT = "dev"
 
 # Identidad del despliegue. "lh" = LEGADO Holding. Un futuro despliegue para
 # Funeraria del Zulia usará TENANT = "fdz". Lo consumen: prevision-api.js (path
-# /api/public/t/<tenant>), las líneas de log, chat_sessions.metadata.tenant y
+# /api/public/t/<tenant>), las líneas de log y
 # (a futuro) el service.name de OpenTelemetry. Ver worker/src/tenant.js.
 TENANT = "lh"
 
@@ -53,31 +51,16 @@ ALLOWED_ORIGINS = "https://legadoholding.com,https://www.legadoholding.com,http:
 # El secret se carga con: cd worker && wrangler secret put OPENAI_API_KEY
 OPENAI_MODEL = "gpt-5.6-luna"
 
-# Supabase: memoria persistente del bot (chat_sessions) + logs de turnos
-# (chat_turns) para analytics y debugging. URL pública del proyecto; el
-# service_role key se carga aparte como secret:
-#   cd worker && wrangler secret put SUPABASE_SERVICE_ROLE_KEY
-# Si SUPABASE_URL o el secret faltan, el chat sigue funcionando (no-op fallback).
-SUPABASE_URL = "https://naebpcyphdcopndqovie.supabase.co"
-
 # Rate Limiting de Workers (ver src/ratelimit.js). namespace_id es un entero
 # arbitrario propio de esta cuenta; period solo admite 10 o 60 segundos.
-# /chat: 20 mensajes por minuto por IP (el tope de 60 mensajes por
-# conversación vive en src/chat.js).
+# /chat: 20 mensajes por minuto por IP (el tope de mensajes por conversación
+# lo configura el administrador en Previsión — parametros.max_mensajes_por_conversacion
+# de Asistente del sitio; 60 por defecto, ver src/alma.js).
 [[ratelimits]]
 name = "CHAT_IP_LIMITER"
 namespace_id = "1001"
   [ratelimits.simple]
   limit = 20
-  period = 60
-
-# Login del panel admin: 5 intentos por minuto por IP (frena fuerza bruta
-# contra ADMIN_TOKEN).
-[[ratelimits]]
-name = "ADMIN_LOGIN_LIMITER"
-namespace_id = "1002"
-  [ratelimits.simple]
-  limit = 5
   period = 60
 
 # Observability deshabilitado explícito. En wrangler 4.x se activaba por

@@ -1,13 +1,13 @@
 /* =============================================================================
    Agente Alma — OpenAI (gpt-5.6-luna) con function calling.
 
-   Entrada (de chat.js):  { sessionId, message, history, lang, db, attribution? }
+   Entrada (de chat.js):  { sessionId, message, history, lang, attribution? }
    Salida (a chat.js):    { output, handoff?, waHandoff?, lead?, coverage?, events:[...] }
 
    attribution: bloque {codigo_vendedor?, canal_origen?, utm_*?} del ?ref= del
    sitio. Alma NO lo ve en el prompt ni en las tools — se inyecta en los
    executores (create_lead → atribucion; handoff_whatsapp → línea de referido
-   en el texto + stub de lead) para que sea determinista y quede fuera del
+   en el texto + registro de la derivación en Previsión) para que sea determinista y quede fuera del
    razonamiento del modelo.
 
    Tools que el modelo puede invocar:
@@ -28,7 +28,7 @@
    conectar (por WhatsApp si es urgente, por prospecto si es informativo) — eso
    lo hace un aliado o un asesor humano, no el bot.
 
-   `events` se devuelve para que chat.js los escriba en Supabase (chat_turns).
+   `events` se devuelve para diagnóstico (logs de chat.js); ya no se persisten.
    ============================================================================= */
 
 import { trace, SpanStatusCode } from "@opentelemetry/api";
@@ -57,7 +57,7 @@ export const _retryTiming = { baseDelayMs: 800, maxDelayMs: 4000 };
 
 /* Número de ÚLTIMO recurso que Alma comparte como texto solo si handoff_whatsapp
    falla por un error técnico y no se puede ni siquiera armar el link de WhatsApp.
-   Se resuelve en runtime: agent_config.emergency_phone (si el staff configuró una
+   Se resuelve en runtime: telefono_emergencia de Previsión (si el staff configuró una
    línea dedicada) y, si no, DEFAULT_WHATSAPP_EMERGENCIA (el WhatsApp de emergencia
    real del tenant). NUNCA un placeholder — antes era "0414-XXX-XXXX" y Alma podía
    llegar a dictarlo. Se inyecta en el prompt vía el marcador {{emergency_phone}}. */
@@ -107,7 +107,7 @@ export async function resolveEmergencyWhatsapp(env, { maxWaitMs = 10000 } = {}) 
    clave de API en Previsión (Configuración › Asistente del sitio, GET
    /asistente). Caché en memoria del isolate (nunca KV ni logs: trae la clave
    descifrada). Si Previsión no responde se usa la última conocida; si nunca
-   respondió, null → runAlma cae a agent_config / al código. */
+   respondió, null → runAlma cae a lo del código / env. */
 const ASISTENTE_CACHE_MS = 5 * 60 * 1000;
 let asistenteCache = null; // { cfg, until }
 
@@ -131,19 +131,29 @@ export async function resolveAsistente(env) {
 
 const str = (v) => (typeof v === "string" ? v.trim() : "");
 
-/* Resuelve la configuración efectiva del turno. Precedencia por campo:
-   Previsión → agent_config (Supabase, legacy) → código/env. `fallback` es la
-   clave+modelo propios del Worker, para reintentar si OpenAI rechaza la
-   clave o el modelo cargados en Previsión. Exportada para los tests. */
-export function resolveAlmaConfig(pf, cfg, env) {
-  const envModel = str(env.OPENAI_MODEL) || "gpt-5.6-luna";
-  let legacyModel = str(cfg.model);
-  if (/^gemini/i.test(legacyModel)) {
-    /* agent_config.model quedó con un valor de la era Gemini — usarlo rompe
-       el chat entero contra OpenAI. Se ignora (queda el log). */
-    console.warn(`[alma] agent_config.model="${legacyModel}" es un modelo de Gemini obsoleto — ignorando.`);
-    legacyModel = "";
+/* Mensajes de usuario por conversación. Configurable por el administrador en
+   Previsión (Asistente del sitio › parámetros, clave
+   `max_mensajes_por_conversacion`); 60 si no está cargado o no es válido. */
+export const DEFAULT_MAX_TURNS = 60;
+export function resolveMaxTurns(pf) {
+  const raw = pf && pf.parametros && typeof pf.parametros === "object"
+    ? pf.parametros.max_mensajes_por_conversacion
+    : undefined;
+  const n = Number(String(raw ?? "").trim());
+  if (raw === undefined || raw === null || String(raw).trim() === "") return DEFAULT_MAX_TURNS;
+  if (!Number.isInteger(n) || n < 1 || n > 1000) {
+    console.warn(`[alma] parametros.max_mensajes_por_conversacion="${raw}" no es un entero entre 1 y 1000 — uso ${DEFAULT_MAX_TURNS}`);
+    return DEFAULT_MAX_TURNS;
   }
+  return n;
+}
+
+/* Resuelve la configuración efectiva del turno. Precedencia por campo:
+   Previsión → código/env (agent_config de Supabase se retiró). `fallback` es
+   la clave+modelo propios del Worker, para reintentar si OpenAI rechaza la
+   clave o el modelo cargados en Previsión. Exportada para los tests. */
+export function resolveAlmaConfig(pf, env) {
+  const envModel = str(env.OPENAI_MODEL) || "gpt-5.6-luna";
 
   let usePF = !!(pf && pf.configurado);
   if (usePF && pf.proveedor && pf.proveedor !== "openai") {
@@ -154,14 +164,15 @@ export function resolveAlmaConfig(pf, cfg, env) {
   }
   const p = usePF ? pf : {};
 
-  const fallback = { apiKey: str(env.OPENAI_API_KEY), model: legacyModel || envModel };
+  const fallback = { apiKey: str(env.OPENAI_API_KEY), model: envModel };
   const primary = {
     apiKey: str(p.api_key) || fallback.apiKey,
     model:  str(p.modelo) || fallback.model,
   };
 
   const tNum = (v) => (v === null || v === undefined || v === "" ? NaN : Number(v));
-  const temperature = [tNum(p.temperatura), tNum(cfg.temperature)].find(Number.isFinite) ?? 0.3;
+  const t = tNum(p.temperatura);
+  const temperature = Number.isFinite(t) ? t : 0.3;
 
   return {
     source: usePF ? "prevision" : "respaldo",
@@ -170,17 +181,17 @@ export function resolveAlmaConfig(pf, cfg, env) {
     fallback: (fallback.apiKey && (fallback.apiKey !== primary.apiKey || fallback.model !== primary.model)) ? fallback : null,
     temperature,
     prompts: {
-      es: str(p.prompt_es) ? { text: str(p.prompt_es), source: "prevision" } : str(cfg.system_prompt_es) ? { text: str(cfg.system_prompt_es), source: "db" } : null,
-      en: str(p.prompt_en) ? { text: str(p.prompt_en), source: "prevision" } : str(cfg.system_prompt_en) ? { text: str(cfg.system_prompt_en), source: "db" } : null,
+      es: str(p.prompt_es) ? { text: str(p.prompt_es), source: "prevision" } : null,
+      en: str(p.prompt_en) ? { text: str(p.prompt_en), source: "prevision" } : null,
     },
-    emergencyPhone: str(p.telefono_emergencia) || str(cfg.emergency_phone) || null,
+    emergencyPhone: str(p.telefono_emergencia) || null,
   };
 }
 
 /* ── Protocolo de crisis ──────────────────────────────────────────────────────
    Prioridad absoluta: señales de autolesión / suicidio / daño a terceros.
    Se ANTEPONE al system prompt en runAlma() SIEMPRE — venga el prompt del
-   hardcoded o de un override en agent_config.system_prompt_* — para que un
+   hardcoded o del prompt cargado en Previsión (Asistente del sitio) — para que un
    cambio desde el panel admin no pueda quitarlo. Decisión #1 del plan del bot
    (docs/plan-bot-alma-funeraria-del-zulia.md §4). Tenant-agnóstico: aplica
    igual a LEGADO y a Funeraria del Zulia.
@@ -612,7 +623,7 @@ const normCity = (s) =>
    PF-11). Lo mantiene el personal en el panel de Previsión (Aliados). El
    respaldo en Supabase (funeral_partners) se retiró el 2026-11-17, cuando
    Legado terminó de cargar sus aliados en Previsión. */
-export async function execLookupCoverage(args, env, db, emergencyPhone) {
+export async function execLookupCoverage(args, env, emergencyPhone) {
   const city = (args && args.city) ? String(args.city).trim() : "";
   if (!city) {
     return { covered: false, error: "Ciudad no proporcionada" };
@@ -746,30 +757,29 @@ function buildWhatsAppText(lang, nombre, necesidad, vendorCode, vendorName) {
   return text;
 }
 
-/* Deja rastro en el sistema del vendedor asociado a un contacto que se derivó
-   por WhatsApp (donde no se crea ninguna transacción en la API en ese
-   momento). Best-effort: si falla, el handoff igual sigue — el código ya va en
-   el texto de WhatsApp. Solo se dispara cuando hay un codigo_vendedor real. */
-async function registerAttributionStub(env, attribution, nombre, necesidad) {
-  if (!attribution || !attribution.codigo_vendedor) return;
+/* Registra en Previsión TODA derivación a WhatsApp hecha por Alma (antes solo
+   las que traían vendedor; el resto quedaba únicamente en chat_sessions de
+   Supabase, ya retirado). Es la constancia durable de que alguien fue pasado
+   a la guardia, con el resumen para el asesor en `mensaje`. Best-effort: si
+   falla, la derivación igual sigue (el usuario ya tiene el link). */
+export async function registerHandoffSolicitud(env, { nombre, resumen, attribution }) {
   const parts = String(nombre || "").trim().split(/\s+/).filter(Boolean);
-  const nombres   = (parts[0] || "Contacto").slice(0, 60);
-  const apellidos = (parts.slice(1).join(" ") || "(por WhatsApp)").slice(0, 60);
   const body = {
+    nombres:   (parts[0] || "Contacto").slice(0, 60),
+    apellidos: (parts.slice(1).join(" ") || "(por WhatsApp)").slice(0, 60),
     /* `telefono` en /solicitudes tope 20 chars — el número real llega por
-       WhatsApp, acá va un placeholder corto. El staff concilia este lead
-       contra la conversación real de WhatsApp usando el `mensaje`. */
-    nombres,
-    apellidos,
-    telefono: "por WhatsApp",
-    mensaje: `[Atribución vendedor ${attribution.codigo_vendedor}] Contacto derivado a WhatsApp por Alma. Necesidad: ${necesidad || "no indicada"}`.slice(0, 500),
-    atribucion: attribution,
+       WhatsApp; el staff concilia con la conversación usando el `mensaje`. */
+    telefono:  "por WhatsApp",
+    mensaje:   String(resumen || "").slice(0, 500),
   };
+  if (attribution) body.atribucion = attribution;
   try {
-    const pf = createPF(env);
-    await pf.crearSolicitud(body);
+    const resp = await createPF(env).crearSolicitud(body);
+    console.log(`[alma] derivación registrada en Previsión solicitud=${resp?.id ?? resp?.solicitud_id ?? "?"}`);
+    return true;
   } catch (e) {
-    console.warn(`[alma] attribution stub lead falló: ${e.message}`);
+    console.warn(`[alma] no se pudo registrar la derivación en Previsión: ${e.message}`);
+    return false;
   }
 }
 
@@ -811,7 +821,13 @@ async function execCreateLead(args, env, attribution) {
   }
   const body = { tipo, nombres, apellidos, telefono };
   if (a.email)   body.email   = String(a.email).trim();
-  if (a.mensaje) body.mensaje = String(a.mensaje).trim();
+  /* Constancia de consentimiento: create_lead solo se llama tras el "sí"
+     explícito del usuario en el chat (PROCESO C del prompt). Antes vivía en
+     chat_sessions (Supabase); ahora va con el prospecto, en Previsión. Se
+     reserva su espacio dentro del tope de 500 de `mensaje`. */
+  const consent = `[Consentimiento: aceptado en el chat del sitio (Alma), ${new Date().toISOString()}]`;
+  const userMsg = a.mensaje ? String(a.mensaje).trim().slice(0, 500 - consent.length - 1) : "";
+  body.mensaje = userMsg ? `${userMsg}\n${consent}` : consent;
   /* Atribución de vendedor/canal (?ref=) — el prospecto tiene que quedar
      asociado al vendedor que trajo al visitante. */
   if (attribution) body.atribucion = attribution;
@@ -851,26 +867,17 @@ function historyToMessages(history) {
 export async function runAlma(input, env, executionCtx) {
   const lang  = (input.lang || "es").toLowerCase();
   const { id: tenant } = resolveTenant(env);
-  const db    = input.db;   /* puede ser cliente real o noop */
   const attribution = input.attribution || null;   /* {codigo_vendedor?, canal_origen?, ...} */
 
-  /* Config dinámica, en paralelo: la de Previsión (fuente principal) y
-     agent_config de Supabase (legacy, respaldo por campo). Si ambas faltan,
-     queda lo hard-coded de este archivo / env: siempre hay un fallback. */
-  const [pfAsistente, cfg] = await Promise.all([
-    resolveAsistente(env),
-    db.getAgentConfigMap().catch((e) => {
-      console.warn(`[alma] no se pudo leer agent_config: ${e.message}`);
-      return {};
-    }),
-  ]);
-  const conf = resolveAlmaConfig(pfAsistente, cfg || {}, env);
+  /* Config dinámica de Previsión (caché en memoria). Si falta, queda lo
+     hard-coded de este archivo / env: siempre hay un fallback. */
+  const conf = resolveAlmaConfig(await resolveAsistente(env), env);
   let { apiKey, model } = conf.primary;
   if (!apiKey) {
     throw new Error("Sin clave de OpenAI: ni en Previsión (Asistente del sitio) ni OPENAI_API_KEY en el Worker");
   }
   const temperature = conf.temperature;
-  /* {{emergency_phone}} del prompt: línea del bot (Previsión / agent_config) si
+  /* {{emergency_phone}} del prompt: línea del bot (Previsión) si
      existe, si no el WhatsApp de emergencia real del tenant. Nunca un placeholder. */
   const emergencyPhone =
     conf.emergencyPhone || (await resolveEmergencyWhatsapp(env, { maxWaitMs: 3000 }));
@@ -879,7 +886,7 @@ export async function runAlma(input, env, executionCtx) {
   const promptOverride  = lang.startsWith("en") ? conf.prompts.en : conf.prompts.es;
   const promptSource    = promptOverride ? promptOverride.source : "hardcoded";
   /* El protocolo de crisis se antepone SIEMPRE — venga el prompt del código,
-     de Previsión o de agent_config — para que un cambio desde un panel no
+     o de Previsión — para que un cambio desde el panel no
      pueda quitarlo (decisión #1, docs/plan-bot-alma-funeraria-del-zulia.md). */
   const crisisPreamble = lang.startsWith("en") ? CRISIS_PREAMBLE_EN : CRISIS_PREAMBLE_ES;
   const sysPrompt = (crisisPreamble + "\n\n" + (promptOverride ? promptOverride.text : promptHardcoded)).replace(
@@ -999,7 +1006,7 @@ export async function runAlma(input, env, executionCtx) {
       });
       try {
         if (name === "lookup_coverage") {
-          result = await execLookupCoverage(args, env, db, emergencyPhone);
+          result = await execLookupCoverage(args, env, emergencyPhone);
           if (result.covered && result.location) {
             out.coverage = {
               covered: true,
@@ -1038,14 +1045,8 @@ export async function runAlma(input, env, executionCtx) {
                 nombre:    (args && args.nombre    ? String(args.nombre).trim()    : ""),
                 necesidad: (args && args.necesidad ? String(args.necesidad).trim() : ""),
               };
-              /* Stub de atribución: deja el vendedor registrado aunque la venta
-                 se cierre por WhatsApp. Best-effort, en background. */
-              if (attribution && attribution.codigo_vendedor) {
-                const stubPromise = registerAttributionStub(env, attribution, args?.nombre, args?.necesidad);
-                if (executionCtx?.waitUntil) executionCtx.waitUntil(stubPromise);
-                else await stubPromise;
-                out.attributionStub = true;
-              }
+              /* El registro de la derivación en Previsión lo hace chat.js
+                 (registerHandoffSolicitud), que tiene el resumen completo. */
             }
           }
         } else if (name === "create_lead") {

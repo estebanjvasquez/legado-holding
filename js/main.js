@@ -1207,9 +1207,12 @@ async function sendChatMessage() {
 
   try {
     /* history: turnos previos en formato {role, content}. El turno del usuario
-       actual NO va aquí (recién se hizo push) — va en `message`. Tope de 20
-       turnos previos para no inflar el request en conversaciones largas. */
-    const history = chatMessages.slice(-21, -1);
+       actual NO va aquí (recién se hizo push) — va en `message`. Es la memoria
+       de Alma (el Worker ya no guarda conversaciones): últimos 40 turnos. */
+    const history = chatMessages.slice(-41, -1);
+    /* Número de este mensaje en la conversación, para el tope de mensajes por
+       conversación que configura Previsión (el historial viaja recortado). */
+    const turn = chatMessages.filter((m) => m.role === "user").length;
     /* El Worker corta cada turno a los ~60 s (TURN_BUDGET_MS en alma.js);
        este tope solo cubre que el Worker mismo no responda. */
     const ctrl = new AbortController();
@@ -1224,6 +1227,7 @@ async function sendChatMessage() {
         mode:        chatMode,
         lang:        currentLang,
         history,
+        turn,
         attribution: getAttribution(),
       }),
     }).finally(() => clearTimeout(chatTimer));

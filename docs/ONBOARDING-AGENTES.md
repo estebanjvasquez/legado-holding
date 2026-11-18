@@ -43,7 +43,7 @@ Navegador ──GET catálogo (CORS, sin token)──▶ prevision-funeraria.sis
    │
    ├─ wizard: POST /  ─────────▶ Worker (api.legadoholding.com) ──Bearer PF_TOKEN──▶ Previsión POST /compras ──▶ Stripe Checkout
    │                                                                                   (webhook firmado → contrato activo)
-   └─ chat:   POST /chat ──────▶ Worker ──▶ OpenAI (gpt-5.6-luna, function calling en src/alma.js) + Supabase (memoria)
+   └─ chat:   POST /chat ──────▶ Worker ──▶ OpenAI (gpt-5.6-luna, function calling en src/alma.js); config de Alma, aliados, prospectos y derivaciones en Previsión
 ```
 
 - **Frontend**: HTML/CSS/JS plano, **sin bundler ni framework**, servido por Apache/cPanel.
@@ -52,9 +52,9 @@ Navegador ──GET catálogo (CORS, sin token)──▶ prevision-funeraria.sis
   function-calling contra OpenAI, no hay n8n).
 - **Prevision-Funeraria**: multi-tenant (Cloudflare Workers + D1). Este repo es solo
   un **consumidor** de su API pública. No se toca desde acá.
-- **Invoice Ninja**: ya NO existe (confirmado 2026-11-17). El panel admin entra solo con
-  el secret `ADMIN_TOKEN` (`worker/src/admin.js`); el panel es legacy y se retira cuando
-  sus módulos pasen a Prevision-Funeraria.
+- **Invoice Ninja, Supabase y el panel admin legacy (`admin/`)**: ya NO existen
+  (2026-11-18). Lo administrativo vive en el panel de Prevision-Funeraria. El Worker no
+  tiene base de datos propia: la memoria de la conversación la manda el navegador.
 
 ---
 
@@ -63,7 +63,7 @@ Navegador ──GET catálogo (CORS, sin token)──▶ prevision-funeraria.sis
 ### Frontend (raíz)
 | Archivo | Rol |
 |---|---|
-| `index.html` | Página única. `LEGADO_CONFIG` (switch dev/prod), `PLANS_API_URL` directo a Previsión, `PARENTESCOS_API_URL`/chat vía Worker. **Cache-bust `?v=N`**: `css/main.css?v=4`, `js/attribution.js?v=1`, `js/main.js?v=12` (independientes; líneas ~110 y ~1358). |
+| `index.html` | Página única. `LEGADO_CONFIG` (switch dev/prod), `PLANS_API_URL` directo a Previsión, `PARENTESCOS_API_URL`/chat vía Worker. **Cache-bust `?v=N`**: `css/main.css?v=4`, `js/attribution.js?v=1`, `js/main.js?v=13` (independientes; líneas ~110 y ~1358). |
 | `js/attribution.js` | Atribución de vendedor (`?ref=`): valida el código contra `/wizard/vendedor`, first-touch entre códigos válidos (TTL 90d), guarda los últimos 10 toques. Se carga antes de `main.js`; tests en `worker/test/attribution-frontend.test.mjs`. |
 | `js/main.js` | i18n, wizard de 4 pasos, UI del chat de Alma, y **§"ATRIBUCIÓN DE VENDEDOR / CANAL"** (`initAttribution`/`getAttribution`, `localStorage["legado_attribution"]`, first-touch TTL 90d). `SELECTO_CHECKOUT_ENABLED = true`, `WIZARD_ENABLED_SLUGS`. |
 | `js/wizard-generic.js` | Botones "Protege tu Legado" sin plan → scroll a la sección de planes. |
@@ -71,7 +71,6 @@ Navegador ──GET catálogo (CORS, sin token)──▶ prevision-funeraria.sis
 | `css/main.css` | Estilos. Marca: navy `#263c5b`, dorado `#c9a84c` (decorativo, no CTAs), fuente Inter. |
 | `gracias.html` / `cancelado.html` | `success_url` / `cancel_url` de Stripe Checkout. **Deben estar en la lista de copia de `.cpanel.yml`.** |
 | `terminos-condiciones.html` / `politica-privacidad.html` | Legales (fuentes en los `.txt` homónimos). |
-| `admin/` | Panel admin legacy (`index.html` + `admin.js?v=3`): pestañas Agente y Conversaciones. Login con el token `ADMIN_TOKEN`. |
 
 ### Worker (`worker/`)
 | Archivo | Rol |
@@ -81,11 +80,9 @@ Navegador ──GET catálogo (CORS, sin token)──▶ prevision-funeraria.sis
 | `src/prevision-api.js` | Cliente HTTP a Prevision-Funeraria (`getParentescos`, `crearCompra`, lookup de vendedor). |
 | `src/wizard-compra.js` | `processWizardCheckout(body, env)` — arma el body de `POST /compras`. Reemplazó al viejo `pipeline.js`. |
 | `src/alma.js` | Agente Alma: loop OpenAI, tools (`list_planes`, `list_servicios`, `lookup_coverage`, `handoff_whatsapp`, `create_lead`). **No cotiza ni factura.** Inyecta la atribución en los executores (Alma no la ve). |
-| `src/chat.js` | Handler `/chat`: sanea `attribution`, llama a `runAlma`, persiste en `chat_sessions.metadata` de Supabase. |
+| `src/chat.js` | Handler `/chat`: sanea `attribution` e historial (memoria = lo que manda el navegador, 40 turnos), aplica el tope de mensajes por conversación (`turn` del frontend vs. `parametros.max_mensajes_por_conversacion` de PF, 60 por defecto), llama a `runAlma` y registra cada derivación a WhatsApp en PF (`POST /solicitudes`, resumen en `mensaje`). |
 | `src/attribution.js` | `sanitizeAttribution(raw)` (whitelists + límites de longitud), `attributionTag()` para logs. |
-| `src/supabase.js` | Memoria del chat. No-op si faltan `SUPABASE_URL`/secret. |
-| `src/admin.js` | Panel legacy: auth solo con `ADMIN_TOKEN` (tiempo constante, login limitado a 5/min por IP). |
-| `src/ratelimit.js` | Límites de uso (bindings `CHAT_IP_LIMITER` 20/min por IP, `ADMIN_LOGIN_LIMITER` 5/min). Fail-open. El tope de 60 mensajes por conversación vive en `src/chat.js`. |
+| `src/ratelimit.js` | Límite de uso (binding `CHAT_IP_LIMITER` 20/min por IP). Fail-open. |
 | `test/` | Tests con `node --test` (`npm test` en `worker/`). Corren en Node, no en workerd; `test/setup.mjs` stubea `cloudflare:workers`, `caches` y `scheduler`. |
 | `src/errors.js` | Helpers de error. |
 
@@ -137,15 +134,19 @@ Navegador ──GET catálogo (CORS, sin token)──▶ prevision-funeraria.sis
   - **Configuración de Alma desde PF** (Configuración › *Asistente del sitio*,
     `GET /api/public/t/lh/asistente`): el Worker la lee (`resolveAsistente` /
     `resolveAlmaConfig` en `worker/src/alma.js`, caché en memoria 5 min, última conocida
-    si PF cae). Precedencia por campo: PF → `agent_config` (Supabase) → código/env. Si
+    si PF cae). Precedencia por campo: PF → código/env. Si
     `proveedor` no es `openai`, se usa el respaldo (Alma solo implementa OpenAI). Si OpenAI
     rechaza (4xx) la clave/modelo de PF, el turno reintenta una vez con
     `OPENAI_API_KEY`/`OPENAI_MODEL` del Worker. El protocolo de crisis se antepone siempre.
-    Log por turno: `cfg_source=… key_source=… prompt_source=prevision|db|hardcoded`.
-    Cuando los prompts vivan en PF, se puede retirar la pestaña *Agente* del panel legacy.
-- **Panel admin legacy** (`admin/` + `worker/src/admin.js`): Invoice Ninja ya no existe;
-  entra solo con `ADMIN_TOKEN`. Pendiente retirarlo (aliados → `/aliados` de Previsión;
-  config de Alma y conversaciones: ver plan de migración).
+    Log por turno: `cfg_source=… key_source=… prompt_source=prevision|hardcoded`.
+- **Panel admin legacy y Supabase retirados (2026-11-18).** Lo que guardaba
+  `chat_sessions` quedó así: derivaciones a WhatsApp → siempre una solicitud en PF con
+  el resumen para el asesor; prospectos → solicitud en PF con la constancia de
+  consentimiento en `mensaje`; memoria → historial del navegador; tope por conversación
+  → configurable en PF. Las transcripciones completas (`chat_turns`) **ya no se guardan**
+  (decisión pendiente: vista de conversaciones en PF). Los datos de Supabase eran de
+  prueba y no se migraron. Pendiente en PF: distinguir derivación de prospecto y campo
+  de consentimiento (prompt entregado al usuario).
 - **Hilo abierto**: el usuario reportó que Alma "se presenta dos veces" en su navegador,
   pese a que el fix está verificado correcto en backend y frontend. Falta confirmarlo en
   ventana de incógnito. Ver `.claude/handoff.json` → `open_thread_needs_followup`.
@@ -167,9 +168,8 @@ Navegador ──GET catálogo (CORS, sin token)──▶ prevision-funeraria.sis
    (a) es un modelo *reasoning* que en `/v1/chat/completions` **rechaza (400) function
    tools** junto a su `reasoning_effort` por defecto → `alma.js` fuerza
    `reasoning_effort: "none"` en cada llamada.
-   (b) `agent_config.model` en Supabase había quedado en `"gemini-2.5-flash"` de la era
-   anterior y tenía prioridad → `alma.js` ahora **ignora** un `agent_config.model` con
-   pinta de Gemini.
+   (b) (histórico) `agent_config.model` en Supabase había quedado en `"gemini-2.5-flash"`;
+   Supabase ya se retiró y la config viene de PF (`/asistente`).
 4. **`POST /solicitudes` de Previsión**: `telefono` **≤ 20 caracteres** (400 silencioso
    `"Too big..."` si se pasa), `nombres`/`apellidos` ≤ 60. El Worker capa esos campos.
 5. **`solicitud_id` es un string opaco de 10 caracteres**, NO un entero. Nunca
@@ -184,7 +184,7 @@ Navegador ──GET catálogo (CORS, sin token)──▶ prevision-funeraria.sis
 9. **Cargar secrets en Windows**: PowerShell bloquea `wrangler.ps1` → usar `wrangler.cmd`.
    No pegar el valor en el aviso oculto de `secret put` (en 2026-11-17 el pegado falló sin
    avisar y el secret quedó con otro valor). Pasarlo por pipe:
-   `$t | wrangler.cmd secret put ADMIN_TOKEN` (el Worker hace `trim()` del valor).
+   `$t | wrangler.cmd secret put NOMBRE` (el Worker hace `trim()` del valor).
 10. **Rate Limiting de Workers es aproximado y por ubicación**: en la prueba en vivo los
     429 empezaron unos mensajes después del umbral de 20/min. Sirve contra abuso, no es
     una cuota exacta.
@@ -257,6 +257,5 @@ Si agregas un archivo estático nuevo que deba publicarse, **agrégalo a esa lis
 - El wizard o el bot Alma **sin seguir** `docs/api-publica-wizard.md` y
   `docs/GUIA_INTERACCION_BOT_LEGADO.md`.
 - El token de API del tenant `lh` (no regenerar).
-- El secret `ADMIN_TOKEN` del Worker: es el único acceso al panel legacy.
 - Los archivos gitignoreados de `docs/` (`*.SECRET.md`, `*.docx`, `campanasatribucion.md`,
   `cost-and-pricing.md`, `proposal-client.md`).

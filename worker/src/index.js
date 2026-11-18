@@ -18,7 +18,6 @@ import { processWizardCheckout } from "./wizard-compra.js";
 import { handleChat, fallbackChatResponse } from "./chat.js";
 import { sanitizeAttribution } from "./attribution.js";
 import { clientIp, isRateLimited } from "./ratelimit.js";
-import { handleAdmin } from "./admin.js";
 import { isValidationError } from "./errors.js";
 import { resolveTenant } from "./tenant.js";
 import { resolveOtelConfig, otelEnabled } from "./otel.js";
@@ -37,16 +36,6 @@ const handler = {
       return new Response(null, { headers: cors });
     }
 
-    /* /admin/* — todos los métodos los maneja admin.js (con su propia auth). */
-    if (url.pathname.startsWith("/admin/")) {
-      try {
-        return await handleAdmin(request, env, cors);
-      } catch (e) {
-        console.error(`[admin top] ${e.message}`);
-        return json({ error: e.message }, 500);
-      }
-    }
-
     if (request.method === "GET") {
       if (url.pathname === "/wizard/parentescos") {
         return await handleParentescos(env, json);
@@ -63,8 +52,6 @@ const handler = {
         pfBase:             env.PF_BASE,
         openaiConfigured:   !!env.OPENAI_API_KEY,
         openaiModel:        env.OPENAI_MODEL || "gpt-5.6-luna",
-        supabaseConfigured: !!(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY),
-        supabaseUrl:        env.SUPABASE_URL || null,
         allowedOrigins:     getAllowedOrigins(env),
       });
     }
@@ -134,7 +121,7 @@ const handler = {
 
 /* OpenTelemetry: si hay endpoint OTLP configurado (secret), servimos el handler
    envuelto con instrument() — auto-instrumenta cada `fetch` saliente (OpenAI /
-   Prevision-Funeraria / Supabase / Stripe) como span hijo, más los spans
+   Prevision-Funeraria / Stripe) como span hijo, más los spans
    manuales de alma.js/chat.js. Sin el secret, el handler va crudo (cero
    overhead, kill-switch). Ver worker/src/otel.js. */
 const instrumented = instrument(handler, resolveOtelConfig);
@@ -199,8 +186,8 @@ function corsFor(request, env) {
   const list   = getAllowedOrigins(env);
 
   const headers = {
-    "Access-Control-Allow-Methods": "GET, POST, PATCH, PUT, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, X-Admin-Token",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Max-Age":       "86400",
     Vary:                           "Origin",
   };
