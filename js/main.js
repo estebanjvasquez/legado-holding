@@ -406,6 +406,23 @@ const LANG = {
   wiz_monthly_sub: ["Suscripción mensual", "Monthly subscription"],
   wiz_annual_title: ["Pago anual", "Annual payment"],
   wiz_annual_sub: ["¡Ahorra 2 meses!", "Save 2 months!"],
+  wiz_choose_billing: [
+    "Elige mensual o anual para continuar.",
+    "Choose monthly or annual to continue.",
+  ],
+  wiz_initial_once: ["Cuota inicial (cobro único)", "Initial fee (one-time)"],
+  wiz_sum_recurring_mo: ["Cuota mensual", "Monthly fee"],
+  wiz_sum_recurring_yr: ["Cuota anual", "Annual fee"],
+  wiz_sum_first_charge: ["Primer cobro (hoy)", "First charge (today)"],
+  wiz_sum_note_mo: [
+    "Luego se cobra la cuota mensual cada mes hasta que canceles.",
+    "After that, the monthly fee is charged every month until you cancel.",
+  ],
+  wiz_sum_note_yr: [
+    "Luego se cobra la cuota anual cada año hasta que canceles.",
+    "After that, the annual fee is charged every year until you cancel.",
+  ],
+  wiz_change: ["Cambiar", "Change"],
   wiz_yr: ["/año", "/yr"],
   wiz_summary_title: ["Resumen de compra", "Purchase summary"],
   wiz_sum_billing: ["Modalidad", "Billing mode"],
@@ -678,6 +695,11 @@ async function loadPlansFromAPI() {
         mo_save:     monthlyPrice !== null ? formatPrice(monthlyPrice * 2) : null,
         maxAge:      maxAge || 65,
         notes:       (p.descripcion_detallada || p.descripcion || "").trim(),
+        /* Centavos crudos de GET /planes para el resumen del wizard
+           (js/wizard-pricing.js). Solo se muestran, nunca se envían. */
+        monthlyCents: monthlyPrice !== null ? monthlyCents : null,
+        annualCents:  annualPrice  !== null ? annualCents  : null,
+        initialCents: hasInitial ? initialCents : null,
       };
       /* Cuota inicial única (planes Selecto). Solo se setea `initial` si la API
          la trae > 0 — es lo que activa la vista de "cuota inicial" en las
@@ -724,7 +746,7 @@ let wizardOpen = false;
 let wizardSubmitted = false;
 let wizardStep = 0;
 let wizardSelectedPlan = null;
-let wizardPaymentType = "monthly";
+let wizardPaymentType = null; // "monthly" | "annual" | null (sin elegir)
 let wizardAcceptedTerms = false;
 let wizardBuyer = {
   name: "",
@@ -1339,8 +1361,9 @@ function openWizard(planId) {
   wizardSubmitted = false;
   wizardStep = 0;
   wizardSelectedPlan = planId;
-  const _plan = PLANS[planId] || {};
-  wizardPaymentType = _plan.monthly ? "monthly" : (_plan.annual ? "annual" : "monthly");
+  /* Sin preselección: el comprador tiene que elegir la frecuencia en el paso
+     "Pago" (antes venía "mensual" marcado y nadie la elegía de verdad). */
+  wizardPaymentType = null;
   wizardAcceptedTerms = false;
   wizardBuyer = {
     name: "",
@@ -1769,58 +1792,74 @@ function renderStep2() {
     }
   };
 
-  const prefix = isSelecto ? plan.initial + " + " : "";
-  const monthlyBtn = plan.monthly
-    ? `<button class="payment-option${wizardPaymentType === "monthly" ? " selected" : ""}" data-type="monthly">
-      <div>
-        <p class="payment-option-title">${t("wiz_monthly_title")}</p>
-        <p class="payment-option-sub">${monthlyLabel}</p>
-      </div>
-      <div class="payment-option-price">${prefix}${plan.monthly}<span>${t("plan_mo")}</span></div>
-    </button>`
+  const P = window.LegadoWizardPricing;
+  const fmtRecurring = (type) => {
+    const s = P.summary(plan, type);
+    return s ? P.formatCents(s.recurringCents) : (type === "monthly" ? plan.monthly : plan.annual);
+  };
+  const initialNote = isSelecto
+    ? `<p class="payment-option-sub">+ ${t("wiz_initial_once")}: ${plan.initialCents ? P.formatCents(plan.initialCents) : plan.initial}</p>`
     : "";
-  const annualBtn = plan.annual
-    ? `<button class="payment-option${wizardPaymentType === "annual" ? " selected" : ""}" data-type="annual">
-      <div>
-        <p class="payment-option-title">${t("wiz_annual_title")}</p>
-        <p class="payment-option-sub highlight">${annualSub}</p>
+  const option = (type, title, sub, subClass, per) => {
+    const sel = wizardPaymentType === type;
+    return `<button type="button" role="radio" aria-checked="${sel}" class="payment-option${sel ? " selected" : ""}" data-type="${type}">
+      <span class="payment-option-check" aria-hidden="true"></span>
+      <div class="payment-option-body">
+        <p class="payment-option-title">${title}</p>
+        <p class="payment-option-sub${subClass}">${sub}</p>
+        ${initialNote}
       </div>
-      <div class="payment-option-price">${prefix}${plan.annual}<span>${t("wiz_yr")}</span></div>
-    </button>`
+      <div class="payment-option-price">${fmtRecurring(type)}<span>${per}</span></div>
+    </button>`;
+  };
+  const types = P.availableTypes(plan);
+  const monthlyBtn = types.includes("monthly")
+    ? option("monthly", t("wiz_monthly_title"), monthlyLabel, "", t("plan_mo"))
+    : "";
+  const annualBtn = types.includes("annual")
+    ? option("annual", t("wiz_annual_title"), annualSub, " highlight", t("wiz_yr"))
     : "";
 
   return `
     <p style="color:var(--muted-foreground);font-size:0.875rem;margin-bottom:0.5rem">${t("wiz_select_billing")}</p>
+    <div role="radiogroup" aria-label="${t("wiz_select_billing")}">
     ${monthlyBtn}
     ${annualBtn}
+    </div>
+    <p class="form-hint payment-choose-hint"${wizardPaymentType ? ' style="display:none"' : ""}>${t("wiz_choose_billing")}</p>
     `;
+}
+
+/* Frecuencia elegida y válida para el plan (si no, el wizard no avanza). */
+function wizardPaymentSummary() {
+  const plan = PLANS[wizardSelectedPlan];
+  return plan && window.LegadoWizardPricing
+    ? window.LegadoWizardPricing.summary(plan, wizardPaymentType)
+    : null;
 }
 
 function renderStep3() {
   const plan = PLANS[wizardSelectedPlan];
   const planName = t(`plan_${wizardSelectedPlan}_name`);
-  const isSelecto = plan.initial !== undefined;
-  const prefix = isSelecto ? plan.initial + " + " : "";
-  const priceDisplay =
-    wizardPaymentType === "monthly"
-      ? prefix + plan.monthly + t("plan_mo")
-      : prefix +
-        plan.annual +
-        t("wiz_yr") +
-        (currentLang === "es" ? " (oferta lanzamiento)" : " (launch offer)");
-
-  // Get billing mode display
-  const billingMode =
-    wizardPaymentType === "monthly"
-      ? t("wiz_monthly_title")
-      : t("wiz_annual_title");
+  const P = window.LegadoWizardPricing;
+  const s = wizardPaymentSummary();
+  const isAnnual = wizardPaymentType === "annual";
+  const billingMode = isAnnual ? t("wiz_annual_title") : t("wiz_monthly_title");
+  /* El paso 3 solo se alcanza con una frecuencia válida (canWizardNext). */
+  const amountRows = s
+    ? `
+      <div class="summary-row"><span class="label">${isAnnual ? t("wiz_sum_recurring_yr") : t("wiz_sum_recurring_mo")}</span><span class="value">${P.formatCents(s.recurringCents)}${isAnnual ? t("wiz_yr") : t("plan_mo")}</span></div>
+      ${s.initialCents ? `<div class="summary-row"><span class="label">${t("wiz_initial_once")}</span><span class="value">${P.formatCents(s.initialCents)}</span></div>` : ""}
+      <div class="summary-row"><span class="label">${t("wiz_sum_first_charge")}</span><span class="value highlight" data-first-charge="${s.firstChargeCents}">${P.formatCents(s.firstChargeCents)}</span></div>
+      <p class="form-hint summary-charge-note">${isAnnual ? t("wiz_sum_note_yr") : t("wiz_sum_note_mo")}</p>`
+    : "";
 
   return `
     <div class="summary-box">
       <h4>${t("wiz_summary_title")}</h4>
       <div class="summary-row"><span class="label">${t("wiz_sum_plan")}</span><span class="value">${planName}</span></div>
-      <div class="summary-row"><span class="label">${t("wiz_sum_billing")}</span><span class="value">${billingMode}</span></div>
-      <div class="summary-row"><span class="label">${t("wiz_sum_payment")}</span><span class="value highlight">${priceDisplay}</span></div>
+      <div class="summary-row"><span class="label">${t("wiz_sum_billing")}</span><span class="value" data-billing="${s ? s.frecuenciaPago : ""}">${billingMode} <button type="button" class="summary-change-btn" id="wizard-change-billing">${t("wiz_change")}</button></span></div>
+      ${amountRows}
       <div class="summary-row"><span class="label">${t("wiz_sum_buyer")}</span><span class="value">${escapeHTML(wizardBuyer.name)} ${escapeHTML(wizardBuyer.lastName)}</span></div>
       <div class="summary-row"><span class="label">${t("wiz_sum_members")}</span><span class="value">${wizardFamily.length}</span></div>
     </div>
@@ -1928,13 +1967,23 @@ function bindWizardStepEvents() {
     $$(".payment-option").forEach((btn) => {
       btn.addEventListener("click", () => {
         wizardPaymentType = btn.dataset.type;
-        $$(".payment-option").forEach((b) => b.classList.remove("selected"));
+        $$(".payment-option").forEach((b) => {
+          b.classList.remove("selected");
+          b.setAttribute("aria-checked", "false");
+        });
         btn.classList.add("selected");
+        btn.setAttribute("aria-checked", "true");
+        const hint = $(".payment-choose-hint");
+        if (hint) hint.style.display = "none";
         updateWizardFooter();
       });
     });
   }
   if (wizardStep === 3) {
+    $("#wizard-change-billing")?.addEventListener("click", () => {
+      wizardStep = 2;
+      renderWizardContent();
+    });
     $("#terms-check")?.addEventListener("change", (e) => {
       wizardAcceptedTerms = e.target.checked;
       updateWizardFooter();
@@ -2051,8 +2100,8 @@ function canWizardNext() {
       return true;
     });
   }
-  if (wizardStep === 2) return !!(wizardSelectedPlan && wizardPaymentType);
-  if (wizardStep === 3) return wizardAcceptedTerms && (!TURNSTILE_SITEKEY || !!wizardTurnstile.token);
+  if (wizardStep === 2) return !!wizardPaymentSummary();
+  if (wizardStep === 3) return !!wizardPaymentSummary() && wizardAcceptedTerms && (!TURNSTILE_SITEKEY || !!wizardTurnstile.token);
   return true;
 }
 

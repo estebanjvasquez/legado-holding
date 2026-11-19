@@ -48,7 +48,9 @@ function normalize(body) {
   const intent = (body.intent || "").toLowerCase();
   const planSlug = body.plan || null;
   const planId = Number(body.planId);
-  const paymentType = (body.paymentType || "monthly").toLowerCase();
+  /* Sin default: la frecuencia la elige el comprador en el wizard. Si no
+     llega, se rechaza en vez de asumir "mensual" (que nadie eligió). */
+  const paymentType = String(body.paymentType || "").toLowerCase();
   const buyer = body.buyer || {};
 
   if (intent !== "create_payment_intent") {
@@ -270,7 +272,7 @@ export async function processWizardCheckout(body, env) {
   const compraBody = buildCompraBody(ctx, env);
   const key = validIdempotencyKey(body.idempotencyKey);
   console.log(
-    `Wizard checkout start: plan=${ctx.planSlug} email=${maskEmail(ctx.buyer.email)} atribucion=${attributionTag(ctx.atribucion)} idem=${key ? "sí" : "no"}`,
+    `Wizard checkout start: plan=${ctx.planSlug} paymentType=${ctx.paymentType} frecuencia_pago=${ctx.frecuenciaPago} email=${maskEmail(ctx.buyer.email)} atribucion=${attributionTag(ctx.atribucion)} idem=${key ? "sí" : "no"}`,
   );
 
   let result;

@@ -2028,7 +2028,52 @@ footer {
 }
 .payment-option.selected {
     border-color: var(--accent);
-    background: rgba(201, 168, 76, 0.04);
+    background: rgba(201, 168, 76, 0.1);
+    box-shadow: 0 0 0 1px var(--accent);
+}
+/* Indicador tipo radio: deja claro cuál frecuencia está elegida. */
+.payment-option-check {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    margin-right: 0.85rem;
+    border: 2px solid var(--border);
+    border-radius: 50%;
+    position: relative;
+}
+.payment-option.selected .payment-option-check {
+    border-color: var(--accent);
+}
+.payment-option.selected .payment-option-check::after {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    border-radius: 50%;
+    background: var(--accent);
+}
+.payment-option-body {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.payment-option-price {
+    margin-left: 0.75rem;
+    white-space: nowrap;
+}
+.summary-change-btn {
+    margin-left: 0.5rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    font-size: 0.8rem;
+    text-decoration: underline;
+    cursor: pointer;
+}
+.payment-choose-hint,
+.summary-charge-note {
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--muted-foreground);
 }
 .payment-option:hover {
     border-color: rgba(201, 168, 76, 0.4);

@@ -66,3 +66,42 @@ test("las llamadas a Previsión llevan señal de timeout", async () => {
   await processWizardCheckout(body(), ENV);
   assert.ok(compras(m.calls)[0].init.signal instanceof AbortSignal);
 });
+
+/* ── Frecuencia de pago (incidente 2026-11-19: compra 42 llegó "anual") ── */
+const frecuenciaEnviada = async (paymentType) => {
+  m = mockFetch([[isPF, () => jsonResponse(OK)]]);
+  const b = { ...body(false), paymentType };
+  if (paymentType === undefined) delete b.paymentType;
+  const r = await processWizardCheckout(b, ENV);
+  const c = compras(m.calls);
+  return { r, frecuencia: c.length ? c[0].body.frecuencia_pago : null, n: c.length };
+};
+
+test("frecuencia: el comprador elige mensual → POST /compras lleva frecuencia_pago 'mensual'", async () => {
+  const { r, frecuencia } = await frecuenciaEnviada("monthly");
+  assert.equal(r.success, true);
+  assert.equal(frecuencia, "mensual");
+});
+
+test("frecuencia: el comprador elige anual → POST /compras lleva frecuencia_pago 'anual'", async () => {
+  const { r, frecuencia } = await frecuenciaEnviada("annual");
+  assert.equal(r.success, true);
+  assert.equal(frecuencia, "anual");
+});
+
+test("frecuencia: sin paymentType NO se asume mensual — se rechaza sin llamar a Previsión", async () => {
+  await assert.rejects(() => frecuenciaEnviada(undefined), /paymentType/);
+  assert.equal(compras(m.calls).length, 0);
+});
+
+test("frecuencia: valor desconocido se rechaza sin llamar a Previsión", async () => {
+  await assert.rejects(() => frecuenciaEnviada("weekly"), /paymentType/);
+  assert.equal(compras(m.calls).length, 0);
+});
+
+test("frecuencia: el body a Previsión NO lleva montos (los calcula Previsión)", async () => {
+  m = mockFetch([[isPF, () => jsonResponse(OK)]]);
+  await processWizardCheckout({ ...body(false), paymentType: "annual" }, ENV);
+  const sent = JSON.stringify(compras(m.calls)[0].body);
+  assert.doesNotMatch(sent, /monto|precio|centavos|amount/i);
+});
