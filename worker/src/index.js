@@ -19,6 +19,7 @@ import { handleChat, fallbackChatResponse } from "./chat.js";
 import { sanitizeAttribution } from "./attribution.js";
 import { clientIp, isRateLimited } from "./ratelimit.js";
 import { isValidationError } from "./errors.js";
+import { verifyTurnstile } from "./turnstile.js";
 import { resolveTenant } from "./tenant.js";
 import { resolveOtelConfig, otelEnabled } from "./otel.js";
 
@@ -110,6 +111,19 @@ const handler = {
         message: "Demasiados intentos seguidos. Espera un minuto e intenta de nuevo.",
       }, 429);
     }
+
+    /* Anti-bots (Turnstile): verificado antes de tocar Previsión o Stripe.
+       Ver worker/src/turnstile.js. */
+    const ts = await verifyTurnstile(body.turnstileToken, clientIp(request), env);
+    if (!ts.ok) {
+      console.warn(`Turnstile rechazado: ${ts.reason}`);
+      return json({
+        success: false,
+        code: "bot_check_failed",
+        message: "No pudimos verificar que eres una persona. Recarga la página e intenta de nuevo.",
+      }, 403);
+    }
+    delete body.turnstileToken;
 
     try {
       const result = await processWizardCheckout(body, env);

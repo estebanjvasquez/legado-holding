@@ -48,6 +48,11 @@ SITE_BASE_URL = "https://www.legadoholding.com"
 # (ver .dev.vars.example), que `wrangler dev` usa en lugar de este valor.
 ALLOWED_ORIGINS = "https://legadoholding.com,https://www.legadoholding.com"
 
+# Turnstile (anti-bots del checkout). Hostnames de los que se acepta un token;
+# nunca incluir localhost en producción. El secret: `wrangler secret put
+# TURNSTILE_SECRET --config wrangler.toml`. Sin secret no se verifica (dev).
+TURNSTILE_HOSTNAMES = "legadoholding.com,www.legadoholding.com"
+
 # Modelo de OpenAI que ejecuta el agente Alma directamente en el Worker.
 # Ya no se llama a n8n: el loop de function calling vive en src/alma.js.
 # Cambiar aquí si quieres probar otro modelo.

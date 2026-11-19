@@ -69,6 +69,18 @@ const CHAT_TIMEOUT_MS = 75000;
    error aunque la compra sí se hubiera creado. */
 const WIZARD_TIMEOUT_MS = 50000;
 
+/* Turnstile (anti-bots del checkout). En localhost se usa la clave de prueba
+   de Cloudflare (siempre pasa); el Worker local no tiene TURNSTILE_SECRET y no
+   verifica. Vacío en LEGADO_CONFIG = desactivado. */
+const TURNSTILE_SITEKEY = (() => {
+  const cfg = typeof window !== "undefined" && window.LEGADO_CONFIG;
+  if (cfg && typeof cfg.TURNSTILE_SITEKEY === "string") return cfg.TURNSTILE_SITEKEY;
+  const h = typeof location !== "undefined" ? location.hostname : "";
+  return h === "localhost" || h === "127.0.0.1"
+    ? "1x00000000000000000000AA"
+    : "0x4AAAAAAGIgfIe3QUWSazB6";
+})();
+
 const WIZARD_WEBHOOK_URL =
   (typeof window !== "undefined" && window.LEGADO_CONFIG?.WIZARD_WEBHOOK_URL) ||
   "https://api.legadoholding.com";
@@ -1449,6 +1461,7 @@ function closeWizard() {
      personales sin consentimiento. Se quitó; si se quiere recuperar
      abandonos, hacerlo con consentimiento explícito vía POST /solicitudes. */
   wizardOpen = false;
+  unmountWizardTurnstile();
   $("#wizard-overlay").classList.add("hidden");
 }
 
@@ -1822,7 +1835,8 @@ function renderStep3() {
         <input type="checkbox" id="terms-check" ${wizardAcceptedTerms ? "checked" : ""}>
         <span class="text">${t("wiz_contract_chk")}</span>
       </label>
-    </div>`;
+    </div>
+    ${TURNSTILE_SITEKEY ? '<div id="wf-turnstile" class="wizard-turnstile" style="margin-top:1rem;display:flex;justify-content:center"></div><p id="wf-turnstile-msg" class="form-hint" style="text-align:center"></p>' : ""}`;
 }
 
 /* =============================================================================
@@ -1925,7 +1939,83 @@ function bindWizardStepEvents() {
       wizardAcceptedTerms = e.target.checked;
       updateWizardFooter();
     });
+    mountWizardTurnstile();
   }
+}
+
+/* =============================================================================
+   TURNSTILE — widget del paso "Resumen". El token es de un solo uso: cada
+   intento de envío consume el suyo y el widget se vuelve a montar.
+   ============================================================================= */
+const wizardTurnstile = { widgetId: null, token: null, failed: false };
+let turnstileScriptPromise = null;
+
+function loadTurnstileScript() {
+  if (window.turnstile) return Promise.resolve(window.turnstile);
+  if (turnstileScriptPromise) return turnstileScriptPromise;
+  turnstileScriptPromise = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+    s.async = true;
+    s.onload = () => (window.turnstile ? resolve(window.turnstile) : reject(new Error("turnstile")));
+    s.onerror = () => {
+      turnstileScriptPromise = null; /* permite reintentar en el próximo montaje */
+      reject(new Error("turnstile"));
+    };
+    document.head.appendChild(s);
+  });
+  return turnstileScriptPromise;
+}
+
+function unmountWizardTurnstile() {
+  if (wizardTurnstile.widgetId !== null && window.turnstile) {
+    try { window.turnstile.remove(wizardTurnstile.widgetId); } catch (_) { /* ya no está */ }
+  }
+  wizardTurnstile.widgetId = null;
+  wizardTurnstile.token = null;
+}
+
+function setWizardTurnstileMsg(text) {
+  const el = $("#wf-turnstile-msg");
+  if (el) el.textContent = text || "";
+}
+
+function mountWizardTurnstile() {
+  if (!TURNSTILE_SITEKEY) return;
+  unmountWizardTurnstile();
+  wizardTurnstile.failed = false;
+  loadTurnstileScript()
+    .then((ts) => {
+      const box = $("#wf-turnstile");
+      if (!box || !wizardOpen || wizardStep !== 3) return;
+      wizardTurnstile.widgetId = ts.render(box, {
+        sitekey: TURNSTILE_SITEKEY,
+        action: "checkout",
+        language: currentLang === "en" ? "en" : "es",
+        callback: (token) => {
+          wizardTurnstile.token = token;
+          setWizardTurnstileMsg("");
+          updateWizardFooter();
+        },
+        "expired-callback": () => {
+          wizardTurnstile.token = null;
+          updateWizardFooter();
+        },
+        "error-callback": () => {
+          wizardTurnstile.token = null;
+          updateWizardFooter();
+        },
+      });
+    })
+    .catch(() => {
+      wizardTurnstile.failed = true;
+      setWizardTurnstileMsg(
+        currentLang === "es"
+          ? "No pudimos cargar la verificación de seguridad. Revisa tu conexión (o desactiva el bloqueador de anuncios) y vuelve a abrir este paso."
+          : "We couldn't load the security check. Check your connection (or disable your ad blocker) and reopen this step.",
+      );
+      updateWizardFooter();
+    });
 }
 
 function renderWizardFamilyStep() {
@@ -1962,7 +2052,7 @@ function canWizardNext() {
     });
   }
   if (wizardStep === 2) return !!(wizardSelectedPlan && wizardPaymentType);
-  if (wizardStep === 3) return wizardAcceptedTerms;
+  if (wizardStep === 3) return wizardAcceptedTerms && (!TURNSTILE_SITEKEY || !!wizardTurnstile.token);
   return true;
 }
 
@@ -2056,6 +2146,9 @@ async function submitWizard() {
   };
   payload.idempotencyKey = wizardIdempotencyKey(payload);
   payload.timestamp = new Date().toISOString();
+  /* Fuera de la huella de idempotencia: el token cambia en cada intento. */
+  if (wizardTurnstile.token) payload.turnstileToken = wizardTurnstile.token;
+  wizardTurnstile.token = null; /* de un solo uso */
 
   setWizardProcessing(true);
 
