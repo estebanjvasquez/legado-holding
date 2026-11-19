@@ -877,6 +877,11 @@ async function execCreateLead(args, env, attribution) {
     return { ok: true, solicitud_id: resp?.id ?? resp?.solicitud_id ?? null, tipo, plan_id: body.plan_id ?? null, servicio_id: body.servicio_id ?? null };
   } catch (e) {
     console.warn(`[alma] create_lead error: ${e.message}`);
+    /* 429 demasiadas_solicitudes / 503 sobrecarga: saturación pasajera, no
+       una falla — que Alma pida intentarlo en un momento. */
+    if (e.status === 429 || e.status === 503) {
+      return { ok: false, retry_later: true, error: "El sistema está recibiendo muchas solicitudes en este momento y no se pudo registrar el prospecto. Dile con calma que lo intente de nuevo en un momento (no lo llames error técnico) y ofrécele, si prefiere, otro medio de contacto." };
+    }
     return { ok: false, error: `No se pudo registrar el prospecto por un error técnico (${e.message}). Discúlpate y ofrece reintentar u otro medio de contacto.` };
   }
 }

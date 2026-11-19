@@ -13,7 +13,7 @@ const isAliados = (u) => u.includes("/aliados");
 let m;
 beforeEach(() => {
   _resetEmergencyCache();
-  Object.assign(_compraTiming, { enProcesoWaitMs: 1, retryWaitMs: 1, budgetMs: 8000 });
+  Object.assign(_compraTiming, { enProcesoWaitMs: 1, retryWaitMs: 1, budgetMs: 8000, maxRetryAfterMs: 3000 });
 });
 afterEach(() => m && m.restore());
 
@@ -149,6 +149,19 @@ test("PF-9: con clave, un 503 se reintenta una vez (seguro) y conserva al vended
   assert.equal(r.success, true);
   assert.equal(compras(m.calls).length, 2);
   assert.ok(compras(m.calls)[1].body.atribucion);
+});
+
+test("PF-9: 503 sobrecarga con Retry-After: espera ese tiempo (tope) y termina en UNA compra", async () => {
+  _compraTiming.maxRetryAfterMs = 50;
+  let n = 0;
+  m = mockFetch([[isPF, () => (++n === 1 ? jsonResponse({ codigo: "sobrecarga" }, 503, { "Retry-After": "2" }) : jsonResponse(OK))]]);
+  const t0 = Date.now();
+  const r = await processWizardCheckout(body(), ENV);
+  assert.equal(r.success, true);
+  assert.ok(Date.now() - t0 >= 45, "respeta el Retry-After (acotado al tope)");
+  const c = compras(m.calls);
+  assert.equal(c.length, 2);
+  assert.equal(c[0].init.headers["Idempotency-Key"], c[1].init.headers["Idempotency-Key"], "misma clave: Previsión no duplica");
 });
 
 test("PF-9: sin clave, un 503 NO se reintenta", async () => {

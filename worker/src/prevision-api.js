@@ -8,6 +8,10 @@ import { resolveTenant } from "./tenant.js";
 
 const DEFAULT_TIMEOUT_MS = 10000;
 const COMPRA_TIMEOUT_MS  = 20000;
+/* Tope de espera para respetar el Retry-After de un 503 `sobrecarga`
+   (exportado para que los tests lo acorten). */
+export const _solicitudTiming = { maxRetryAfterMs: 3000 };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export function createPF(env) {
   const { id: tenant } = resolveTenant(env);
@@ -15,9 +19,12 @@ export function createPF(env) {
     `/api/public/t/${tenant}`;
   const token = env.PF_TOKEN;
 
-  /* `auth: true` marca los endpoints server-to-server (parentescos, compras).
-     El catálogo (planes/servicios) y los leads (solicitudes) son públicos —
-     mismo contrato que el navegador, sin token — así que no deben exigirlo. */
+  /* `auth: true` marca los endpoints server-to-server (parentescos, compras,
+     solicitudes…). El catálogo (planes/servicios) es público — mismo contrato
+     que el navegador, sin token. POST /solicitudes también acepta llamadas sin
+     token, pero Previsión las limita a 10/min por IP y todo este Worker sale
+     con la misma IP de Cloudflare: con token solo aplica el tope de la empresa
+     (300/min). El límite por visitante lo pone este Worker. */
   /* Sin timeout, si Previsión se colgaba el usuario quedaba con el spinner
      indefinidamente. Los errores llevan `status` (HTTP) o `timeout`, para que
      quien llama distinga un rechazo de validación (4xx) de una falla
@@ -106,6 +113,18 @@ export function createPF(env) {
     getPlanes:    (idioma) => req("GET", `/planes${idioma ? `?idioma=${idioma}` : ""}`),
     getServicios: (idioma) => req("GET", `/servicios${idioma ? `?idioma=${idioma}` : ""}`),
     /* Lead público (prospecto) — nunca es un contrato, ver docs/api-publica-wizard.md. */
-    crearSolicitud: (body) => req("POST", "/solicitudes", body),
+    /* 503 `sobrecarga` (base de Previsión saturada) → un reintento tras su
+       Retry-After. Un 429 `demasiadas_solicitudes` no se reintenta en caliente.
+       Un 401 es PF_TOKEN mal configurado: NO regenerar el token. */
+    crearSolicitud: async (body) => {
+      try {
+        return await req("POST", "/solicitudes", body, { auth: true });
+      } catch (e) {
+        if (e.status === 401) console.error("[pf] POST /solicitudes 401: revisar PF_TOKEN del Worker (no regenerarlo)");
+        if (e.status !== 503) throw e;
+        await sleep(Math.min(e.retryAfterMs ?? 2000, _solicitudTiming.maxRetryAfterMs));
+        return await req("POST", "/solicitudes", body, { auth: true });
+      }
+    },
   };
 }

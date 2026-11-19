@@ -161,7 +161,7 @@ function validIdempotencyKey(k) {
 }
 
 /* Mutable solo para que los tests no esperen de verdad. */
-export const _compraTiming = { enProcesoWaitMs: 2000, retryWaitMs: 1000, budgetMs: 8000 };
+export const _compraTiming = { enProcesoWaitMs: 2000, retryWaitMs: 1000, budgetMs: 8000, maxRetryAfterMs: 3000 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /* POST /compras con la clave de idempotencia. Con clave, los reintentos son
@@ -188,7 +188,8 @@ async function crearCompraSegura(PF, body, key) {
       if (key && transitorio && transitorios < 1 && queda) {
         transitorios++;
         console.warn(`[wizard] crearCompra falla transitoria (${e.message}) — reintento con la misma Idempotency-Key`);
-        await sleep(_compraTiming.retryWaitMs);
+        /* Previsión manda Retry-After (2 s) en su 503 `sobrecarga`. */
+        await sleep(Math.min(e.retryAfterMs ?? _compraTiming.retryWaitMs, _compraTiming.maxRetryAfterMs));
         continue;
       }
       throw e;

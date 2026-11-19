@@ -2,10 +2,11 @@ import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { handleChat, capHistory, turnNumber, buildHandoffSummary } from "../src/chat.js";
 import { _retryTiming, _resetAsistenteCache, _resetEmergencyCache } from "../src/alma.js";
+import { _solicitudTiming } from "../src/prevision-api.js";
 import { mockFetch, jsonResponse, isOpenAI } from "./helpers.mjs";
 
 let m;
-beforeEach(() => { _retryTiming.baseDelayMs = 1; _retryTiming.maxDelayMs = 5; _resetAsistenteCache(); _resetEmergencyCache(); });
+beforeEach(() => { _solicitudTiming.maxRetryAfterMs = 1; _retryTiming.baseDelayMs = 1; _retryTiming.maxDelayMs = 5; _resetAsistenteCache(); _resetEmergencyCache(); });
 afterEach(() => m && m.restore());
 
 const ENV = { OPENAI_API_KEY: "sk-test", PF_TOKEN: "tok", PF_BASE: "https://pf.test" };
@@ -129,4 +130,47 @@ test("el prospecto (create_lead) lleva el consentimiento estructurado y no es de
   assert.ok(Date.parse(sol[0].body.consentimiento.aceptado_en) <= Date.now(), "nunca en el futuro");
   assert.equal(sol[0].body.origen, undefined, "prospecto = origen por defecto");
   assert.equal(sol[0].body.mensaje.length, 600, "mensaje del usuario completo, sin texto agregado");
+  assert.equal(sol[0].init.headers.Authorization, "Bearer tok", "POST /solicitudes va con PF_TOKEN");
+});
+
+/* create_lead contra un /solicitudes que responde `solicitud`; devuelve las
+   llamadas a /solicitudes y el resultado de la herramienta que vio el LLM. */
+async function leadCon(solicitud) {
+  let n = 0;
+  const args = { tipo: "plan", plan_id: 2, nombres: "Ana", apellidos: "Pérez", telefono: "+13055550000" };
+  m = mockFetch([
+    asistente(), servicios,
+    [isOpenAI, () => (++n === 1
+      ? jsonResponse({ choices: [{ message: { content: null, tool_calls: [{ id: "t1", type: "function", function: { name: "create_lead", arguments: JSON.stringify(args) } }] } }] })
+      : jsonResponse({ choices: [{ message: { content: "ok" } }] }))],
+    [isSolicitudes, solicitud],
+  ]);
+  const c = ctx();
+  await handleChat({ sessionId: "s7", message: "sí", lang: "es" }, ENV, c);
+  await c.done();
+  const second = m.calls.filter((x) => isOpenAI(x.url))[1];
+  const toolMsg = second.body.messages.find((x) => x.role === "tool");
+  return { sol: m.calls.filter((x) => isSolicitudes(x.url)), tool: JSON.parse(toolMsg.content) };
+}
+
+test("create_lead con 429 de Previsión: no reintenta y pide intentarlo en un momento", async () => {
+  const { sol, tool } = await leadCon(() => jsonResponse({ codigo: "demasiadas_solicitudes" }, 429, { "Retry-After": "60" }));
+  assert.equal(sol.length, 1);
+  assert.equal(tool.ok, false);
+  assert.equal(tool.retry_later, true);
+  assert.match(tool.error, /en un momento/);
+});
+
+test("create_lead con 503 sobrecarga: un reintento tras Retry-After y registra", async () => {
+  let k = 0;
+  const { sol, tool } = await leadCon(() => (++k === 1 ? jsonResponse({ codigo: "sobrecarga" }, 503, { "Retry-After": "2" }) : jsonResponse({ id: 5 })));
+  assert.equal(sol.length, 2);
+  assert.equal(tool.ok, true);
+  assert.equal(tool.solicitud_id, 5);
+});
+
+test("create_lead con 503 dos veces: pide intentarlo en un momento", async () => {
+  const { sol, tool } = await leadCon(() => jsonResponse({ codigo: "sobrecarga" }, 503, { "Retry-After": "2" }));
+  assert.equal(sol.length, 2);
+  assert.equal(tool.retry_later, true);
 });
