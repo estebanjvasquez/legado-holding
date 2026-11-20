@@ -208,3 +208,25 @@ test("maskEmail: el log no lleva el correo completo", async () => {
   assert.equal(maskEmail("ana.perez@gmail.com"), "an***@gmail.com");
   assert.equal(maskEmail(""), "***");
 });
+
+/* ── atribucion.fuente_codigo (Previsión 2026-11-20) ── */
+test("fuente_codigo: 'enlace' y 'manual' viajan; otro valor o sin código se descarta", () => {
+  assert.equal(sanitizeAttribution({ codigo_vendedor: "MN4UYC5Y", fuente_codigo: "enlace" }).fuente_codigo, "enlace");
+  assert.equal(sanitizeAttribution({ codigo_vendedor: "MARIAP2026", fuente_codigo: "Manual" }).fuente_codigo, "manual");
+  assert.equal(sanitizeAttribution({ codigo_vendedor: "MN4UYC5Y", fuente_codigo: "qr" }).fuente_codigo, undefined);
+  assert.equal(sanitizeAttribution({ canal_origen: "directo", fuente_codigo: "manual" }).fuente_codigo, undefined);
+});
+
+test("fuente_codigo: compra con código manual → POST /compras lleva fuente_codigo 'manual'", async () => {
+  m = mockFetch([[isPF, () => jsonResponse({ compra_pendiente_id: 1, estado: "pendiente_pago", link_de_cobro: "https://x" })]]);
+  await processWizardCheckout(body({ attribution: { codigo_vendedor: "MARIAP2026", fuente_codigo: "manual" } }), ENV);
+  const c = m.calls.filter((x) => x.url.endsWith("/compras"));
+  assert.deepEqual([c[0].body.atribucion.codigo_vendedor, c[0].body.atribucion.fuente_codigo], ["MARIAP2026", "manual"]);
+});
+
+test("fuente_codigo: compra con ?ref= → POST /compras lleva fuente_codigo 'enlace'", async () => {
+  m = mockFetch([[isPF, () => jsonResponse({ compra_pendiente_id: 1, estado: "pendiente_pago", link_de_cobro: "https://x" })]]);
+  await processWizardCheckout(body({ attribution: { codigo_vendedor: "MN4UYC5Y", fuente_codigo: "enlace" } }), ENV);
+  const c = m.calls.filter((x) => x.url.endsWith("/compras"));
+  assert.equal(c[0].body.atribucion.fuente_codigo, "enlace");
+});

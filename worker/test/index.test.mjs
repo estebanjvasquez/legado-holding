@@ -79,3 +79,17 @@ test("vendedor: un código de más de 20 caracteres no se recorta (sería otro c
   const r = await worker.fetch(new Request(`https://api.test/wizard/vendedor?codigo=${"A".repeat(21)}`), { PF_TOKEN: "t" }, ctx);
   assert.equal((await r.json()).activo, false);
 });
+
+test("vendedor: si el código cambió, devuelve el VIGENTE que trae Previsión", async () => {
+  m = mockFetch([[(u) => String(u).includes("/vendedores/lookup"), () => jsonResponse({ activo: true, codigo: "MARIAP2026", nombre: "María P." })]]);
+  const r = await worker.fetch(new Request("https://api.test/wizard/vendedor?codigo=mn4uyc5y"), { PF_TOKEN: "t", PF_BASE: "https://pf.test" }, ctx);
+  const d = await r.json();
+  assert.equal(d.activo, true);
+  assert.equal(d.codigo, "MARIAP2026");
+});
+
+test("vendedor: sin código en la respuesta, devuelve el consultado", async () => {
+  m = mockFetch([[(u) => String(u).includes("/vendedores/lookup"), () => jsonResponse({ activo: true, nombre: "X" })]]);
+  const r = await worker.fetch(new Request("https://api.test/wizard/vendedor?codigo=AB12CD34"), { PF_TOKEN: "t", PF_BASE: "https://pf.test" }, ctx);
+  assert.equal((await r.json()).codigo, "AB12CD34");
+});

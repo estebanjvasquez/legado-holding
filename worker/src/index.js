@@ -226,7 +226,8 @@ async function handleParentescos(env, json, url) {
 async function handleVendedorLookup(codigo, env, json, url) {
   const c = (codigo || "").replace(/[^A-Za-z0-9]/g, "");
   if (c.length < 4 || c.length > 20) return json({ activo: false, verificado: true });
-  const path = `vendedor/${resolveTenant(env).id}/${c}`;
+  /* Previsión compara sin distinguir mayúsculas: una sola entrada de caché. */
+  const path = `vendedor/${resolveTenant(env).id}/${c.toUpperCase()}`;
   const cached = await cacheGet(url, path);
   if (cached) return json(cached);
   try {
@@ -236,7 +237,8 @@ async function handleVendedorLookup(codigo, env, json, url) {
     const out = {
       activo: !!(resp && resp.activo),
       verificado: true,
-      codigo: c,
+      /* Si el vendedor cambió de código, Previsión trae el VIGENTE. */
+      codigo: (resp && /^[A-Za-z0-9]{4,20}$/.test(String(resp.codigo || ""))) ? String(resp.codigo) : c,
       nombre: (resp && (resp.nombre || resp.nombre_completo)) || null,
     };
     await cachePut(url, path, out, out.activo ? VENDEDOR_TTL_S : VENDEDOR_MISS_TTL_S);

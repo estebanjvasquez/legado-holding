@@ -168,8 +168,16 @@
      pendiente). */
   async function validate(rec, lookup) {
     for (let i = 0; i < 2 && rec && rec.ref && rec.ref_estado !== "valido"; i++) {
-      const res = await lookup(rec.ref);
+      const r = await lookup(rec.ref);
+      const res = typeof r === "string" ? r : r && r.estado;
       if (res === "valido") {
+        /* Si el vendedor cambió de código, el viejo sigue atribuyendo pero
+           Previsión devuelve el VIGENTE: se guarda ese (aviso PF 2026-11-20). */
+        const canon = canonicalCode(rec.ref, r);
+        if (canon !== rec.ref) {
+          markToques(rec, rec.ref, "valido");
+          rec.ref = canon;
+        }
         rec.ref_estado = "valido";
         markToques(rec, rec.ref, "valido");
         delete rec.ref_pendiente;
@@ -189,11 +197,15 @@
     return rec;
   }
 
+  /* Código vigente que devolvió el lookup, o el consultado si no trae uno
+     válido. */
+  function canonicalCode(asked, res) {
+    const c = res && typeof res === "object" ? String(res.codigo || "") : "";
+    return REF_RE.test(c) ? c : asked;
+  }
+
   function makeLookup(lookupUrl, fetchFn) {
-    const detail = makeLookupDetail(lookupUrl, fetchFn);
-    return async function lookup(code) {
-      return (await detail(code)).estado;
-    };
+    return makeLookupDetail(lookupUrl, fetchFn);
   }
 
   /* Igual que lookup pero devuelve también el nombre del vendedor:
@@ -209,7 +221,7 @@
         });
         if (!r.ok) return { estado: "error", nombre: null };
         const d = await r.json();
-        if (d && d.activo) return { estado: "valido", nombre: d.nombre || null };
+        if (d && d.activo) return { estado: "valido", nombre: d.nombre || null, codigo: canonicalCode(code, d) };
         /* verificado:false = el Worker no pudo consultar a Previsión. */
         if (d && d.verificado === false) return { estado: "error", nombre: null };
         return { estado: "invalido", nombre: null };
@@ -265,6 +277,8 @@
     const out = {};
     if (rec.ref) {
       out.codigo_vendedor = rec.ref;
+      /* De dónde salió el código que se usa para atribuir. */
+      out.fuente_codigo = rec.fuente === "manual" ? "manual" : "enlace";
     } else if (rec.canal_origen && CANAL_ENUM.includes(rec.canal_origen)) {
       out.canal_origen = rec.canal_origen;
     }
@@ -309,6 +323,18 @@
     if (rec && rec.ref && rec.ref_estado === "valido" && rec.fuente !== "manual") return false;
     if (!rec) rec = { v: 2, ts: d.now, toques: [] };
     const st = estado === "valido" ? "valido" : "sin_verificar";
+    /* El wizard pre-llena el código del enlace aún sin verificar: si el
+       comprador lo deja igual, la fuente sigue siendo el enlace. */
+    /* opts.asked: lo que escribió el comprador, si `code` es el vigente que
+       devolvió Previsión. */
+    const same = (x) => !!x && rec.ref.toUpperCase() === String(x).toUpperCase();
+    if (rec.ref && rec.fuente !== "manual" && (same(code) || same(d.asked))) {
+      rec.ref = code;
+      rec.ref_estado = st;
+      delete rec.ref_pendiente;
+      save(d.storage, rec);
+      return true;
+    }
     rec.ref = code;
     rec.ref_estado = st;
     if (rec.fuente !== "manual") rec.canal_previo = rec.canal_origen || "directo";
@@ -341,6 +367,6 @@
     return makeLookupDetail(lookupUrl, d.fetchFn)(code);
   }
 
-  const api = { init, get, current, setManual, clearManual, lookupCode, _internals: { readFromURL, applyTouch, validate, load, KEY, TTL_MS, MAX_TOQUES, REF_RE } };
+  const api = { init, get, current, setManual, clearManual, lookupCode, _internals: { canonicalCode, readFromURL, applyTouch, validate, load, KEY, TTL_MS, MAX_TOQUES, REF_RE } };
   root.LegadoAttribution = api;
 })(typeof window !== "undefined" ? window : globalThis);

@@ -9,6 +9,7 @@
    (docs/api-publica-wizard.md §"Atribución de canal / vendedor").
    ============================================================================= */
 
+const FUENTES_CODIGO = ["enlace", "manual"];
 const CANAL_ENUM = ["directo", "redes_sociales", "buscador", "otro", "vendedor"];
 
 function clean(s, maxLen) {
@@ -26,7 +27,13 @@ export function sanitizeAttribution(raw) {
   /* 4–20 letras/números (aleatorio o personalizado). Un código más largo se
      descarta en vez de recortarse: recortado sería OTRO código. */
   const code = String(raw.codigo_vendedor || "").replace(/[^A-Za-z0-9]/g, "");
-  if (code.length >= 4 && code.length <= 20) out.codigo_vendedor = code;
+  if (code.length >= 4 && code.length <= 20) {
+    out.codigo_vendedor = code;
+    /* "enlace" (?ref=) o "manual" (campo código de asesor). Solo tiene sentido
+       con un código; otro valor se descarta. */
+    const fuente = String(raw.fuente_codigo || "").toLowerCase().trim();
+    if (FUENTES_CODIGO.includes(fuente)) out.fuente_codigo = fuente;
+  }
 
   const canal = String(raw.canal_origen || "").toLowerCase().trim();
   if (CANAL_ENUM.includes(canal)) out.canal_origen = canal;

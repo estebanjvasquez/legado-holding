@@ -147,7 +147,65 @@ test("formato del código: 4 a 20 letras/números", () => {
 
 test("lookupCode devuelve estado y nombre del vendedor", async () => {
   const fetchFn = async () => ({ ok: true, json: async () => ({ activo: true, verificado: true, nombre: "María Pérez" }) });
-  assert.deepEqual(await A.lookupCode("MARIAP2026", "https://api.test/wizard/vendedor", { fetchFn }), { estado: "valido", nombre: "María Pérez" });
+  assert.deepEqual(await A.lookupCode("MARIAP2026", "https://api.test/wizard/vendedor", { fetchFn }), { estado: "valido", nombre: "María Pérez", codigo: "MARIAP2026" });
   const down = async () => ({ ok: false });
   assert.equal((await A.lookupCode("MARIAP2026", "https://api.test/wizard/vendedor", { fetchFn: down })).estado, "error");
+});
+
+/* ── Previsión 2026-11-20: fuente_codigo y código vigente ── */
+test("fuente_codigo: código de ?ref= viaja como 'enlace'", async () => {
+  const s = memStorage();
+  await visit(s, "?ref=GOOD1234", { lookup: lookupFrom({ GOOD1234: "valido" }) });
+  assert.equal(A.get({ storage: s }).fuente_codigo, "enlace");
+});
+
+test("fuente_codigo: código escrito en el wizard viaja como 'manual'", () => {
+  const s = memStorage();
+  assert.equal(A.setManual("MARIAP2026", "valido", { storage: s }), true);
+  const a = A.get({ storage: s });
+  assert.equal(a.codigo_vendedor, "MARIAP2026");
+  assert.equal(a.fuente_codigo, "manual");
+});
+
+test("fuente_codigo: manual distinto de un ?ref= sin verificar → se usa el manual, fuente 'manual'", async () => {
+  const s = memStorage();
+  await visit(s, "?ref=TYPO1234", { lookup: async () => "error" });
+  A.setManual("MARIAP2026", "valido", { storage: s });
+  const a = A.get({ storage: s });
+  assert.deepEqual([a.codigo_vendedor, a.fuente_codigo], ["MARIAP2026", "manual"]);
+});
+
+test("fuente_codigo: dejar en el wizard el mismo código del enlace sigue siendo 'enlace'", async () => {
+  const s = memStorage();
+  await visit(s, "?ref=GOOD1234", { lookup: async () => "error" });
+  A.setManual("good1234", "valido", { storage: s });
+  assert.equal(A.get({ storage: s }).fuente_codigo, "enlace");
+});
+
+test("fuente_codigo: enlace con código viejo que Previsión resuelve al vigente sigue siendo 'enlace'", async () => {
+  const s = memStorage();
+  await visit(s, "?ref=OLDC0DE9", { lookup: async () => "error" });
+  A.setManual("NEWCODE7", "valido", { storage: s, asked: "OLDC0DE9" });
+  const a = A.get({ storage: s });
+  assert.deepEqual([a.codigo_vendedor, a.fuente_codigo], ["NEWCODE7", "enlace"]);
+});
+
+test("código cambiado: si el lookup trae otro código vigente, se guarda el vigente", async () => {
+  const s = memStorage();
+  await visit(s, "?ref=OLDC0DE9", { lookup: async () => ({ estado: "valido", codigo: "MARIAP2026" }) });
+  assert.equal(s.raw().ref, "MARIAP2026");
+  assert.equal(s.raw().ref_estado, "valido");
+  assert.equal(A.get({ storage: s }).codigo_vendedor, "MARIAP2026");
+});
+
+test("código cambiado: un código vigente con formato inválido se ignora", async () => {
+  const s = memStorage();
+  await visit(s, "?ref=GOOD1234", { lookup: async () => ({ estado: "valido", codigo: "x" }) });
+  assert.equal(s.raw().ref, "GOOD1234");
+});
+
+test("lookupCode devuelve el código vigente de la respuesta", async () => {
+  const fetchFn = async () => ({ ok: true, json: async () => ({ activo: true, codigo: "MARIAP2026", nombre: "María" }) });
+  const r = await A.lookupCode("mn4uyc5y", "https://api.test/wizard/vendedor", { fetchFn });
+  assert.deepEqual(r, { estado: "valido", nombre: "María", codigo: "MARIAP2026" });
 });

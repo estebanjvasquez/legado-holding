@@ -1413,6 +1413,8 @@ async function checkWizardAsesor(code) {
   } else {
     wizardAsesor.estado = res.estado;
     wizardAsesor.nombre = res.nombre;
+    /* Código vigente según Previsión (si el vendedor lo cambió). */
+    wizardAsesor.canon = res.estado === "valido" && res.codigo ? res.codigo : null;
   }
   renderWizardAsesorStatus();
   updateWizardFooter();
@@ -1450,7 +1452,7 @@ function applyWizardAsesor() {
   if (!A || wizardAsesor.locked) return;
   try {
     if (wizardAsesor.code && (wizardAsesor.estado === "valido" || wizardAsesor.estado === "error")) {
-      A.setManual(wizardAsesor.code, wizardAsesor.estado === "valido" ? "valido" : "sin_verificar");
+      A.setManual(wizardAsesor.canon || wizardAsesor.code, wizardAsesor.estado === "valido" ? "valido" : "sin_verificar", { asked: wizardAsesor.code });
     } else if (!wizardAsesor.code) {
       A.clearManual();
     }
@@ -1916,6 +1918,7 @@ function bindWizardStepEvents() {
       clearTimeout(wizardAsesorTimer);
       wizardAsesor.code = code;
       wizardAsesor.nombre = null;
+      wizardAsesor.canon = null;
       if (!code) wizardAsesor.estado = "";
       else if (code.length < 4) wizardAsesor.estado = "short";
       else {
