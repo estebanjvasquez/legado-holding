@@ -565,6 +565,20 @@ legado-holding.)*
 
 ## Cerrado
 
+- [x] **LH-5 · `fuente_codigo` + código vigente del vendedor** (aviso de Previsión
+  2026-11-20) — ✅ desplegado 2026-11-20, commit `5640ad9`, Worker `ecd61778`.
+  `atribucion.fuente_codigo` `enlace`/`manual` en `/compras` y `/solicitudes`; si
+  `/vendedores/lookup` trae otro `codigo`, el sitio guarda el vigente. Tests: manual →
+  `"manual"`, `?ref=` → `"enlace"`.
+- [x] **LH-4 · Frecuencia de pago en el wizard** (pedido 2026-11-19) — ✅ desplegado
+  2026-11-20, commit `d5dc81c`. El paso "Pago" exige elegir (sin preselección); el
+  resumen muestra cuota mensual/anual de `GET /planes`, cuota inicial Selecto y primer
+  cobro; el Worker exige `paymentType` y loguea `frecuencia_pago`. Investigación: el
+  sitio manda bien la frecuencia (probado en navegador: mensual → `"mensual"`, anual →
+  `"anual"`); no se pudo explicar desde acá por qué la **compra 42 / contrato 14** llegó
+  `"anual"` (sin logs históricos del Worker). **Pendiente de Previsión:** revisar el
+  body recibido en esa compra. **Pendiente del usuario:** confirmar en el Stripe de
+  Legado que la compra anual de prueba del 2026-11-20 muestra 94,70 US$/año.
 - [x] **LH-3 · Smoke test end-to-end en navegador** — ✅ cerrado 2026-08-27.
   - API + lógica: Worker `POST /compras` Selecto (id 3/4, mensual/anual) → 200 con
     `atribucion`; Alma `create_lead` + handoff con `?ref=` (incl. minúsculas) OK;

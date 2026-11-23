@@ -4,7 +4,7 @@
 > escanear el repo entero. Si algo de acá contradice al código, gana el código —
 > avísalo y corrige este archivo.
 >
-> **Última actualización: 2026-11-17.** Mantener esta fecha y el bloque
+> **Última actualización: 2026-11-23 (cierre de proyecto).** Mantener esta fecha y el bloque
 > "Estado actual" al día en cada cierre de jornada.
 
 ---
@@ -30,6 +30,7 @@ separado, tenant `lh`).
 | 5 | `docs/api-publica-wizard.md` | **Contrato** de la API de Prevision-Funeraria que consume el wizard y Alma. Autoritativo. |
 | 6 | `docs/GUIA_INTERACCION_BOT_LEGADO.md` | Contrato de tono y clasificación (A/B/C) del bot Alma |
 | 7 | `docs/pruebas-tenant-lh-para-prevision.md` | Canal entre agentes (este repo ↔ Prevision-Funeraria): bitácora de pedidos PF-\*/LH-\* |
+| 8 | `docs/activar-stripe-lh.md` | Configuración de Stripe del tenant `lh` en el panel de Previsión y checklist para pasar de test a cobros reales |
 
 Lo demás en `docs/` es material de apoyo (specs de UI, manuales, auditoría de marca)
 o **archivo histórico** (ver §9).
@@ -63,8 +64,9 @@ Navegador ──GET catálogo (CORS, sin token)──▶ app.previsionfuneraria.
 ### Frontend (raíz)
 | Archivo | Rol |
 |---|---|
-| `index.html` | Página única. `LEGADO_CONFIG` (switch dev/prod), `PLANS_API_URL` directo a Previsión, `PARENTESCOS_API_URL`/chat vía Worker. **Cache-bust `?v=N`**: `css/main.css?v=4`, `js/attribution.js?v=2`, `js/main.js?v=17` (independientes; líneas ~110 y ~1358). |
-| `js/attribution.js` | Atribución de vendedor (`?ref=`): valida el código contra `/wizard/vendedor`, first-touch entre códigos válidos (TTL 90d), guarda los últimos 10 toques. Se carga antes de `main.js`; tests en `worker/test/attribution-frontend.test.mjs`. |
+| `index.html` | Página única. `LEGADO_CONFIG` (switch dev/prod), `PLANS_API_URL` directo a Previsión, `PARENTESCOS_API_URL`/chat vía Worker. **Cache-bust `?v=N`**: `css/main.css?v=5`, `js/attribution.js?v=3`, `js/wizard-pricing.js?v=1`, `js/main.js?v=19` (independientes; líneas ~110 y ~1358). |
+| `js/attribution.js` | Atribución de vendedor (`?ref=`): valida el código contra `/wizard/vendedor`, first-touch entre códigos válidos (TTL 90d), guarda los últimos 10 toques. Si Previsión devuelve otro `codigo` (el vendedor cambió de código) guarda el **vigente**. Manda `fuente_codigo` (`enlace`/`manual`). Se carga antes de `main.js`; tests en `worker/test/attribution-frontend.test.mjs`. |
+| `js/wizard-pricing.js` | Montos que **muestra** el wizard según la frecuencia (mensual = `precio_mensual_centavos`, anual = `precio_anual_centavos`, + `cuota_inicial_centavos` en Selecto). Solo presentación: el sitio nunca envía montos. Tests en `worker/test/wizard-pricing.test.mjs`. |
 | `js/main.js` | i18n, wizard de 4 pasos, UI del chat de Alma, y **§"ATRIBUCIÓN DE VENDEDOR / CANAL"** (`initAttribution`/`getAttribution`, `localStorage["legado_attribution"]`, first-touch TTL 90d). `SELECTO_CHECKOUT_ENABLED = true`, `WIZARD_ENABLED_SLUGS`. |
 | `js/wizard-generic.js` | Botones "Protege tu Legado" sin plan → scroll a la sección de planes. |
 | `js/vendor/purify.min.js` | DOMPurify (sanitiza HTML del chat). |
@@ -89,21 +91,43 @@ Navegador ──GET catálogo (CORS, sin token)──▶ app.previsionfuneraria.
 
 ### Vars y secrets del Worker
 - **Vars** (en `wrangler.toml`, no secretas): `PF_BASE`, `SITE_BASE_URL`, `ALLOWED_ORIGINS`
-  (CSV de orígenes CORS), `OPENAI_MODEL=gpt-5.6-luna`, `SUPABASE_URL`, `ENVIRONMENT`.
+  (CSV de orígenes CORS), `TURNSTILE_HOSTNAMES`, `OPENAI_MODEL=gpt-5.6-luna`, `TENANT=lh`, `ENVIRONMENT`.
 - **Secrets** (`wrangler secret put`): `PF_TOKEN` (Bearer para `/compras`, `/parentescos`,
-  `/vendedores/lookup` de Previsión), `OPENAI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
+  `/vendedores/lookup`, `/solicitudes` de Previsión), `OPENAI_API_KEY`, `TURNSTILE_SECRET`.
+  **Stripe no tiene ningún secret acá**: lo maneja Previsión (ver `docs/activar-stripe-lh.md`).
 - Local: `worker/.dev.vars` (gitignoreado). El `PF_TOKEN` de prueba está también en
   `docs/pruebas-tenant-lh-para-prevision.SECRET.md` (gitignoreado).
 
 ---
 
-## 5. Estado actual (2026-11-17)
+## 5. Estado actual (2026-11-23 — proyecto cerrado)
+
+**Cierre 2026-11-23.** Todo lo pedido está desplegado (sitio en cPanel + Worker). Últimos
+commits de código: `d5dc81c` (frecuencia de pago), `5640ad9` (atribución `fuente_codigo`
++ código vigente). Worker `ecd61778-365a-43b9-9c57-12600ab2d236`. 114 tests en verde.
+
+- **Frecuencia de pago (2026-11-19/20).** El paso "Pago" del wizard ya no preselecciona
+  nada: no avanza hasta elegir mensual o anual. El resumen muestra la frecuencia, la
+  cuota (`precio_mensual_centavos`/`precio_anual_centavos`), la cuota inicial de los
+  Selecto y el **primer cobro**. El Worker rechaza una compra sin `paymentType` (ya no
+  asume mensual) y loguea `paymentType`/`frecuencia_pago`. Previsión corrigió su lado:
+  anual = mensual × `meses_facturados_anual` (Esencial Zulia 94,70 US$/año).
+- **Atribución (2026-11-20).** `atribucion.fuente_codigo` (`enlace`/`manual`) en
+  `POST /compras` y `POST /solicitudes`; el código de vendedor se reemplaza por el
+  vigente si cambió; caché del lookup sin distinguir mayúsculas.
+- **Stripe — modo TEST.** Previsión reportó las compras de prueba del 2026-11-19 en
+  "Stripe modo test", lo que **supera** la nota del 2026-11-17 de abajo ("Stripe en
+  VIVO"). Las claves viven solo en el panel de Previsión (Secret key + Webhook signing
+  secret); pasar a cobros reales = cargar las claves live, sin tocar este repo. Pasos y
+  ficha en `docs/activar-stripe-lh.md`.
+
+### Estado previo (2026-11-17)
 
 - **En producción.** `main` despliega a la **raíz** de `legadoholding.com` (antes `/v2`;
   tag de rollback `pre-prevision-funeraria-rollback`). El Worker de `api.legadoholding.com`
   corre el código nuevo. **El deploy del frontend NO es automático**: tras el push a `main`
   hay que hacer en cPanel → Git Version Control → *Update from Remote* + *Deploy HEAD Commit*.
-- **Stripe en VIVO** (cuenta propia de Legado Holding Inc., confirmado 2026-11-17). Una
+- ~~**Stripe en VIVO**~~ **(superado 2026-11-19: modo TEST, ver arriba)** (cuenta propia de Legado Holding Inc., confirmado 2026-11-17). Una
   compra de prueba crea una compra pendiente real en Previsión.
 - **Revisión 2026-11-17 desplegada** (commits `419ebdf`, `562e68a`; Worker `85428f82` +
   cambio de secret): reintentos de OpenAI con presupuesto de 60 s por turno y WhatsApp de
@@ -127,6 +151,19 @@ Navegador ──GET catálogo (CORS, sin token)──▶ app.previsionfuneraria.
 - **Páginas legales** (Términos, Privacidad) publicadas.
 
 ### Pendiente / hilos abiertos
+
+- **(2026-11-23) Verificar la compra anual de prueba en el Stripe de Legado**: el usuario la
+  pagó el 2026-11-20; falta confirmar que Stripe muestra **94,70 US$/año** (checklist §3 de
+  `docs/activar-stripe-lh.md`). El conector de Stripe de Claude ve OTRA cuenta (SISTEG):
+  no sirve para esto.
+- **(2026-11-23) Compra 42 / contrato 14 llegó `"anual"` (2026-11-19)** aunque el usuario
+  eligió mensual. No se reproduce en el sitio (probado en navegador: mensual →
+  `mensual`); el paso "Pago" tenía mensual preseleccionado. Se pidió a Previsión revisar
+  el body recibido. Sin logs históricos del Worker (`observability` apagado).
+- **(2026-11-23) Paso a cobros reales**: depende de que Stripe apruebe la cuenta de Legado
+  Holding Inc.; luego seguir `docs/activar-stripe-lh.md` §4.
+- **Pruebas automáticas en producción**: Turnstile bloquea navegadores automatizados
+  (headless y con ventana). Las compras de prueba en prod las hace una persona.
 - **Canal entre agentes: PF-8 a PF-11 desplegados en ambos lados (2026-11-17).** Ver
   `docs/pruebas-tenant-lh-para-prevision.md`. Queda:
   - Aliados: viven solo en Previsión (panel de PF → *Aliados*); Alma los lee de
@@ -212,13 +249,13 @@ Navegador ──GET catálogo (CORS, sin token)──▶ app.previsionfuneraria.
 
 ```bash
 # Deploy del Worker
-cd worker && wrangler deploy
+cd worker && npx wrangler deploy --config wrangler.toml
 
 # Deploy del frontend (dispara .cpanel.yml al hacer push a main)
 git push origin main       # el usuario confirma que el deploy de cPanel se disparó
 
 # Secrets del Worker
-cd worker && wrangler secret put PF_TOKEN            # (o OPENAI_API_KEY, SUPABASE_SERVICE_ROLE_KEY)
+cd worker && wrangler secret put PF_TOKEN            # (o OPENAI_API_KEY, TURNSTILE_SECRET)
 
 # Health check (debe reportar pfTokenLoaded:true)
 Invoke-RestMethod -Uri 'https://api.legadoholding.com' -Method GET
@@ -227,7 +264,7 @@ Invoke-RestMethod -Uri 'https://api.legadoholding.com' -Method GET
 ```
 
 `.cpanel.yml` copia a `/home/legadoholding/public_html`:
-`index.html gracias.html cancelado.html css js images terminos-condiciones.html politica-privacidad.html admin`.
+`index.html gracias.html cancelado.html css js images terminos-condiciones.html politica-privacidad.html` (+ `.htaccess`; borra `admin/` del servidor).
 Si agregas un archivo estático nuevo que deba publicarse, **agrégalo a esa lista**.
 
 ---

@@ -389,7 +389,7 @@ de Invoice Ninja):
 1. normalize(body)
    ├─ Valida intent === 'create_payment_intent'
    ├─ Valida plan contra VALID_PLAN_SLUGS (solo esencial-zulia, vanguardia-zulia)
-   ├─ Valida planId, paymentType (monthly|annual), email y nombre del comprador
+   ├─ Valida planId, paymentType OBLIGATORIO (monthly|annual — sin default), email y nombre del comprador
    └─ Sanitiza y valida afiliados (máx. 6, cada uno con parentesco_id)
 
 2. createPF(env).crearCompra(...)

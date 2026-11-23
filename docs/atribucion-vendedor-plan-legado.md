@@ -67,3 +67,20 @@ los executores, para que sea determinista y quede fuera del razonamiento del mod
 3. Volver con `?ref=OTRO` → el `localStorage` **sigue** con `MN4UYC5Y` (first-touch).
 4. Chat con Alma pidiendo hablar con alguien → el botón "Continuar por WhatsApp" abre
    un mensaje que incluye "Vengo referido/a por un asesor de LEGADO (ref: MN4UYC5Y)".
+
+## Actualización 2026-11-20 (aviso de Previsión)
+
+- **`atribucion.fuente_codigo`**: `"enlace"` si el código vino del `?ref=`, `"manual"` si
+  el comprador lo escribió en el campo "código de asesor" del wizard. Viaja en
+  `POST /compras` y `POST /solicitudes`. Si el comprador deja el mismo código del enlace
+  (aunque Previsión lo resuelva al vigente), sigue siendo `"enlace"`. Lo arma
+  `js/attribution.js` (`get()`/`setManual()`) y lo filtra `worker/src/attribution.js`.
+- **Código vigente**: si un vendedor cambió de código, el viejo sigue atribuyendo y
+  `/vendedores/lookup` devuelve el vigente en `codigo`. El Worker
+  (`/wizard/vendedor`) lo reenvía y el sitio reemplaza el código guardado (90 días) y el
+  manual por el vigente.
+- Caché del lookup en el Worker sin distinguir mayúsculas (Previsión compara igual).
+- Formato de código: 4–20 letras/números (aleatorio de 8 o personalizado, p. ej.
+  `MARIAP2026`). Lo de "4–24" y "Selecto sin wizard" de arriba es histórico.
+- Commit `5640ad9`; tests en `worker/test/attribution-frontend.test.mjs`,
+  `worker/test/pf-8-11.test.mjs`, `worker/test/index.test.mjs`.

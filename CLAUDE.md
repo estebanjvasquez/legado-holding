@@ -86,3 +86,21 @@ de archivos actualizado, gaps conocidos de la API nueva, y un hilo abierto sin c
 (`open_thread_needs_followup`: reporte del usuario de que el bot Alma sigue
 presentándose dos veces pese a que el fix está verificado correcto en backend y
 frontend — pendiente de confirmar con el usuario en incógnito).
+
+## Cierre del proyecto (2026-11-23)
+
+Todo lo pedido quedó desplegado (sitio vía cPanel + Worker `ecd61778…`). Lo último:
+
+- **Frecuencia de pago (commit `d5dc81c`)**: el paso "Pago" del wizard ya no
+  preselecciona mensual; no avanza sin elección y el resumen muestra cuota, cuota
+  inicial (Selecto) y primer cobro (`js/wizard-pricing.js`, solo presentación — el sitio
+  nunca envía montos). El Worker exige `paymentType` y loguea `frecuencia_pago`.
+- **Atribución (commit `5640ad9`)**: `atribucion.fuente_codigo` (`enlace`/`manual`) y
+  reemplazo por el código vigente cuando un vendedor cambia de código.
+- **Stripe**: hoy en **modo test**. Las claves viven solo en el panel de Previsión
+  (Secret key + Webhook signing secret); este repo no tiene claves de Stripe. Pasar a
+  cobros reales: `docs/activar-stripe-lh.md`. Ojo: el conector de Stripe de Claude ve la
+  cuenta de SISTEG, no la de Legado — no sirve para verificar cobros de Legado.
+- **Pendientes** (en `docs/ONBOARDING-AGENTES.md` §5): verificar en el Stripe de Legado
+  la compra anual de prueba (94,70 US$/año); que Previsión explique por qué la compra 42
+  llegó "anual"; activar live cuando Stripe apruebe la cuenta.
