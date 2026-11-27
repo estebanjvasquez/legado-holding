@@ -189,25 +189,43 @@ Stub de atribución del handoff a WhatsApp (mismo endpoint):
 
 ## Abierto
 
-### PF-12 · Consentimiento de SMS y llamadas en `POST /compras` — **P1** (2026-11-27)
+### PF-12 · Registrar los consentimientos del titular desde la compra web — **P1** (2026-11-27, revisado)
 
-El wizard tiene ahora una casilla **aparte, opcional y sin marcar** (TCPA) para recibir
-SMS y llamadas sobre el plan, con el texto de STOP/HELP. La API pública no documenta un
-campo para guardarlo, así que hoy el Worker **no lo manda** (mandar un campo desconocido
-podría hacer fallar la compra). Está listo para viajar así, detrás de la variable
-`PF_CONSENTIMIENTO_SMS="1"` del Worker:
+**Situación.** El tenant `lh` ya tiene el catálogo `consentimiento_tipos` (ficha del
+titular → *Consentimientos del titular*): `comercial_correo` (1), `comercial_whatsapp` (2)
+y `compartir_aliados` (3). Pero `POST /compras` no recibe consentimientos, así que una
+compra hecha en el sitio deja los tres en "Sin registrar". El wizard ya tiene una casilla
+de SMS/llamadas, pero no la envía porque la API no tiene dónde guardarla, y ese tipo
+tampoco existe en el catálogo.
 
-```json
-"consentimiento_sms": { "aceptado": true, "aceptado_en": "2026-11-27T15:00:00Z",
-  "version": "2026-11-27", "canal": "wizard_sitio", "ip": "203.0.113.7" }
-```
-o `{ "aceptado": false }` si no marcó la casilla.
+**Pedido (lado Previsión):**
+1. **SMS en el catálogo.** Opción recomendada: ampliar `comercial_whatsapp` a
+   **"Comunicaciones comerciales por WhatsApp, SMS y llamadas"**, conservando la clave.
+   Alternativa: un tipo nuevo `comercial_sms`. Para TCPA, el texto aceptado debe nombrar
+   SMS/llamadas y decir que se cancela respondiendo STOP.
+2. **Catálogo público.** `GET /api/public/t/{slug}/consentimientos`, con CORS como
+   `/residencias`: `[{clave, nombre, descripcion}]` de los tipos activos. Así el wizard
+   muestra los textos vigentes del panel en vez de copias propias.
+3. **`POST /compras` acepta:**
+   ```json
+   "consentimientos": [
+     { "clave": "comercial_correo",   "otorgado": true  },
+     { "clave": "comercial_whatsapp", "otorgado": false },
+     { "clave": "compartir_aliados",  "otorgado": false }
+   ]
+   ```
+   La compra lleva `ip` y fecha; se guarda en la compra pendiente y se registra con
+   `registrarConsentimiento` (canal `web`, IP de la compra) **cuando se crea el cliente o
+   contrato** (webhook de Stripe). Ignorar claves desconocidas o inactivas sin rechazar la
+   compra. Registrar también `otorgado:false`: deja constancia de que se ofreció y no se
+   aceptó, y sale "Rechazado" en vez de "Sin registrar".
+4. **Uso.** Las campañas y la mensajería respetan `puedeContactar`; procesar STOP/HELP del
+   proveedor de SMS como retiro de `comercial_whatsapp` (o `comercial_sms`); los correos de
+   marketing llevan enlace de baja.
 
-Pedido: (1) aceptar y guardar ese campo en la compra/contrato (con fecha, versión del
-texto e IP como constancia); (2) no enviar SMS de promoción a quien no consintió;
-(3) procesar las respuestas STOP/HELP del proveedor de SMS (baja inmediata); (4) los
-correos de marketing que envíe Previsión llevan enlace para darse de baja. Avisar acá
-el nombre final del campo para activar la variable.
+**Lado LH, al confirmar los nombres:** el wizard lee `/consentimientos`, muestra una
+casilla opcional y sin marcar por cada tipo, y el Worker manda el arreglo. Esto reemplaza
+el campo provisional `consentimiento_sms` y la variable `PF_CONSENTIMIENTO_SMS`.
 
 ### PF-8 · `whatsapp_emergencia` del tenant `lh` desactualizado — **P1**
 
