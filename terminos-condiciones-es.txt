@@ -1,0 +1,107 @@
+CONTRATO DE SERVICIOS FUNERARIOS PREPAGADOS — TÉRMINOS Y CONDICIONES
+Versión 2.0 — noviembre de 2026
+
+1. PARTES Y OBJETO
+1.1 Este contrato se celebra entre LEGADO HOLDING GROUP LLC, sociedad de responsabilidad limitada con sede en Houston, Texas, Estados Unidos (en adelante, "la Empresa"), y la persona que contrata y paga el plan (en adelante, "el Titular").
+1.2 Su objeto es la prestación prepagada de servicios funerarios en Venezuela a favor de las personas inscritas por el Titular, según el plan elegido. La Empresa gestiona la contratación, el cobro y la atención al Titular, y los servicios los presta en Venezuela una funeraria aliada (Funeraria del Zulia u otra que la Empresa designe con un nivel de servicio equivalente).
+1.3 Este contrato NO es una póliza de seguro ni un producto de inversión. No genera rendimientos ni da derecho a recibir dinero en lugar del servicio, salvo los reembolsos expresamente previstos en la cláusula 7.
+
+2. DEFINICIONES
+- Titular: la persona mayor de edad que contrata el plan, acepta estos términos y es responsable de los pagos. El Titular puede estar o no inscrito como beneficiario.
+- Afiliado o beneficiario: cada persona inscrita en el contrato que recibirá el servicio funerario en Venezuela.
+- Plan: el paquete de servicios elegido (por ejemplo, Esencial Zulia o Vanguardia Zulia), con la cobertura, las condiciones y los precios publicados en su ficha al momento de la compra.
+- Portal del Titular: el área en línea donde el Titular consulta su contrato, sus pagos y sus afiliados, actualiza su tarjeta y solicita la cancelación.
+- Servicio: la atención funeraria que se presta al fallecer un afiliado, según el plan.
+
+3. SERVICIOS INCLUIDOS
+3.1 Los servicios cubiertos son los que describe la ficha del plan elegido, que forma parte de este contrato. Según el plan, pueden incluir:
+- Traslado del fallecido desde el lugar del deceso hasta la funeraria, dentro del área de cobertura del plan.
+- Preparación y conservación del cuerpo.
+- Ataúd o urna, según el plan y la elección de la familia.
+- Sala de velación.
+- Asistencia para una ceremonia religiosa o civil.
+- Traslado al cementerio o crematorio.
+- Inhumación o cremación, según el plan.
+- Gestión de la documentación legal necesaria en Venezuela.
+- Aviso necrológico.
+3.2 Si un elemento no aparece en la ficha del plan, no está incluido.
+3.3 Para solicitar el servicio, la familia debe comunicarse con la línea de emergencia publicada en el sitio web y en el Portal del Titular. Los servicios se prestan en Venezuela; la coordinación depende de las condiciones locales (por ejemplo, la disponibilidad de traslados, permisos y documentos oficiales).
+
+4. AFILIADOS
+4.1 Los afiliados, su parentesco y su edad deben cumplir las reglas del plan (edades mínima y máxima por parentesco, cantidad de personas y documentos exigidos), que se muestran al momento de inscribirlos. El precio puede variar según la edad de cada afiliado.
+4.2 El Titular declara que los datos de los afiliados (nombre, documento de identidad, fecha de nacimiento y parentesco) son verdaderos. Datos falsos o incompletos pueden impedir o retrasar el servicio y dar lugar a la anulación del afiliado.
+4.3 El Titular debe informar cualquier cambio de sus afiliados. Agregar un afiliado puede modificar el precio y, si el plan lo prevé, iniciar para esa persona su propio período de espera.
+4.4 Períodos de espera (carencia): si el plan establece un período de espera desde la inscripción, el fallecimiento durante ese período, por causas distintas de las que el plan exceptúe, no está cubierto. El período de espera de cada plan figura en su ficha.
+
+5. PRECIO, PAGO Y RENOVACIÓN AUTOMÁTICA
+5.1 Los precios están en dólares estadounidenses (USD) y son los que se muestran al Titular antes de pagar, según el plan, la frecuencia de pago y la edad de los afiliados.
+5.2 El pago se hace con tarjeta de crédito o débito a través de Stripe, procesador de pagos de la Empresa. La Empresa no almacena los datos completos de la tarjeta.
+5.3 RENOVACIÓN AUTOMÁTICA: AL CONTRATAR, EL TITULAR AUTORIZA QUE SE COBRE A SU TARJETA EL MONTO DEL PLAN DE FORMA AUTOMÁTICA EN CADA PERÍODO (MENSUAL O ANUAL, SEGÚN LO ELEGIDO) HASTA QUE CANCELE. EL TITULAR PUEDE CANCELAR EN CUALQUIER MOMENTO DESDE SU PORTAL O ESCRIBIENDO A soporte@legadoholding.com.
+5.4 En los planes de pago anual, la Empresa enviará un aviso por correo electrónico entre 30 y 45 días antes de cada renovación, con el monto que se cobrará y la forma de cancelar.
+5.5 El Titular puede adelantar cuotas desde su Portal cuando la Empresa ofrezca esa opción.
+5.6 Si la Empresa cambia el precio de un plan, avisará al Titular con al menos 30 días de anticipación. El nuevo precio aplicará a partir del período siguiente al aviso, y el Titular podrá cancelar antes sin penalidad.
+
+6. PAGOS RECHAZADOS Y SUSPENSIÓN
+6.1 Si un cobro es rechazado, la Empresa avisará al Titular para que actualice su tarjeta en el Portal. El procesador de pagos podrá reintentar el cobro.
+6.2 Mientras una cuota esté vencida, el contrato no está al día y el Servicio puede no prestarse hasta que se regularice el pago. Si el atraso supera 30 días o la suscripción termina por falta de pago, el contrato queda suspendido.
+6.3 Un contrato suspendido puede reactivarse pagando lo adeudado, en las condiciones que la Empresa informe. La reactivación puede iniciar un nuevo período de espera si el plan lo prevé.
+6.4 Si el Titular desconoce un cobro ante su banco (contracargo), el pago se considera no realizado mientras se resuelve el reclamo. Se recomienda escribir primero a soporte@legadoholding.com.
+
+7. CANCELACIÓN Y REEMBOLSOS
+7.1 DERECHO DE CANCELACIÓN EN 30 DÍAS (RESIDENTES DE FLORIDA): SI EL TITULAR RESIDE EN FLORIDA, PUEDE CANCELAR ESTE CONTRATO DENTRO DE LOS 30 DÍAS SIGUIENTES A SU FIRMA Y RECIBIRÁ EL REEMBOLSO TOTAL DE LO PAGADO, SIEMPRE QUE NO SE HAYA PRESTADO NINGÚN SERVICIO. El reembolso se hace a la misma tarjeta dentro de los 30 días siguientes a la solicitud. La cancelación se solicita desde el Portal del Titular o escribiendo a soporte@legadoholding.com.
+7.2 Titulares de otros estados o países: pueden cancelar en cualquier momento y no se harán más cobros desde la cancelación. Los reembolsos, si corresponden, se rigen por la ley de protección al consumidor aplicable en el estado de residencia del Titular.
+7.3 Fuera de los casos anteriores, la cancelación toma efecto al final del período ya pagado. La cobertura se mantiene hasta esa fecha y no se reembolsa la parte no usada del período, salvo que la ley aplicable disponga otra cosa.
+7.4 No hay reembolso por servicios ya prestados.
+7.5 El estado de residencia es el que el Titular declara al comprar. El Titular debe declararlo con veracidad; la Empresa solo vende en línea en los estados que tiene habilitados.
+
+8. EXCLUSIONES
+No están cubiertos:
+- Servicios o elementos no incluidos en la ficha del plan.
+- Servicios adicionales o mejoras que pida la familia (se cobran aparte, previo acuerdo con la funeraria).
+- Traslados fuera del área de cobertura del plan y repatriaciones o traslados internacionales.
+- Exhumaciones, reinhumaciones, compra de parcelas, nichos o derechos de cementerio, salvo que el plan los incluya.
+- Avisos necrológicos adicionales a los incluidos.
+- Fallecimientos durante el período de espera, o de afiliados inscritos con datos falsos.
+- Servicios solicitados mientras el contrato esté suspendido o con cuotas vencidas.
+
+9. OBLIGACIONES DE LA EMPRESA
+9.1 Prestar o hacer prestar los servicios del plan de forma profesional y respetuosa, a través de funerarias aliadas en Venezuela.
+9.2 Atender al Titular y a su familia en español e inglés por los canales publicados.
+9.3 Informar con claridad los cobros, renovaciones y cambios del contrato.
+9.4 La Empresa no responde por demoras o imposibilidad de prestar el servicio causadas por fuerza mayor o por hechos ajenos a su control (por ejemplo, desastres naturales, restricciones de autoridades, conflictos, cortes de servicios públicos o sanciones internacionales). En esos casos hará lo razonable para prestar el servicio o una alternativa equivalente.
+
+10. OBLIGACIONES DEL TITULAR
+10.1 Pagar puntualmente y mantener vigente su medio de pago.
+10.2 Mantener actualizados sus datos de contacto y los de sus afiliados.
+10.3 Dar información veraz al contratar y al solicitar el servicio.
+10.4 Informar a sus afiliados y familiares de la existencia del contrato y de la línea de emergencia.
+
+11. VENDEDORES
+Si el Titular compró a través de un vendedor o código de referido, el vendedor actúa en nombre de la Empresa. Ningún vendedor puede cambiar estos términos ni prometer coberturas, precios o reembolsos distintos de los aquí previstos.
+
+12. DATOS PERSONALES
+12.1 La Empresa trata los datos del Titular y de los afiliados según su Política de Privacidad, publicada en el sitio web.
+12.2 Para prestar el servicio, los datos se comparten con: Stripe (pagos), los proveedores de correo y mensajería que usa la Empresa para avisos, la plataforma de gestión de contratos de la Empresa y la funeraria aliada en Venezuela. Al contratar, el Titular acepta que sus datos y los de sus afiliados se transfieran a Venezuela con ese fin.
+12.3 La Empresa no vende datos personales.
+12.4 El Titular declara que tiene la autorización de sus afiliados para entregar sus datos.
+
+13. COMUNICACIONES Y ACEPTACIÓN ELECTRÓNICA
+13.1 El Titular acepta recibir por correo electrónico, SMS o WhatsApp los avisos del contrato (confirmaciones, cobros, pagos rechazados, renovaciones y cambios). Los mensajes de promoción solo se envían con su consentimiento y puede darse de baja en cualquier momento.
+13.2 La aceptación de estos términos por medios electrónicos tiene la misma validez que una firma. La Empresa conserva un registro de la versión aceptada, la fecha y hora, la dirección IP y el navegador usados.
+13.3 Idioma: este contrato existe en español y en inglés. Ambas versiones tienen el mismo contenido; el Titular acepta la versión en el idioma en que compró.
+
+14. CAMBIOS A ESTOS TÉRMINOS
+La Empresa puede modificar estos términos publicando una nueva versión. Los cambios se avisan al Titular con al menos 30 días de anticipación y aplican desde el período siguiente. Si el Titular no está de acuerdo, puede cancelar antes de que el cambio tome efecto. Los cambios no reducen los servicios ya pagados ni aplican a servicios en curso.
+
+15. LEY APLICABLE Y RECLAMOS
+15.1 Este contrato se rige por las leyes del Estado de Texas, Estados Unidos, sin perjuicio de los derechos que la ley del estado de residencia del Titular le otorgue como consumidor, los cuales no se renuncian.
+15.2 Antes de cualquier reclamo formal, el Titular puede escribir a soporte@legadoholding.com; la Empresa responderá dentro de 10 días hábiles.
+15.3 El Titular puede además presentar quejas ante la autoridad de protección al consumidor o el organismo regulador de su estado de residencia.
+
+16. CONTACTO
+LEGADO HOLDING GROUP LLC — Houston, Texas, Estados Unidos
+Correo: soporte@legadoholding.com
+Sitio web: www.legadoholding.com
+
+ACEPTACIÓN
+Al marcar la casilla "He leído y acepto los términos y condiciones" y completar la compra, el Titular confirma que leyó, entendió y acepta este contrato, incluida la renovación automática (cláusula 5.3) y las condiciones de cancelación (cláusula 7).

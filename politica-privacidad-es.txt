@@ -1,0 +1,68 @@
+POLÍTICA DE PRIVACIDAD
+Legado Holding Group LLC — Versión 2.0 — Última actualización: noviembre de 2026
+
+1. QUIÉNES SOMOS
+LEGADO HOLDING GROUP LLC (en adelante, "Legado", "nosotros"), con sede en Houston, Texas, Estados Unidos, vende planes de servicios funerarios prepagados que se prestan en Venezuela. Esta política explica qué datos personales recopilamos en www.legadoholding.com, en el proceso de compra, en el Portal del Titular y en nuestros canales de atención, para qué los usamos y qué derechos tienes.
+Contacto de privacidad: soporte@legadoholding.com
+
+2. QUÉ DATOS RECOPILAMOS
+2.1 Del Titular (quien contrata y paga): nombres y apellidos, documento de identidad, correo electrónico, teléfono, dirección, país y estado de residencia, idioma preferido y el historial de su contrato y de sus pagos.
+2.2 De los afiliados (personas que recibirán el servicio en Venezuela): nombres y apellidos, documento de identidad (cuando el plan lo exige), fecha de nacimiento y parentesco con el Titular. Si un afiliado fallece, también los datos necesarios para prestar el servicio (lugar, fecha y documentos del deceso, y datos de contacto del familiar que lo solicita).
+2.3 Datos de pago: los datos de tu tarjeta los recibe y procesa directamente Stripe. Nosotros no almacenamos el número completo de la tarjeta; solo vemos datos limitados, como la marca, los últimos 4 dígitos y el resultado de cada cobro.
+2.4 Constancia de aceptación: cuando aceptas los términos y condiciones, guardamos la versión aceptada, la fecha y hora, tu dirección IP y el navegador que usaste.
+2.5 Referidos: si compraste con un vendedor o un código de referido, registramos esa relación.
+2.6 Comunicaciones: los mensajes que nos envías por correo, WhatsApp, formularios o el asistente virtual "Alma", si decides usarlo.
+2.7 Datos de navegación: páginas visitadas y eventos de uso del sitio, mediante Google Analytics, solo si aceptas las cookies de analítica (ver sección 6).
+
+3. PARA QUÉ USAMOS TUS DATOS
+3.1 Celebrar y administrar tu contrato: inscribir a tus afiliados, calcular el precio según su edad y el plan, y mantener tu Portal del Titular.
+3.2 Cobrar las cuotas, enviarte recibos y avisarte de cobros rechazados, renovaciones, cambios de precio o de términos.
+3.3 Prestar el servicio funerario en Venezuela cuando fallezca un afiliado.
+3.4 Cumplir la ley: aplicar el derecho de cancelación del estado donde vives, conservar la constancia de aceptación, atender reclamos de pago y cumplir obligaciones contables, fiscales y de control de sanciones internacionales.
+3.5 Pagar la comisión al vendedor que hizo la venta.
+3.6 Atender tus consultas y mejorar el sitio y nuestros servicios.
+3.7 Enviarte información o promociones, solo si nos diste tu consentimiento. Puedes darte de baja en cualquier momento.
+
+4. CON QUIÉN COMPARTIMOS TUS DATOS
+No vendemos tus datos personales. Solo los compartimos con:
+- Stripe, para procesar los pagos con tarjeta.
+- Previsión Funeraria, la plataforma que administra nuestros planes, contratos y cobros, alojada en la infraestructura de Cloudflare.
+- Los proveedores de correo electrónico, SMS y WhatsApp que usamos para enviarte avisos del contrato.
+- La funeraria aliada en Venezuela (Funeraria del Zulia u otra que designemos), con los datos necesarios para prestar el servicio a tus afiliados.
+- El vendedor que hizo tu venta, con los datos necesarios para atenderte y calcular su comisión.
+- Google Analytics, solo si aceptas las cookies de analítica.
+- Autoridades, cuando la ley nos obligue o para defender nuestros derechos ante un reclamo.
+Exigimos a estos proveedores usar los datos solo para el fin para el que se los entregamos.
+
+5. TRANSFERENCIA A VENEZUELA
+Como el servicio se presta en Venezuela, los datos de los afiliados y los necesarios del Titular se transfieren a la funeraria aliada en ese país. Al contratar, aceptas esa transferencia para ese único fin.
+
+6. COOKIES Y ANALÍTICA
+El sitio usa cookies técnicas necesarias para funcionar (por ejemplo, para mantener tu sesión en el Portal y completar la compra). Las cookies de Google Analytics (GA4) no son esenciales y solo se activan si las aceptas en el aviso de cookies de tu primera visita. Puedes cambiar tu decisión en cualquier momento borrando las cookies del sitio en tu navegador.
+
+7. DATOS DE LOS AFILIADOS Y DE MENORES
+7.1 Al inscribir afiliados, declaras que tienes su autorización (o la de su representante legal) para entregarnos sus datos.
+7.2 Los afiliados pueden ser menores de edad cuando el plan lo permite; sus datos los entrega el Titular solo para el servicio. El sitio no está dirigido a menores y no recopilamos datos directamente de ellos.
+
+8. CUÁNTO TIEMPO CONSERVAMOS TUS DATOS
+8.1 Los datos del contrato, de los pagos y de los afiliados se conservan mientras el contrato esté vigente y, después, durante el plazo que exijan las leyes contables, fiscales y de protección al consumidor, o el necesario para atender reclamos.
+8.2 La constancia de aceptación de términos se conserva como prueba durante ese mismo plazo.
+8.3 Los datos de navegación se conservan según la configuración de Google Analytics.
+8.4 Al terminar esos plazos, eliminamos o anonimizamos los datos.
+
+9. TUS DERECHOS
+9.1 Puedes pedirnos acceso a tus datos, corregirlos, eliminarlos (salvo los que la ley nos obligue a conservar), recibir una copia, retirar tu consentimiento para promociones o analítica y oponerte a ciertos usos.
+9.2 Puedes actualizar tus datos de contacto y tu tarjeta en el Portal del Titular. Para lo demás, escríbenos a soporte@legadoholding.com. Podemos pedirte datos para verificar tu identidad antes de responder.
+9.3 Responderemos dentro de los 45 días siguientes a tu solicitud. Si la rechazamos, te diremos por qué y cómo apelar la decisión.
+9.4 Si vives en un estado con su propia ley de privacidad (por ejemplo, Texas o California), tienes además los derechos que esa ley te otorgue. No te discriminaremos por ejercerlos.
+
+10. SEGURIDAD
+Protegemos los datos con conexiones cifradas, acceso restringido al personal autorizado, autenticación de varios factores para el personal y registro de auditoría de los accesos. Ningún sistema es infalible; si ocurre un incidente que afecte tus datos, te avisaremos según lo exija la ley.
+
+11. CAMBIOS A ESTA POLÍTICA
+Podemos actualizar esta política. Publicaremos la nueva versión en el sitio con su fecha. Si el cambio es importante, te avisaremos por correo electrónico antes de que tome efecto.
+
+12. CONTACTO
+LEGADO HOLDING GROUP LLC — Houston, Texas, Estados Unidos
+Correo de privacidad: soporte@legadoholding.com
+Sitio web: www.legadoholding.com

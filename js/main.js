@@ -1431,7 +1431,6 @@ function openWizard(planId) {
   loadParentescos();
   loadResidencias();
   loadCondiciones();
-  if (siteTerms.status === "idle") loadSiteTerms();
 }
 
 /* ── Residencia y términos (brief de Previsión 2026-11-26) ───────────────── */
@@ -1639,21 +1638,6 @@ async function sendResidenceLead() {
   st?.focus?.();
 }
 
-/* Términos generales del sitio (mismo texto que terminos-condiciones.html). */
-let siteTerms = { status: "idle", text: "" };
-async function loadSiteTerms() {
-  siteTerms.status = "loading";
-  try {
-    const resp = await fetch("terminos-condiciones.txt");
-    if (!resp.ok) throw new Error("HTTP " + resp.status);
-    siteTerms = { status: "ok", text: (await resp.text()).trim() };
-  } catch (e) {
-    console.warn("Términos del sitio no disponibles:", e.message);
-    siteTerms = { status: "error", text: "" };
-  }
-  if (wizardOpen && wizardStep === S_SUM && !wizardCondiciones.vigente) { renderWizardStep(); updateWizardFooter(); }
-}
-
 /* Texto de renovación automática junto al botón de pagar (brief §4.3). */
 function wizardRenewalHTML() {
   const s = wizardPaymentSummary();
@@ -1661,7 +1645,7 @@ function wizardRenewalHTML() {
   if (!s || !P) return "";
   const annual = wizardPaymentType === "annual";
   const amount = P.formatCents(s.recurringCents);
-  const mail = '<a href="mailto:info@legadoholding.com">info@legadoholding.com</a>';
+  const mail = '<a href="mailto:soporte@legadoholding.com">soporte@legadoholding.com</a>';
   const res = wizardResidencia();
   const fl = res && res.pais === "US" && res.estado === "FL";
   const es = currentLang === "es";
@@ -2202,16 +2186,13 @@ function renderStep3() {
       </label>
     </div>`;
   } else {
-    /* Sin términos publicados en Previsión: se muestran completos los del
-       sitio (terminos-condiciones.txt), no solo un enlace. */
-    if (siteTerms.status === "idle") loadSiteTerms();
-    const body = siteTerms.status === "ok"
-      ? `<div class="contract-text" tabindex="0" role="region" aria-labelledby="wf-terms-title" style="white-space:pre-wrap">${escapeHTML(siteTerms.text)}</div>`
-      : `<p class="form-hint" role="status">${siteTerms.status === "error" ? "" : t("wiz_terms_loading")}</p>`;
+    /* El texto de los términos dentro del wizard sale SOLO de Previsión
+       (GET /condiciones del tenant lh): es el que queda registrado como
+       aceptado. Si el plan todavía no tiene una versión publicada allí, se
+       enlazan las páginas públicas del sitio. */
     termsBox = `
     <div class="contract-box">
       <h4 id="wf-terms-title">${t("wiz_terms_title")}</h4>
-      ${body}
       <p style="margin:0.5rem 0 0.75rem"><a href="terminos-condiciones.html" target="_blank" rel="noopener" style="color:var(--legado-navy,#263c5b);font-weight:600;text-decoration:underline">${t("wiz_terms_open")}</a> · <a href="politica-privacidad.html" target="_blank" rel="noopener" style="color:var(--legado-navy,#263c5b);font-weight:600;text-decoration:underline">${t("wiz_privacy_open")}</a></p>
       <label class="checkbox-row">
         <input type="checkbox" id="terms-check" ${wizardAcceptedTerms ? "checked" : ""}>

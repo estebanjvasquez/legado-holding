@@ -65,7 +65,7 @@
                 Tu plan se renueva automáticamente con la frecuencia que elegiste
                 hasta que canceles. Puedes cancelar en cualquier momento desde tu
                 portal de cliente o escribiendo a
-                <a href="mailto:info@legadoholding.com">info@legadoholding.com</a>.
+                <a href="mailto:soporte@legadoholding.com">soporte@legadoholding.com</a>.
             </p>
             <a class="btn" href="/">Volver al inicio</a>
         </div>
@@ -77,7 +77,7 @@
                 try { d = JSON.parse(sessionStorage.getItem("legado_last_purchase") || "null"); } catch (_) {}
                 var lang = (d && d.lang) || (function () { try { return localStorage.getItem("legado_lang"); } catch (_) { return null; } })() || "es";
                 var en = lang === "en";
-                var mail = '<a href="mailto:info@legadoholding.com">info@legadoholding.com</a>';
+                var mail = '<a href="mailto:soporte@legadoholding.com">soporte@legadoholding.com</a>';
                 var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
                 var html;
                 if (d && d.recurring) {

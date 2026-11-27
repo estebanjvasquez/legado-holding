@@ -1,143 +1,150 @@
 POLÍTICA DE PRIVACIDAD / PRIVACY POLICY
-══════════════════════════════════════════════════════════════════════════════
+Legado Holding Group LLC — Versión/Version 2.0 — 2026-11
 
-TÍTULO: Política de Privacidad de LEGADO HOLDING / LEGADO HOLDING Privacy Policy
+Esta política está disponible en español e inglés; ambas versiones tienen el mismo contenido.
+This policy is available in Spanish and English; both versions have the same content.
 
-IDIOMA / LANGUAGE: Esta política está disponible en español e inglés. This policy is available in Spanish and English.
+PARTE 1: ESPAÑOL / PART 2: ENGLISH
 
-ÚLTIMA ACTUALIZACIÓN / LAST UPDATED: 2026-08-25
+==============================================================================
 
-══════════════════════════════════════════════════════════════════════════════
+POLÍTICA DE PRIVACIDAD
+Legado Holding Group LLC — Versión 2.0 — Última actualización: noviembre de 2026
 
-1. QUÉ DATOS RECOPILAMOS / WHAT DATA WE COLLECT
-══════════════════════════════════════════════════════════════════════════════
+1. QUIÉNES SOMOS
+LEGADO HOLDING GROUP LLC (en adelante, "Legado", "nosotros"), con sede en Houston, Texas, Estados Unidos, vende planes de servicios funerarios prepagados que se prestan en Venezuela. Esta política explica qué datos personales recopilamos en www.legadoholding.com, en el proceso de compra, en el Portal del Titular y en nuestros canales de atención, para qué los usamos y qué derechos tienes.
+Contacto de privacidad: soporte@legadoholding.com
 
-ES: Cuando contratas un plan o nos contactas, recopilamos:
+2. QUÉ DATOS RECOPILAMOS
+2.1 Del Titular (quien contrata y paga): nombres y apellidos, documento de identidad, correo electrónico, teléfono, dirección, país y estado de residencia, idioma preferido y el historial de su contrato y de sus pagos.
+2.2 De los afiliados (personas que recibirán el servicio en Venezuela): nombres y apellidos, documento de identidad (cuando el plan lo exige), fecha de nacimiento y parentesco con el Titular. Si un afiliado fallece, también los datos necesarios para prestar el servicio (lugar, fecha y documentos del deceso, y datos de contacto del familiar que lo solicita).
+2.3 Datos de pago: los datos de tu tarjeta los recibe y procesa directamente Stripe. Nosotros no almacenamos el número completo de la tarjeta; solo vemos datos limitados, como la marca, los últimos 4 dígitos y el resultado de cada cobro.
+2.4 Constancia de aceptación: cuando aceptas los términos y condiciones, guardamos la versión aceptada, la fecha y hora, tu dirección IP y el navegador que usaste.
+2.5 Referidos: si compraste con un vendedor o un código de referido, registramos esa relación.
+2.6 Comunicaciones: los mensajes que nos envías por correo, WhatsApp, formularios o el asistente virtual "Alma", si decides usarlo.
+2.7 Datos de navegación: páginas visitadas y eventos de uso del sitio, mediante Google Analytics, solo si aceptas las cookies de analítica (ver sección 6).
 
-• Datos del Cliente (titular): nombre, correo electrónico, teléfono y datos de pago.
-• Datos de los familiares designados: nombre, parentesco y datos necesarios para
-  identificar al beneficiario del servicio en Venezuela.
-• Datos de navegación: páginas visitadas y eventos de interacción con el sitio,
-  recopilados mediante Google Analytics (ver sección 4, Cookies).
-• Conversaciones con el asistente virtual "Alma", si decides usar el chat.
+3. PARA QUÉ USAMOS TUS DATOS
+3.1 Celebrar y administrar tu contrato: inscribir a tus afiliados, calcular el precio según su edad y el plan, y mantener tu Portal del Titular.
+3.2 Cobrar las cuotas, enviarte recibos y avisarte de cobros rechazados, renovaciones, cambios de precio o de términos.
+3.3 Prestar el servicio funerario en Venezuela cuando fallezca un afiliado.
+3.4 Cumplir la ley: aplicar el derecho de cancelación del estado donde vives, conservar la constancia de aceptación, atender reclamos de pago y cumplir obligaciones contables, fiscales y de control de sanciones internacionales.
+3.5 Pagar la comisión al vendedor que hizo la venta.
+3.6 Atender tus consultas y mejorar el sitio y nuestros servicios.
+3.7 Enviarte información o promociones, solo si nos diste tu consentimiento. Puedes darte de baja en cualquier momento.
 
-Los datos de pago (tarjeta de crédito/débito) son procesados directamente por
-Stripe y por la plataforma de Previsión Funeraria que administra los planes;
-LEGADO HOLDING no almacena el número completo de tu tarjeta en sus propios
-sistemas.
+4. CON QUIÉN COMPARTIMOS TUS DATOS
+No vendemos tus datos personales. Solo los compartimos con:
+- Stripe, para procesar los pagos con tarjeta.
+- Previsión Funeraria, la plataforma que administra nuestros planes, contratos y cobros, alojada en la infraestructura de Cloudflare.
+- Los proveedores de correo electrónico, SMS y WhatsApp que usamos para enviarte avisos del contrato.
+- La funeraria aliada en Venezuela (Funeraria del Zulia u otra que designemos), con los datos necesarios para prestar el servicio a tus afiliados.
+- El vendedor que hizo tu venta, con los datos necesarios para atenderte y calcular su comisión.
+- Google Analytics, solo si aceptas las cookies de analítica.
+- Autoridades, cuando la ley nos obligue o para defender nuestros derechos ante un reclamo.
+Exigimos a estos proveedores usar los datos solo para el fin para el que se los entregamos.
 
-EN: When you purchase a plan or contact us, we collect:
+5. TRANSFERENCIA A VENEZUELA
+Como el servicio se presta en Venezuela, los datos de los afiliados y los necesarios del Titular se transfieren a la funeraria aliada en ese país. Al contratar, aceptas esa transferencia para ese único fin.
 
-• Customer (policyholder) data: name, email, phone number, and payment details.
-• Designated family member data: name, relationship, and information needed to
-  identify the service beneficiary in Venezuela.
-• Browsing data: pages visited and interaction events on the site, collected
-  via Google Analytics (see section 4, Cookies).
-• Conversations with the "Alma" virtual assistant, if you choose to use the chat.
+6. COOKIES Y ANALÍTICA
+El sitio usa cookies técnicas necesarias para funcionar (por ejemplo, para mantener tu sesión en el Portal y completar la compra). Las cookies de Google Analytics (GA4) no son esenciales y solo se activan si las aceptas en el aviso de cookies de tu primera visita. Puedes cambiar tu decisión en cualquier momento borrando las cookies del sitio en tu navegador.
 
-Payment data (credit/debit card) is processed directly by Stripe and by the
-Prevision Funeraria platform that administers the plans; LEGADO HOLDING does
-not store your full card number in its own systems.
+7. DATOS DE LOS AFILIADOS Y DE MENORES
+7.1 Al inscribir afiliados, declaras que tienes su autorización (o la de su representante legal) para entregarnos sus datos.
+7.2 Los afiliados pueden ser menores de edad cuando el plan lo permite; sus datos los entrega el Titular solo para el servicio. El sitio no está dirigido a menores y no recopilamos datos directamente de ellos.
 
-══════════════════════════════════════════════════════════════════════════════
+8. CUÁNTO TIEMPO CONSERVAMOS TUS DATOS
+8.1 Los datos del contrato, de los pagos y de los afiliados se conservan mientras el contrato esté vigente y, después, durante el plazo que exijan las leyes contables, fiscales y de protección al consumidor, o el necesario para atender reclamos.
+8.2 La constancia de aceptación de términos se conserva como prueba durante ese mismo plazo.
+8.3 Los datos de navegación se conservan según la configuración de Google Analytics.
+8.4 Al terminar esos plazos, eliminamos o anonimizamos los datos.
 
-2. PARA QUÉ USAMOS TUS DATOS / HOW WE USE YOUR DATA
-══════════════════════════════════════════════════════════════════════════════
+9. TUS DERECHOS
+9.1 Puedes pedirnos acceso a tus datos, corregirlos, eliminarlos (salvo los que la ley nos obligue a conservar), recibir una copia, retirar tu consentimiento para promociones o analítica y oponerte a ciertos usos.
+9.2 Puedes actualizar tus datos de contacto y tu tarjeta en el Portal del Titular. Para lo demás, escríbenos a soporte@legadoholding.com. Podemos pedirte datos para verificar tu identidad antes de responder.
+9.3 Responderemos dentro de los 45 días siguientes a tu solicitud. Si la rechazamos, te diremos por qué y cómo apelar la decisión.
+9.4 Si vives en un estado con su propia ley de privacidad (por ejemplo, Texas o California), tienes además los derechos que esa ley te otorgue. No te discriminaremos por ejercerlos.
 
-ES:
-2.1 Para gestionar tu contrato de previsión funeraria y coordinar el servicio
-    con las funerarias aliadas en Venezuela cuando sea necesario.
-2.2 Para procesar tus pagos y enviarte confirmaciones y recibos.
-2.3 Para responder tus consultas de soporte y contacto.
-2.4 Para entender el uso del sitio y mejorar la experiencia (analítica).
+10. SEGURIDAD
+Protegemos los datos con conexiones cifradas, acceso restringido al personal autorizado, autenticación de varios factores para el personal y registro de auditoría de los accesos. Ningún sistema es infalible; si ocurre un incidente que afecte tus datos, te avisaremos según lo exija la ley.
 
-EN:
-2.1 To manage your funeral pre-planning contract and coordinate the service
-    with partner funeral homes in Venezuela when needed.
-2.2 To process your payments and send you confirmations and receipts.
-2.3 To respond to your support and contact inquiries.
-2.4 To understand site usage and improve the experience (analytics).
+11. CAMBIOS A ESTA POLÍTICA
+Podemos actualizar esta política. Publicaremos la nueva versión en el sitio con su fecha. Si el cambio es importante, te avisaremos por correo electrónico antes de que tome efecto.
 
-══════════════════════════════════════════════════════════════════════════════
+12. CONTACTO
+LEGADO HOLDING GROUP LLC — Houston, Texas, Estados Unidos
+Correo de privacidad: soporte@legadoholding.com
+Sitio web: www.legadoholding.com
 
-3. CON QUIÉN COMPARTIMOS TUS DATOS / WHO WE SHARE YOUR DATA WITH
-══════════════════════════════════════════════════════════════════════════════
 
-ES: No vendemos tus datos personales. Los compartimos únicamente con:
+==============================================================================
 
-• Stripe, para procesar pagos con tarjeta.
-• La plataforma de Previsión Funeraria (Cloudflare Workers/D1) que administra
-  los planes y contratos.
-• Funerarias aliadas en Venezuela (p. ej. Funeraria del Zulia), solo lo
-  necesario para prestar el servicio contratado al familiar designado.
-• Proveedores de analítica (Google Analytics), de forma agregada y anónima
-  cuando es posible.
+PRIVACY POLICY
+Legado Holding Group LLC — Version 2.0 — Last updated: November 2026
 
-EN: We do not sell your personal data. We share it only with:
+1. WHO WE ARE
+LEGADO HOLDING GROUP LLC ("Legado", "we", "us"), based in Houston, Texas, United States, sells prepaid funeral service plans performed in Venezuela. This policy explains what personal data we collect on www.legadoholding.com, during checkout, in the Account Holder Portal and through our support channels, how we use it, and what rights you have.
+Privacy contact: soporte@legadoholding.com
 
-• Stripe, to process card payments.
-• The Prevision Funeraria platform (Cloudflare Workers/D1) that administers
-  plans and contracts.
-• Partner funeral homes in Venezuela (e.g. Funeraria del Zulia), only what is
-  necessary to deliver the contracted service to the designated family member.
-• Analytics providers (Google Analytics), aggregated and anonymized where
-  possible.
+2. WHAT DATA WE COLLECT
+2.1 From the Account Holder (the person who purchases and pays): first and last name, ID document, email, phone number, address, country and state of residence, preferred language, and the history of the contract and payments.
+2.2 From members (the persons who will receive the service in Venezuela): first and last name, ID document (when the plan requires it), date of birth and relationship to the Account Holder. If a member passes away, also the data needed to provide the service (place, date and documents of the death, and contact details of the relative requesting it).
+2.3 Payment data: your card details are received and processed directly by Stripe. We do not store the full card number; we only see limited data, such as the card brand, the last 4 digits and the result of each charge.
+2.4 Record of acceptance: when you accept the terms and conditions, we keep the accepted version, the date and time, your IP address and the browser you used.
+2.5 Referrals: if you purchased through a sales agent or referral code, we record that relationship.
+2.6 Communications: messages you send us by email, WhatsApp, forms or the "Alma" virtual assistant, if you choose to use it.
+2.7 Browsing data: pages visited and usage events on the site, through Google Analytics, only if you accept analytics cookies (see section 6).
 
-══════════════════════════════════════════════════════════════════════════════
+3. HOW WE USE YOUR DATA
+3.1 To enter into and manage your contract: enroll your members, calculate the price according to their age and the plan, and maintain your Account Holder Portal.
+3.2 To collect installments, send you receipts and notify you of declined charges, renewals, and price or terms changes.
+3.3 To provide the funeral service in Venezuela when a member passes away.
+3.4 To comply with the law: apply the cancellation rights of your state of residence, keep the record of acceptance, handle payment disputes, and meet accounting, tax and international sanctions compliance obligations.
+3.5 To pay the commission to the sales agent who made the sale.
+3.6 To answer your inquiries and improve the site and our services.
+3.7 To send you information or promotions, only with your consent. You may unsubscribe at any time.
 
-4. COOKIES Y ANALÍTICA / COOKIES AND ANALYTICS
-══════════════════════════════════════════════════════════════════════════════
+4. WHO WE SHARE YOUR DATA WITH
+We do not sell your personal data. We share it only with:
+- Stripe, to process card payments.
+- Previsión Funeraria, the platform that manages our plans, contracts and billing, hosted on Cloudflare infrastructure.
+- The email, SMS and WhatsApp providers we use to send you contract notices.
+- The partner funeral home in Venezuela (Funeraria del Zulia or another one we designate), with the data needed to provide the service to your members.
+- The sales agent who made your sale, with the data needed to assist you and calculate their commission.
+- Google Analytics, only if you accept analytics cookies.
+- Authorities, when required by law or to defend our rights in a claim.
+We require these providers to use the data only for the purpose for which we provide it.
 
-ES: Usamos Google Analytics (GA4) para entender cómo se usa el sitio. Estas
-cookies no son esenciales para el funcionamiento del sitio y solo se activan
-después de que aceptas el banner de cookies que aparece en tu primera visita.
-Puedes cambiar tu decisión en cualquier momento borrando las cookies del sitio
-desde la configuración de tu navegador.
+5. TRANSFER TO VENEZUELA
+Because the service is performed in Venezuela, members' data and the necessary Account Holder data are transferred to the partner funeral home in that country. By purchasing, you agree to that transfer for that sole purpose.
 
-EN: We use Google Analytics (GA4) to understand how the site is used. These
-cookies are not essential to the site's operation and are only activated after
-you accept the cookie banner shown on your first visit. You can change your
-decision at any time by clearing the site's cookies from your browser settings.
+6. COOKIES AND ANALYTICS
+The site uses technical cookies required for it to work (for example, to keep your Portal session and complete checkout). Google Analytics (GA4) cookies are not essential and are activated only if you accept them in the cookie notice on your first visit. You may change your choice at any time by clearing the site's cookies in your browser.
 
-══════════════════════════════════════════════════════════════════════════════
+7. MEMBERS' AND MINORS' DATA
+7.1 When enrolling members, you represent that you have their authorization (or that of their legal representative) to provide their data.
+7.2 Members may be minors when the plan allows it; their data is provided by the Account Holder solely for the service. The site is not directed to minors and we do not collect data directly from them.
 
-5. TUS DERECHOS / YOUR RIGHTS
-══════════════════════════════════════════════════════════════════════════════
+8. HOW LONG WE KEEP YOUR DATA
+8.1 Contract, payment and member data are kept while the contract is in force and afterwards for the period required by accounting, tax and consumer protection laws, or as needed to handle claims.
+8.2 The record of acceptance of the terms is kept as evidence for that same period.
+8.3 Browsing data is kept according to Google Analytics settings.
+8.4 When those periods end, we delete or anonymize the data.
 
-ES: Puedes solicitar acceso, corrección o eliminación de tus datos personales,
-o retirar tu consentimiento para el uso de analítica, escribiendo a
-soporte@legadoholding.com. Responderemos en un plazo razonable.
+9. YOUR RIGHTS
+9.1 You may ask us to access your data, correct it, delete it (except data the law requires us to keep), receive a copy, withdraw your consent to promotions or analytics, and object to certain uses.
+9.2 You can update your contact details and card in the Account Holder Portal. For anything else, write to soporte@legadoholding.com. We may ask for information to verify your identity before responding.
+9.3 We will respond within 45 days of your request. If we deny it, we will tell you why and how to appeal the decision.
+9.4 If you live in a state with its own privacy law (for example, Texas or California), you also have the rights that law grants you. We will not discriminate against you for exercising them.
 
-EN: You can request access to, correction of, or deletion of your personal
-data, or withdraw your consent for analytics use, by writing to
-soporte@legadoholding.com. We will respond within a reasonable timeframe.
+10. SECURITY
+We protect data with encrypted connections, access restricted to authorized staff, multi-factor authentication for staff and audit logging of access. No system is infallible; if an incident affects your data, we will notify you as required by law.
 
-══════════════════════════════════════════════════════════════════════════════
+11. CHANGES TO THIS POLICY
+We may update this policy. We will post the new version on the site with its date. If the change is significant, we will notify you by email before it takes effect.
 
-6. RETENCIÓN DE DATOS / DATA RETENTION
-══════════════════════════════════════════════════════════════════════════════
-
-ES: Conservamos los datos del contrato mientras el plan esté activo y durante
-el tiempo adicional requerido por obligaciones legales o contables. Los datos
-de navegación se conservan según la configuración por defecto de Google
-Analytics.
-
-EN: We retain contract data for as long as the plan is active and for any
-additional time required by legal or accounting obligations. Browsing data is
-retained according to Google Analytics' default settings.
-
-══════════════════════════════════════════════════════════════════════════════
-
-7. CAMBIOS A ESTA POLÍTICA / CHANGES TO THIS POLICY
-══════════════════════════════════════════════════════════════════════════════
-
-ES: Podemos actualizar esta política. Publicaremos cualquier cambio en esta
-misma página con una nueva fecha de "última actualización".
-
-EN: We may update this policy. Any changes will be posted on this same page
-with a new "last updated" date.
-
-══════════════════════════════════════════════════════════════════════════════
-
-EMPRESA / COMPANY: LEGADO HOLDING
-CONTACTO DE PRIVACIDAD / PRIVACY CONTACT: soporte@legadoholding.com
+12. CONTACT
+LEGADO HOLDING GROUP LLC — Houston, Texas, United States
+Privacy email: soporte@legadoholding.com
+Website: www.legadoholding.com

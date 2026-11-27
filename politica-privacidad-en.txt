@@ -1,0 +1,68 @@
+PRIVACY POLICY
+Legado Holding Group LLC — Version 2.0 — Last updated: November 2026
+
+1. WHO WE ARE
+LEGADO HOLDING GROUP LLC ("Legado", "we", "us"), based in Houston, Texas, United States, sells prepaid funeral service plans performed in Venezuela. This policy explains what personal data we collect on www.legadoholding.com, during checkout, in the Account Holder Portal and through our support channels, how we use it, and what rights you have.
+Privacy contact: soporte@legadoholding.com
+
+2. WHAT DATA WE COLLECT
+2.1 From the Account Holder (the person who purchases and pays): first and last name, ID document, email, phone number, address, country and state of residence, preferred language, and the history of the contract and payments.
+2.2 From members (the persons who will receive the service in Venezuela): first and last name, ID document (when the plan requires it), date of birth and relationship to the Account Holder. If a member passes away, also the data needed to provide the service (place, date and documents of the death, and contact details of the relative requesting it).
+2.3 Payment data: your card details are received and processed directly by Stripe. We do not store the full card number; we only see limited data, such as the card brand, the last 4 digits and the result of each charge.
+2.4 Record of acceptance: when you accept the terms and conditions, we keep the accepted version, the date and time, your IP address and the browser you used.
+2.5 Referrals: if you purchased through a sales agent or referral code, we record that relationship.
+2.6 Communications: messages you send us by email, WhatsApp, forms or the "Alma" virtual assistant, if you choose to use it.
+2.7 Browsing data: pages visited and usage events on the site, through Google Analytics, only if you accept analytics cookies (see section 6).
+
+3. HOW WE USE YOUR DATA
+3.1 To enter into and manage your contract: enroll your members, calculate the price according to their age and the plan, and maintain your Account Holder Portal.
+3.2 To collect installments, send you receipts and notify you of declined charges, renewals, and price or terms changes.
+3.3 To provide the funeral service in Venezuela when a member passes away.
+3.4 To comply with the law: apply the cancellation rights of your state of residence, keep the record of acceptance, handle payment disputes, and meet accounting, tax and international sanctions compliance obligations.
+3.5 To pay the commission to the sales agent who made the sale.
+3.6 To answer your inquiries and improve the site and our services.
+3.7 To send you information or promotions, only with your consent. You may unsubscribe at any time.
+
+4. WHO WE SHARE YOUR DATA WITH
+We do not sell your personal data. We share it only with:
+- Stripe, to process card payments.
+- Previsión Funeraria, the platform that manages our plans, contracts and billing, hosted on Cloudflare infrastructure.
+- The email, SMS and WhatsApp providers we use to send you contract notices.
+- The partner funeral home in Venezuela (Funeraria del Zulia or another one we designate), with the data needed to provide the service to your members.
+- The sales agent who made your sale, with the data needed to assist you and calculate their commission.
+- Google Analytics, only if you accept analytics cookies.
+- Authorities, when required by law or to defend our rights in a claim.
+We require these providers to use the data only for the purpose for which we provide it.
+
+5. TRANSFER TO VENEZUELA
+Because the service is performed in Venezuela, members' data and the necessary Account Holder data are transferred to the partner funeral home in that country. By purchasing, you agree to that transfer for that sole purpose.
+
+6. COOKIES AND ANALYTICS
+The site uses technical cookies required for it to work (for example, to keep your Portal session and complete checkout). Google Analytics (GA4) cookies are not essential and are activated only if you accept them in the cookie notice on your first visit. You may change your choice at any time by clearing the site's cookies in your browser.
+
+7. MEMBERS' AND MINORS' DATA
+7.1 When enrolling members, you represent that you have their authorization (or that of their legal representative) to provide their data.
+7.2 Members may be minors when the plan allows it; their data is provided by the Account Holder solely for the service. The site is not directed to minors and we do not collect data directly from them.
+
+8. HOW LONG WE KEEP YOUR DATA
+8.1 Contract, payment and member data are kept while the contract is in force and afterwards for the period required by accounting, tax and consumer protection laws, or as needed to handle claims.
+8.2 The record of acceptance of the terms is kept as evidence for that same period.
+8.3 Browsing data is kept according to Google Analytics settings.
+8.4 When those periods end, we delete or anonymize the data.
+
+9. YOUR RIGHTS
+9.1 You may ask us to access your data, correct it, delete it (except data the law requires us to keep), receive a copy, withdraw your consent to promotions or analytics, and object to certain uses.
+9.2 You can update your contact details and card in the Account Holder Portal. For anything else, write to soporte@legadoholding.com. We may ask for information to verify your identity before responding.
+9.3 We will respond within 45 days of your request. If we deny it, we will tell you why and how to appeal the decision.
+9.4 If you live in a state with its own privacy law (for example, Texas or California), you also have the rights that law grants you. We will not discriminate against you for exercising them.
+
+10. SECURITY
+We protect data with encrypted connections, access restricted to authorized staff, multi-factor authentication for staff and audit logging of access. No system is infallible; if an incident affects your data, we will notify you as required by law.
+
+11. CHANGES TO THIS POLICY
+We may update this policy. We will post the new version on the site with its date. If the change is significant, we will notify you by email before it takes effect.
+
+12. CONTACT
+LEGADO HOLDING GROUP LLC — Houston, Texas, United States
+Privacy email: soporte@legadoholding.com
+Website: www.legadoholding.com

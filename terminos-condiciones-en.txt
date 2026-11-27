@@ -1,0 +1,107 @@
+PREPAID FUNERAL SERVICES CONTRACT — TERMS AND CONDITIONS
+Version 2.0 — November 2026
+
+1. PARTIES AND PURPOSE
+1.1 This contract is entered into between LEGADO HOLDING GROUP LLC, a limited liability company based in Houston, Texas, United States ("the Company"), and the person who purchases and pays for the plan ("the Account Holder").
+1.2 Its purpose is the prepaid provision of funeral services in Venezuela for the persons enrolled by the Account Holder, according to the selected plan. The Company handles the sale, billing and customer care, and the services are performed in Venezuela by a partner funeral home (Funeraria del Zulia or another one designated by the Company with an equivalent level of service).
+1.3 This contract is NOT an insurance policy or an investment product. It does not earn returns and does not entitle anyone to receive money instead of the service, except for the refunds expressly provided in section 7.
+
+2. DEFINITIONS
+- Account Holder: the adult who purchases the plan, accepts these terms and is responsible for payments. The Account Holder may or may not be enrolled as a beneficiary.
+- Member or beneficiary: each person enrolled in the contract who will receive the funeral service in Venezuela.
+- Plan: the selected service package (for example, Esencial Zulia or Vanguardia Zulia), with the coverage, conditions and prices published in its description at the time of purchase.
+- Account Holder Portal: the online area where the Account Holder can view the contract, payments and members, update the card on file and request cancellation.
+- Service: the funeral care provided when a member passes away, according to the plan.
+
+3. INCLUDED SERVICES
+3.1 The covered services are those described in the selected plan's description, which is part of this contract. Depending on the plan, they may include:
+- Transfer of the deceased from the place of death to the funeral home, within the plan's coverage area.
+- Preparation and preservation of the body.
+- Casket or urn, according to the plan and the family's choice.
+- Viewing room.
+- Assistance with a religious or civil ceremony.
+- Transfer to the cemetery or crematory.
+- Burial or cremation, according to the plan.
+- Handling of the legal paperwork required in Venezuela.
+- Obituary notice.
+3.2 Any item not listed in the plan description is not included.
+3.3 To request the Service, the family must contact the emergency line published on the website and in the Account Holder Portal. Services are performed in Venezuela; coordination depends on local conditions (for example, availability of transport, permits and official documents).
+
+4. MEMBERS
+4.1 Members, their relationship and their age must meet the plan rules (minimum and maximum ages by relationship, number of persons and required documents), which are shown when they are enrolled. The price may vary according to each member's age.
+4.2 The Account Holder represents that the members' information (name, ID document, date of birth and relationship) is true. False or incomplete information may prevent or delay the Service and may result in the member's removal.
+4.3 The Account Holder must report any change in members. Adding a member may change the price and, if the plan so provides, start that person's own waiting period.
+4.4 Waiting periods: if the plan sets a waiting period from enrollment, a death during that period, from causes other than those the plan exempts, is not covered. Each plan's waiting period is stated in its description.
+
+5. PRICE, PAYMENT AND AUTOMATIC RENEWAL
+5.1 Prices are in US dollars (USD) and are those shown to the Account Holder before payment, according to the plan, the payment frequency and the members' ages.
+5.2 Payment is made by credit or debit card through Stripe, the Company's payment processor. The Company does not store full card details.
+5.3 AUTOMATIC RENEWAL: BY PURCHASING, THE ACCOUNT HOLDER AUTHORIZES THE COMPANY TO AUTOMATICALLY CHARGE THE PLAN AMOUNT TO THE CARD EACH PERIOD (MONTHLY OR ANNUALLY, AS SELECTED) UNTIL THE ACCOUNT HOLDER CANCELS. THE ACCOUNT HOLDER MAY CANCEL AT ANY TIME FROM THE PORTAL OR BY WRITING TO soporte@legadoholding.com.
+5.4 For annual plans, the Company will send an email notice between 30 and 45 days before each renewal, stating the amount to be charged and how to cancel.
+5.5 The Account Holder may prepay installments from the Portal when the Company offers that option.
+5.6 If the Company changes a plan's price, it will notify the Account Holder at least 30 days in advance. The new price will apply from the period following the notice, and the Account Holder may cancel before then without penalty.
+
+6. DECLINED PAYMENTS AND SUSPENSION
+6.1 If a charge is declined, the Company will notify the Account Holder to update the card in the Portal. The payment processor may retry the charge.
+6.2 While an installment is past due, the contract is not in good standing and the Service may not be provided until payment is brought current. If the delay exceeds 30 days or the subscription ends for non-payment, the contract is suspended.
+6.3 A suspended contract may be reinstated by paying the amount owed, under the conditions the Company provides. Reinstatement may start a new waiting period if the plan so provides.
+6.4 If the Account Holder disputes a charge with their bank (chargeback), the payment is considered unpaid while the dispute is resolved. We recommend writing first to soporte@legadoholding.com.
+
+7. CANCELLATION AND REFUNDS
+7.1 30-DAY RIGHT TO CANCEL (FLORIDA RESIDENTS): IF THE ACCOUNT HOLDER RESIDES IN FLORIDA, THE ACCOUNT HOLDER MAY CANCEL THIS CONTRACT WITHIN 30 DAYS AFTER SIGNING IT AND WILL RECEIVE A FULL REFUND OF ALL AMOUNTS PAID, PROVIDED NO SERVICE HAS BEEN PERFORMED. The refund is issued to the same card within 30 days after the request. Cancellation is requested from the Account Holder Portal or by writing to soporte@legadoholding.com.
+7.2 Account Holders in other states or countries may cancel at any time, and no further charges will be made after cancellation. Refunds, if any, are governed by the consumer protection law applicable in the Account Holder's state of residence.
+7.3 Outside the cases above, cancellation takes effect at the end of the period already paid. Coverage continues until that date, and the unused portion of the period is not refunded, unless applicable law provides otherwise.
+7.4 There are no refunds for services already performed.
+7.5 The state of residence is the one the Account Holder declares at purchase. The Account Holder must declare it truthfully; the Company only sells online in the states it has enabled.
+
+8. EXCLUSIONS
+The following are not covered:
+- Services or items not included in the plan description.
+- Additional services or upgrades requested by the family (charged separately, by agreement with the funeral home).
+- Transfers outside the plan's coverage area, and repatriations or international transfers.
+- Exhumations, reburials, and purchase of plots, niches or cemetery rights, unless the plan includes them.
+- Obituary notices beyond those included.
+- Deaths during the waiting period, or of members enrolled with false information.
+- Services requested while the contract is suspended or has past-due installments.
+
+9. COMPANY OBLIGATIONS
+9.1 To provide, or arrange for, the plan services professionally and respectfully, through partner funeral homes in Venezuela.
+9.2 To assist the Account Holder and their family in Spanish and English through the published channels.
+9.3 To clearly communicate charges, renewals and contract changes.
+9.4 The Company is not liable for delays in, or impossibility of, providing the Service caused by force majeure or events beyond its control (for example, natural disasters, government restrictions, conflicts, utility outages or international sanctions). In such cases, it will make reasonable efforts to provide the Service or an equivalent alternative.
+
+10. ACCOUNT HOLDER OBLIGATIONS
+10.1 To pay on time and keep a valid payment method on file.
+10.2 To keep their own and their members' contact information up to date.
+10.3 To provide truthful information when purchasing and when requesting the Service.
+10.4 To inform their members and relatives about the contract and the emergency line.
+
+11. SALES AGENTS
+If the Account Holder purchased through a sales agent or referral code, the agent acts on behalf of the Company. No agent may change these terms or promise coverage, prices or refunds other than those set forth here.
+
+12. PERSONAL DATA
+12.1 The Company processes the Account Holder's and members' data in accordance with its Privacy Policy, published on the website.
+12.2 To provide the Service, data is shared with: Stripe (payments), the email and messaging providers the Company uses for notices, the Company's contract management platform, and the partner funeral home in Venezuela. By purchasing, the Account Holder agrees that their data and their members' data may be transferred to Venezuela for that purpose.
+12.3 The Company does not sell personal data.
+12.4 The Account Holder represents that they have their members' authorization to provide their data.
+
+13. COMMUNICATIONS AND ELECTRONIC ACCEPTANCE
+13.1 The Account Holder agrees to receive contract notices (confirmations, charges, declined payments, renewals and changes) by email, SMS or WhatsApp. Promotional messages are sent only with consent, and the Account Holder may unsubscribe at any time.
+13.2 Electronic acceptance of these terms has the same validity as a signature. The Company keeps a record of the accepted version, the date and time, the IP address and the browser used.
+13.3 Language: this contract exists in Spanish and English. Both versions have the same content; the Account Holder accepts the version in the language in which they purchased.
+
+14. CHANGES TO THESE TERMS
+The Company may modify these terms by publishing a new version. Changes are notified to the Account Holder at least 30 days in advance and apply from the following period. If the Account Holder does not agree, they may cancel before the change takes effect. Changes do not reduce services already paid for and do not apply to services in progress.
+
+15. GOVERNING LAW AND COMPLAINTS
+15.1 This contract is governed by the laws of the State of Texas, United States, without prejudice to the consumer rights granted by the law of the Account Holder's state of residence, which are not waived.
+15.2 Before any formal claim, the Account Holder may write to soporte@legadoholding.com; the Company will respond within 10 business days.
+15.3 The Account Holder may also file complaints with the consumer protection authority or regulator of their state of residence.
+
+16. CONTACT
+LEGADO HOLDING GROUP LLC — Houston, Texas, United States
+Email: soporte@legadoholding.com
+Website: www.legadoholding.com
+
+ACCEPTANCE
+By checking the box "I have read and accept the terms and conditions" and completing the purchase, the Account Holder confirms having read, understood and accepted this contract, including automatic renewal (section 5.3) and the cancellation terms (section 7).
