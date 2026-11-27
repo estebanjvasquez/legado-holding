@@ -44,6 +44,21 @@ const VALID_PLAN_SLUGS = [
   "vanguardia-selecto",
 ];
 
+/* Residencia del comprador (brief de Previsión 2026-11-26 §3.2): códigos de 2
+   letras en mayúscula (ISO de país, USPS de estado). Previsión decide qué
+   estados están habilitados (GET /residencias) y rechaza la compra si no lo
+   está; acá solo se valida el formato. Fuera de EE. UU. va el país sin estado. */
+export function normalizeResidencia(raw) {
+  if (raw === undefined || raw === null || raw === "") return null;
+  if (typeof raw !== "object") throw new ValidationError("residencia inválida");
+  const pais = String(raw.pais || "").trim().toUpperCase();
+  const estado = String(raw.estado || "").trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(pais)) throw new ValidationError("residencia.pais inválido (ISO de 2 letras)");
+  if (estado && !/^[A-Z]{2}$/.test(estado)) throw new ValidationError("residencia.estado inválido (código USPS de 2 letras)");
+  if (pais === "US" && !estado) throw new ValidationError("residencia.estado es requerido para EE. UU.");
+  return estado ? { pais, estado } : { pais };
+}
+
 function normalize(body) {
   const intent = (body.intent || "").toLowerCase();
   const planSlug = body.plan || null;
@@ -117,10 +132,17 @@ function normalize(body) {
     },
     afiliados,
     atribucion: sanitizeAttribution(body.attribution),
+    residencia: normalizeResidencia(body.residencia),
+    /* id de la versión de términos que el comprador aceptó (GET /condiciones). */
+    condicionesVersionId:
+      Number.isInteger(Number(body.condicionesVersionId)) && Number(body.condicionesVersionId) > 0
+        ? Number(body.condicionesVersionId)
+        : null,
+    idioma: body.lang === "en" ? "en" : "es",
   };
 }
 
-function buildCompraBody(ctx, env) {
+function buildCompraBody(ctx, env, meta = {}) {
   const siteBase = (env.SITE_BASE_URL || "https://www.legadoholding.com").replace(/\/$/, "");
   const body = {
     cliente: {
@@ -143,6 +165,16 @@ function buildCompraBody(ctx, env) {
   /* Atribución de vendedor/canal (?ref=). Solo se agrega si el sitio mandó
      algo aprovechable; un código inválido lo ignora la propia API. */
   if (ctx.atribucion) body.atribucion = ctx.atribucion;
+  if (ctx.residencia) body.residencia = ctx.residencia;
+  /* Idioma de la página de pago de Stripe (brief §3.4). */
+  body.idioma = ctx.idioma;
+  /* Aceptación de términos (brief §3.3): versión + IP real + navegador. Solo
+     si el plan tiene términos vigentes (si no, no se manda el campo). */
+  if (ctx.condicionesVersionId) {
+    body.condiciones_version_id = ctx.condicionesVersionId;
+    if (meta.ip) body.ip = String(meta.ip).slice(0, 64);
+    if (meta.navegador) body.navegador = String(meta.navegador).slice(0, 500);
+  }
   return body;
 }
 
@@ -150,9 +182,15 @@ function buildCompraBody(ctx, env) {
    rechazo de los datos (conflicto de clave, clave inválida) y no deben
    disparar el reintento sin atribución. Todo lo demás (5xx, 401 de token,
    timeout, red) es una falla del sistema, no del comprador. */
+/* Rechazos de negocio que el comprador resuelve en el wizard (no son por la
+   atribución, así que no se reintenta sin ella). */
+const CODIGOS_RESIDENCIA = ["residencia_requerida", "residencia_no_habilitada"];
+const CODIGO_CONDICIONES = "condiciones_no_aceptadas";
+
 function isValidationRejection(e) {
   return !!e && (e.status === 400 || e.status === 422) &&
-    !String(e.codigo || "").startsWith("idempotencia_");
+    !String(e.codigo || "").startsWith("idempotencia_") &&
+    !CODIGOS_RESIDENCIA.includes(e.codigo) && e.codigo !== CODIGO_CONDICIONES;
 }
 
 /* Idempotency-Key que manda el sitio (una por intento de checkout, reusada en
@@ -211,6 +249,25 @@ function pfMessage(e) {
    devolver; el detalle técnico queda en el log, no en la respuesta. */
 function compraFailure(e) {
   console.error(`[wizard] crearCompra falló: ${e.message}`);
+  if (e && CODIGOS_RESIDENCIA.includes(e.codigo)) {
+    const h = e.body && e.body.habilitados;
+    return {
+      success: false,
+      code: "pf_residencia",
+      reason: e.codigo,
+      habilitados: h && typeof h === "object"
+        ? { pais: h.pais || null, estados: Array.isArray(h.estados) ? h.estados : [] }
+        : null,
+      message: "Por ahora no podemos vender este plan en línea en tu estado de residencia.",
+    };
+  }
+  if (e && e.codigo === CODIGO_CONDICIONES) {
+    return {
+      success: false,
+      code: "pf_condiciones",
+      message: "Los términos del plan se actualizaron. Revísalos y acéptalos de nuevo para continuar.",
+    };
+  }
   if (e && e.codigo === "idempotencia_requiere_revision") {
     /* Se cortó durante un cobro cuyo resultado no se conoce: nunca se
        repite solo, lo revisa el personal. */
@@ -258,7 +315,7 @@ function compraFailure(e) {
   };
 }
 
-export async function processWizardCheckout(body, env) {
+export async function processWizardCheckout(body, env, meta = {}) {
   const ctx = normalize(body);
 
   if (ctx.intent !== "create_payment_intent") {
@@ -269,10 +326,10 @@ export async function processWizardCheckout(body, env) {
   }
 
   const PF = createPF(env);
-  const compraBody = buildCompraBody(ctx, env);
+  const compraBody = buildCompraBody(ctx, env, meta);
   const key = validIdempotencyKey(body.idempotencyKey);
   console.log(
-    `Wizard checkout start: plan=${ctx.planSlug} paymentType=${ctx.paymentType} frecuencia_pago=${ctx.frecuenciaPago} email=${maskEmail(ctx.buyer.email)} atribucion=${attributionTag(ctx.atribucion)} idem=${key ? "sí" : "no"}`,
+    `Wizard checkout start: plan=${ctx.planSlug} paymentType=${ctx.paymentType} frecuencia_pago=${ctx.frecuenciaPago} email=${maskEmail(ctx.buyer.email)} atribucion=${attributionTag(ctx.atribucion)} idem=${key ? "sí" : "no"} residencia=${ctx.residencia ? [ctx.residencia.pais, ctx.residencia.estado].filter(Boolean).join("-") : "-"} condiciones=${ctx.condicionesVersionId || "-"} idioma=${ctx.idioma}`,
   );
 
   let result;
@@ -304,4 +361,56 @@ export async function processWizardCheckout(body, env) {
     mensaje: result.mensaje || null,
     contratoNumero: result.contrato_numero || null,
   };
+}
+
+/* =============================================================================
+   Prospecto desde el wizard (brief §4.1): el comprador vive en un estado donde
+   todavía no se vende en línea. No se llega al pago; se registra una
+   solicitud en Previsión (POST /solicitudes) para que un asesor lo contacte.
+   ============================================================================= */
+export async function processWizardLead(body, env) {
+  const buyer = (body && body.buyer) || {};
+  const nombres = sanitizeText(buyer.name, 60);
+  const apellidos = sanitizeText(buyer.lastName, 60);
+  const telefono = sanitizeText(buyer.phone, 20);
+  const email = String(buyer.email || "").toLowerCase().trim().slice(0, 254);
+  if (!nombres || !apellidos || !telefono) {
+    throw new ValidationError("Nombre, apellido y teléfono son requeridos");
+  }
+  if (body.consent !== true) {
+    throw new ValidationError("Falta el consentimiento para ser contactado");
+  }
+  const planId = Number(body.planId);
+  if (!Number.isInteger(planId) || planId <= 0) throw new ValidationError("planId inválido o ausente");
+  const residencia = normalizeResidencia(body.residencia);
+  const idioma = body.lang === "en" ? "en" : "es";
+  const donde = residencia ? [residencia.estado, residencia.pais].filter(Boolean).join(", ") : "sin indicar";
+  const sol = {
+    tipo: "plan",
+    plan_id: planId,
+    nombres,
+    apellidos,
+    telefono,
+    mensaje: sanitizeText(
+      `Quiso comprar en línea desde el wizard pero reside en ${donde}, donde todavía no se vende en línea. Idioma: ${idioma}.`,
+      2000,
+    ),
+    consentimiento: { canal: "wizard_sitio", aceptado_en: new Date().toISOString() },
+  };
+  if (email) sol.email = email;
+  const atribucion = sanitizeAttribution(body.attribution);
+  if (atribucion) sol.atribucion = atribucion;
+  console.log(`Wizard lead: plan_id=${planId} residencia=${donde} atribucion=${attributionTag(atribucion)}`);
+  try {
+    const resp = await createPF(env).crearSolicitud(sol);
+    return { success: true, solicitudId: resp?.id ?? resp?.solicitud_id ?? null };
+  } catch (e) {
+    console.error(`[wizard] lead falló: ${e.message}`);
+    const transient = !e.status || e.status === 429 || e.status >= 500;
+    return {
+      success: false,
+      code: transient ? "pf_unavailable" : "pf_rejected",
+      message: "No pudimos registrar tus datos en este momento. Intenta de nuevo en unos minutos.",
+    };
+  }
 }

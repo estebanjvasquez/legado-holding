@@ -8,13 +8,14 @@
      GET  /wizard/parentescos  → catálogo de parentescos (proxy autenticado a PF)
      POST /                    → ejecuta el pipeline de checkout del wizard
      POST /chat                → proxy al agente Alma (handoff, sin facturación)
+     POST /wizard/lead         → prospecto del wizard (estado donde no se vende en línea)
      OPTIONS                   → CORS preflight
    ============================================================================= */
 
 import { instrument } from "@microlabs/otel-cf-workers";
 
 import { createPF } from "./prevision-api.js";
-import { processWizardCheckout } from "./wizard-compra.js";
+import { processWizardCheckout, processWizardLead } from "./wizard-compra.js";
 import { handleChat, fallbackChatResponse } from "./chat.js";
 import { sanitizeAttribution } from "./attribution.js";
 import { clientIp, isRateLimited } from "./ratelimit.js";
@@ -94,6 +95,22 @@ const handler = {
       }
     }
 
+    /* Prospecto del wizard: comprador de un estado donde no se vende en línea
+       (POST /solicitudes en Previsión, con PF_TOKEN). */
+    if (url.pathname === "/wizard/lead") {
+      if (await isRateLimited(env.CHECKOUT_IP_LIMITER, clientIp(request))) {
+        return json({ success: false, code: "rate_limited", message: "Demasiados intentos seguidos. Espera un minuto e intenta de nuevo." }, 429);
+      }
+      try {
+        const r = await processWizardLead(body, env);
+        return json(r, r.success ? 200 : r.code === "pf_unavailable" ? 503 : 400);
+      } catch (e) {
+        if (isValidationError(e)) return json({ success: false, message: e.message }, 400);
+        console.error("Lead error:", e.message);
+        return json({ success: false, message: "No pudimos registrar tus datos. Intenta de nuevo." }, 500);
+      }
+    }
+
     /* El checkout del wizard solo vive en POST / — antes cualquier POST a
        cualquier ruta desconocida terminaba en el checkout. */
     if (url.pathname !== "/") {
@@ -126,11 +143,15 @@ const handler = {
     delete body.turnstileToken;
 
     try {
-      const result = await processWizardCheckout(body, env);
+      const result = await processWizardCheckout(body, env, {
+        ip: request.headers.get("CF-Connecting-IP") || null,
+        navegador: request.headers.get("User-Agent") || null,
+      });
       const status = result.success
         ? 200
         : result.code === "pf_unavailable" ? 503
         : result.code === "pf_review" ? 409
+        : result.code === "pf_condiciones" ? 409
         : 400;
       return json(result, status);
     } catch (e) {

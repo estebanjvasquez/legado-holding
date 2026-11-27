@@ -61,7 +61,44 @@
                 confirmación de tu plan de previsión. Si tienes alguna duda, nuestro
                 equipo está disponible para acompañarte.
             </p>
+            <p id="renewal" class="renewal">
+                Tu plan se renueva automáticamente con la frecuencia que elegiste
+                hasta que canceles. Puedes cancelar en cualquier momento desde tu
+                portal de cliente o escribiendo a
+                <a href="mailto:info@legadoholding.com">info@legadoholding.com</a>.
+            </p>
             <a class="btn" href="/">Volver al inicio</a>
         </div>
+        <script>
+            /* Datos de la compra que dejó el wizard (js/main.js
+               rememberPurchaseForThanks) para repetir el monto y cómo cancelar. */
+            (function () {
+                var d = null;
+                try { d = JSON.parse(sessionStorage.getItem("legado_last_purchase") || "null"); } catch (_) {}
+                var lang = (d && d.lang) || (function () { try { return localStorage.getItem("legado_lang"); } catch (_) { return null; } })() || "es";
+                var en = lang === "en";
+                var mail = '<a href="mailto:info@legadoholding.com">info@legadoholding.com</a>';
+                var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+                var html;
+                if (d && d.recurring) {
+                    var annual = d.period === "annual";
+                    html = en
+                        ? "Your card will be charged <strong>" + esc(d.recurring) + " every " + (annual ? "year" : "month") + "</strong> automatically until you cancel. You can cancel at any time from your customer portal or by writing to " + mail + "."
+                        : "Se cobrará <strong>" + esc(d.recurring) + " cada " + (annual ? "año" : "mes") + "</strong> a tu tarjeta de forma automática hasta que canceles. Puedes cancelar en cualquier momento desde tu portal de cliente o escribiendo a " + mail + ".";
+                    if (d.fl) html += en
+                        ? " If you live in Florida, you can cancel within 30 days of purchase and we will refund everything you paid."
+                        : " Si vives en Florida, puedes cancelar dentro de los 30 días siguientes a la compra y te devolvemos todo lo que pagaste.";
+                } else if (en) {
+                    html = "Your plan renews automatically at the frequency you chose until you cancel. You can cancel at any time from your customer portal or by writing to " + mail + ".";
+                }
+                if (html) document.getElementById("renewal").innerHTML = html;
+                if (en) {
+                    document.documentElement.lang = "en";
+                    document.querySelector("h1").textContent = "Thank you for trusting LEGADO!";
+                    document.querySelector(".card p").textContent = "We received your payment. In a few minutes you will receive an email confirming your funeral pre-planning plan. If you have any questions, our team is here to help.";
+                    document.querySelector("a.btn").textContent = "Back to home";
+                }
+            })();
+        </script>
     </body>
 </html>

@@ -431,30 +431,58 @@ const LANG = {
   wiz_sum_payment: ["Pago", "Payment"],
   wiz_sum_buyer: ["Comprador", "Buyer"],
   wiz_sum_members: ["Familiares", "Family members"],
-  wiz_contract_title: ["Contrato de servicio", "Service contract"],
-  wiz_contract_chk: [
-    "Acepto los términos y condiciones del servicio",
-    "I accept the service terms and conditions",
+  wiz_step_residence: ["Residencia", "Residence"],
+  wiz_res_loading: ["Cargando estados…", "Loading states…"],
+  wiz_res_label: ["¿En qué estado vives?", "Which state do you live in?"],
+  wiz_res_choose: ["Selecciona…", "Select…"],
+  wiz_res_other: ["Otro estado / fuera de EE. UU.", "Other state / outside the U.S."],
+  wiz_res_abroad: ["Fuera de EE. UU.", "Outside the U.S."],
+  wiz_res_country: ["¿En qué país vives?", "Which country do you live in?"],
+  wiz_res_only_in: ["Por ahora solo vendemos en línea en:", "For now we only sell online in:"],
+  wiz_res_rejected: [
+    "Por ahora no podemos vender este plan en línea en tu estado de residencia.",
+    "For now we can't sell this plan online in your state of residence.",
   ],
-  wiz_contract_p0: [
-    "TÉRMINOS Y CONDICIONES DEL SERVICIO DE PREVISIÓN FUNERARIA LEGADO",
-    "LEGADO FUNERAL PRE-PLANNING SERVICE TERMS AND CONDITIONS",
+  wiz_lead_title: ["Te contactamos", "We'll contact you"],
+  wiz_lead_intro: [
+    "Déjanos tus datos y un asesor te contactará para ayudarte.",
+    "Leave your details and an advisor will contact you to help.",
   ],
-  wiz_contract_p1: [
-    "El presente contrato establece los términos y condiciones bajo los cuales Legado provee servicios de previsión funeraria para familias venezolanas. Al aceptar estos términos, el contratante acepta las condiciones de servicio, cobertura y pago aquí descritas.",
-    "This contract establishes the terms and conditions under which Legado provides funeral pre-planning services for Venezuelan families.",
+  wiz_lead_consent: [
+    "Acepto que un asesor de Legado me contacte por teléfono o correo sobre este plan.",
+    "I agree that a Legado advisor may contact me by phone or email about this plan.",
   ],
-  wiz_contract_p2: [
-    "1. COBERTURA: El servicio incluye los beneficios especificados en el plan seleccionado. La cobertura aplica exclusivamente en el territorio de Venezuela según el plan contratado.",
-    "1. COVERAGE: The service includes the benefits specified in the selected plan. Coverage applies exclusively within Venezuelan territory.",
+  wiz_lead_send: ["Quiero que me contacten", "Contact me"],
+  wiz_lead_sending: ["Enviando…", "Sending…"],
+  wiz_lead_sent: [
+    "¡Listo! Recibimos tus datos. Un asesor te contactará pronto.",
+    "Done! We received your details. An advisor will contact you soon.",
   ],
-  wiz_contract_p3: [
-    "2. PAGOS: Los pagos deben realizarse de forma puntual según la modalidad seleccionada (mensual o anual). El incumplimiento de pago por más de 30 días resultará en la suspensión del servicio.",
-    "2. PAYMENTS: Payments must be made promptly. Payment default for more than 30 days will result in service suspension.",
+  wiz_lead_error: [
+    "No pudimos registrar tus datos. Intenta de nuevo en unos minutos.",
+    "We couldn't save your details. Please try again in a few minutes.",
   ],
-  wiz_contract_p4: [
-    "3. CANCELACIÓN: El contratante puede cancelar el servicio en cualquier momento con 30 días de anticipación.",
-    "3. CANCELLATION: The contractor may cancel the service at any time with 30 days notice.",
+  wiz_optional: ["opcional", "optional"],
+  wiz_fl_refund: [
+    "Si vives en Florida, puedes cancelar dentro de los 30 días siguientes a la compra y te devolvemos todo lo que pagaste.",
+    "If you live in Florida, you can cancel within 30 days of purchase and we will refund everything you paid.",
+  ],
+  wiz_sum_residence: ["Residencia", "Residence"],
+  wiz_terms_loading: ["Cargando los términos del plan…", "Loading the plan terms…"],
+  wiz_terms_title: ["Términos y condiciones", "Terms and conditions"],
+  wiz_terms_version: ["Versión", "Version"],
+  wiz_terms_since: ["vigente desde", "effective"],
+  wiz_terms_chk: [
+    "He leído y acepto los términos y condiciones",
+    "I have read and accept the terms and conditions",
+  ],
+  wiz_terms_chk_site: [
+    'He leído y acepto los <a href="terminos-condiciones.html" target="_blank" rel="noopener">términos y condiciones</a> y la <a href="politica-privacidad.html" target="_blank" rel="noopener">política de privacidad</a>',
+    'I have read and accept the <a href="terminos-condiciones.html" target="_blank" rel="noopener">terms and conditions</a> and the <a href="politica-privacidad.html" target="_blank" rel="noopener">privacy policy</a>',
+  ],
+  wiz_terms_changed: [
+    "Los términos del plan se actualizaron. Revísalos y acéptalos de nuevo para continuar.",
+    "The plan terms were updated. Please review and accept them again to continue.",
   ],
 
   /* ── Toast ─────────────────────────────────────────────────────────────── */
@@ -745,6 +773,10 @@ let chatSessionId = null;
 let wizardOpen = false;
 let wizardSubmitted = false;
 let wizardStep = 0;
+/* Pasos del wizard. S_RES (¿dónde vives?) va primero: con un estado donde no
+   se vende en línea no se llega a precios ni al pago (brief de Previsión
+   2026-11-26 §4.1). */
+const S_RES = 0, S_DATA = 1, S_FAM = 2, S_PAY = 3, S_SUM = 4;
 let wizardSelectedPlan = null;
 let wizardPaymentType = null; // "monthly" | "annual" | null (sin elegir)
 let wizardAcceptedTerms = false;
@@ -768,6 +800,18 @@ let wizardParentescosError = false;
    (first-touch: el comprador no lo reemplaza). */
 let wizardAsesor = { code: "", estado: "", nombre: null, locked: false };
 let wizardAsesorTimer = null;
+/* Residencia (paso S_RES). wizardResidencias = respuesta de GET /residencias
+   de Previsión ({ restringe, pais, estados:[{codigo,nombre}] }); los estados
+   HABILITADOS siempre vienen de la API, nunca escritos acá. choice: código
+   USPS | "__other__" (estado no habilitado → prospecto) | "__abroad__". */
+let wizardResidencias = null;
+let wizardResidence = { choice: "", country: "" };
+let wizardResidenceNotice = "";
+let wizardLead = { name: "", lastName: "", phone: "", email: "", consent: false, status: "" };
+/* Términos del plan (GET /condiciones?plan_id=N). vigente = null → el plan no
+   tiene términos publicados en Previsión y no se manda condicionesVersionId. */
+let wizardCondiciones = { status: "idle", vigente: null };
+let wizardSummaryNotice = "";
 let revealObserver = null;
 
 /* =============================================================================
@@ -1375,10 +1419,266 @@ function openWizard(planId) {
     zip: "",
   };
   wizardFamily = [];
+  wizardResidence = { choice: "", country: "" };
+  wizardResidenceNotice = "";
+  wizardSummaryNotice = "";
+  wizardLead = { name: "", lastName: "", phone: "", email: "", consent: false, status: "" };
   initWizardAsesor();
   $("#wizard-overlay").classList.remove("hidden");
   renderWizardContent();
   loadParentescos();
+  loadResidencias();
+  loadCondiciones();
+}
+
+/* ── Residencia y términos (brief de Previsión 2026-11-26) ───────────────── */
+const PF_PUBLIC_BASE = PLANS_API_URL.replace(/\/planes\/?$/, "");
+const WIZARD_LEAD_URL = WIZARD_WEBHOOK_URL.replace(/\/+$/, "") + "/wizard/lead";
+
+/* Lista completa de EE. UU. (50 + DC + PR): no es un dato del negocio, por
+   eso es la única que puede ir fija (brief §4.1). Se usa solo cuando la
+   empresa todavía no restringe estados. */
+const US_STATES = [
+  ["AL","Alabama"],["AK","Alaska"],["AZ","Arizona"],["AR","Arkansas"],["CA","California"],
+  ["CO","Colorado"],["CT","Connecticut"],["DE","Delaware"],["DC","District of Columbia"],
+  ["FL","Florida"],["GA","Georgia"],["HI","Hawaii"],["ID","Idaho"],["IL","Illinois"],
+  ["IN","Indiana"],["IA","Iowa"],["KS","Kansas"],["KY","Kentucky"],["LA","Louisiana"],
+  ["ME","Maine"],["MD","Maryland"],["MA","Massachusetts"],["MI","Michigan"],["MN","Minnesota"],
+  ["MS","Mississippi"],["MO","Missouri"],["MT","Montana"],["NE","Nebraska"],["NV","Nevada"],
+  ["NH","New Hampshire"],["NJ","New Jersey"],["NM","New Mexico"],["NY","New York"],
+  ["NC","North Carolina"],["ND","North Dakota"],["OH","Ohio"],["OK","Oklahoma"],["OR","Oregon"],
+  ["PA","Pennsylvania"],["PR","Puerto Rico"],["RI","Rhode Island"],["SC","South Carolina"],
+  ["SD","South Dakota"],["TN","Tennessee"],["TX","Texas"],["UT","Utah"],["VT","Vermont"],
+  ["VA","Virginia"],["WA","Washington"],["WV","West Virginia"],["WI","Wisconsin"],["WY","Wyoming"],
+];
+const ABROAD_COUNTRIES = ["VE","CO","MX","ES","PA","DO","CL","AR","PE","EC","UY","CR","CA","BR","IT","PT"];
+
+function countryName(code) {
+  try {
+    return new Intl.DisplayNames([currentLang === "en" ? "en" : "es"], { type: "region" }).of(code) || code;
+  } catch (_) {
+    return code;
+  }
+}
+
+async function loadResidencias() {
+  wizardResidencias = null;
+  try {
+    const resp = await fetch(PF_PUBLIC_BASE + "/residencias");
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const d = await resp.json();
+    wizardResidencias = {
+      restringe: d && d.restringe === true,
+      pais: (d && d.pais) || "US",
+      estados: Array.isArray(d && d.estados) ? d.estados.filter((e) => e && e.codigo) : [],
+    };
+  } catch (e) {
+    /* Sin respuesta: se ofrece la lista completa. Si Previsión sí restringe,
+       rechaza la compra con residencia_no_habilitada y el wizard vuelve acá
+       con la lista que trae ese error. */
+    console.warn("Residencias no disponibles:", e.message);
+    wizardResidencias = { restringe: false, pais: "US", estados: [] };
+  }
+  if (wizardOpen && wizardStep === S_RES) { renderWizardStep(); updateWizardFooter(); }
+}
+
+async function loadCondiciones() {
+  const planId = PLANS[wizardSelectedPlan]?.id;
+  wizardCondiciones = { status: "loading", vigente: null };
+  try {
+    if (!planId) throw new Error("plan sin id");
+    const resp = await fetch(PF_PUBLIC_BASE + "/condiciones?plan_id=" + encodeURIComponent(planId));
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const d = await resp.json();
+    const v = d && d.vigente;
+    wizardCondiciones = {
+      status: "ok",
+      vigente: v && v.id ? { id: v.id, version: v.version, titulo: v.titulo || "", texto: v.texto || "", desde: v.vigente_desde || null } : null,
+    };
+  } catch (e) {
+    /* Si el plan sí tenía términos, Previsión responde condiciones_no_aceptadas
+       y el wizard los vuelve a pedir. */
+    console.warn("Condiciones no disponibles:", e.message);
+    wizardCondiciones = { status: "error", vigente: null };
+  }
+  if (wizardOpen && wizardStep === S_SUM) { renderWizardStep(); updateWizardFooter(); }
+}
+
+/* Estados que se muestran en el selector. */
+function residenceOptions() {
+  const R = wizardResidencias;
+  if (R && R.restringe) return R.estados.map((e) => [e.codigo, e.nombre || e.codigo]);
+  return US_STATES;
+}
+
+function enabledStatesText() {
+  const R = wizardResidencias;
+  return R && R.restringe ? R.estados.map((e) => e.nombre || e.codigo).join(", ") : "";
+}
+
+/* true = el comprador vive donde no se vende en línea: no se llega al pago. */
+function wizardResidenceBlocked() {
+  return !!(wizardResidencias && wizardResidencias.restringe && wizardResidence.choice === "__other__");
+}
+
+/* { pais, estado } para POST /compras, o null si falta elegir. */
+function wizardResidencia() {
+  const R = wizardResidencias;
+  const c = wizardResidence.choice;
+  if (!c || c === "__other__") return null;
+  if (c === "__abroad__") return wizardResidence.country ? { pais: wizardResidence.country } : null;
+  return { pais: (R && R.restringe && R.pais) || "US", estado: c };
+}
+
+function renderStepResidence() {
+  const R = wizardResidencias;
+  if (!R) {
+    return `<p class="form-hint" role="status">${t("wiz_res_loading")}</p>`;
+  }
+  const c = wizardResidence.choice;
+  const opts = residenceOptions()
+    .map(([code, name]) => `<option value="${escapeHTML(code)}"${c === code ? " selected" : ""}>${escapeHTML(name)}</option>`)
+    .join("");
+  const extra = R.restringe
+    ? `<option value="__other__"${c === "__other__" ? " selected" : ""}>${t("wiz_res_other")}</option>`
+    : `<option value="__abroad__"${c === "__abroad__" ? " selected" : ""}>${t("wiz_res_abroad")}</option>`;
+  const notice = wizardResidenceNotice
+    ? `<div class="wizard-error" role="alert" style="margin-bottom:1rem">${escapeHTML(wizardResidenceNotice)}</div>`
+    : "";
+  const onlyIn = R.restringe && R.estados.length
+    ? `<p class="form-hint">${t("wiz_res_only_in")} ${escapeHTML(enabledStatesText())}.</p>`
+    : "";
+  const abroad = c === "__abroad__"
+    ? `<div class="form-row"><div class="form-group">
+        <label class="form-label" for="wf-res-country">${t("wiz_res_country")}</label>
+        <select class="form-input" id="wf-res-country">
+          <option value="">${t("wiz_res_choose")}</option>
+          ${ABROAD_COUNTRIES.map((k) => [k, countryName(k)]).sort((a, b) => a[1].localeCompare(b[1])).map(([k, n]) => `<option value="${k}"${wizardResidence.country === k ? " selected" : ""}>${escapeHTML(n)}</option>`).join("")}
+        </select></div></div>`
+    : "";
+  return `
+    ${notice}
+    <div class="form-row"><div class="form-group">
+      <label class="form-label" for="wf-res">${t("wiz_res_label")}</label>
+      <select class="form-input" id="wf-res" aria-describedby="wf-res-help">
+        <option value="">${t("wiz_res_choose")}</option>
+        ${opts}
+        ${extra}
+      </select>
+      <div id="wf-res-help">${onlyIn}</div>
+    </div></div>
+    ${abroad}
+    ${wizardResidenceBlocked() ? renderResidenceLeadForm() : ""}`;
+}
+
+function renderResidenceLeadForm() {
+  const L = wizardLead;
+  if (L.status === "sent") {
+    return `<div class="summary-box" role="status"><p>${t("wiz_lead_sent")}</p></div>`;
+  }
+  const states = enabledStatesText();
+  return `
+    <div class="summary-box" id="wf-lead-box">
+      <h4>${t("wiz_lead_title")}</h4>
+      <p>${t("wiz_res_only_in")} ${escapeHTML(states)}. ${t("wiz_lead_intro")}</p>
+      <div class="form-row cols-2">
+        <div class="form-group"><label class="form-label" for="wl-name">${t("wiz_fname")}</label>
+          <input class="form-input" id="wl-name" type="text" autocomplete="given-name" value="${escapeHTML(L.name)}"></div>
+        <div class="form-group"><label class="form-label" for="wl-lastName">${t("wiz_lname")}</label>
+          <input class="form-input" id="wl-lastName" type="text" autocomplete="family-name" value="${escapeHTML(L.lastName)}"></div>
+      </div>
+      <div class="form-row cols-2">
+        <div class="form-group"><label class="form-label" for="wl-phone">${t("wiz_phone")}</label>
+          <input class="form-input" id="wl-phone" type="tel" autocomplete="tel" value="${escapeHTML(L.phone)}"></div>
+        <div class="form-group"><label class="form-label" for="wl-email">Email (${t("wiz_optional")})</label>
+          <input class="form-input" id="wl-email" type="email" autocomplete="email" value="${escapeHTML(L.email)}"></div>
+      </div>
+      <label class="checkbox-row">
+        <input type="checkbox" id="wl-consent" ${L.consent ? "checked" : ""}>
+        <span class="text">${t("wiz_lead_consent")}</span>
+      </label>
+      <div style="margin-top:0.75rem">
+        <button type="button" class="btn-outline" id="wl-send" ${canSendLead() && L.status !== "sending" ? "" : "disabled"}>${L.status === "sending" ? t("wiz_lead_sending") : t("wiz_lead_send")}</button>
+      </div>
+      <p id="wl-status" class="form-hint" role="status" aria-live="polite">${L.status === "error" ? t("wiz_lead_error") : ""}</p>
+    </div>`;
+}
+
+function canSendLead() {
+  const L = wizardLead;
+  return !!(L.name.trim() && L.lastName.trim() && L.phone.trim() && L.consent);
+}
+
+async function sendResidenceLead() {
+  if (!canSendLead() || wizardLead.status === "sending") return;
+  wizardLead.status = "sending";
+  renderWizardStep();
+  /* "Otro estado": no se sabe cuál; se registra sin residencia estructurada. */
+  try {
+    const resp = await fetch(WIZARD_LEAD_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        buyer: { name: wizardLead.name, lastName: wizardLead.lastName, phone: wizardLead.phone, email: wizardLead.email },
+        planId: PLANS[wizardSelectedPlan]?.id,
+        consent: wizardLead.consent === true,
+        lang: currentLang,
+        attribution: getAttribution(),
+      }),
+    });
+    const d = await resp.json().catch(() => null);
+    wizardLead.status = resp.ok && d && d.success ? "sent" : "error";
+  } catch (_) {
+    wizardLead.status = "error";
+  }
+  if (wizardOpen && wizardStep === S_RES) renderWizardStep();
+  const st = $("#wl-status") || $("#wf-lead-box");
+  st?.focus?.();
+}
+
+/* Texto de renovación automática junto al botón de pagar (brief §4.3). */
+function wizardRenewalHTML() {
+  const s = wizardPaymentSummary();
+  const P = window.LegadoWizardPricing;
+  if (!s || !P) return "";
+  const annual = wizardPaymentType === "annual";
+  const amount = P.formatCents(s.recurringCents);
+  const mail = '<a href="mailto:info@legadoholding.com">info@legadoholding.com</a>';
+  const res = wizardResidencia();
+  const fl = res && res.pais === "US" && res.estado === "FL";
+  const es = currentLang === "es";
+  const main = es
+    ? `Se cobrará <strong>${amount} cada ${annual ? "año" : "mes"}</strong> a tu tarjeta de forma automática hasta que canceles.`
+    : `Your card will be charged <strong>${amount} every ${annual ? "year" : "month"}</strong> automatically until you cancel.`;
+  const initial = s.initialCents
+    ? (es
+        ? ` Hoy se cobra además la cuota inicial única de ${P.formatCents(s.initialCents)}.`
+        : ` Today you will also be charged the one-time initial fee of ${P.formatCents(s.initialCents)}.`)
+    : "";
+  const cancel = es
+    ? ` Puedes cancelar en cualquier momento desde tu portal de cliente o escribiendo a ${mail}.`
+    : ` You can cancel at any time from your customer portal or by writing to ${mail}.`;
+  return `<div class="renewal-notice" id="wf-renewal" style="margin-top:1rem;padding:0.875rem 1rem;border:1px solid var(--border, #d1d5db);border-radius:0.5rem;font-size:0.9375rem;line-height:1.5;color:var(--foreground, #17243a)">
+      <p style="margin:0">${main}${initial}${cancel}</p>
+      ${fl ? `<p style="margin:0.5rem 0 0">${t("wiz_fl_refund")}</p>` : ""}
+    </div>`;
+}
+
+/* gracias.html repite el texto de renovación y cómo cancelar; los datos van
+   por sessionStorage (misma pestaña tras volver de Stripe). */
+function rememberPurchaseForThanks() {
+  const s = wizardPaymentSummary();
+  const P = window.LegadoWizardPricing;
+  if (!s || !P) return;
+  const res = wizardResidencia();
+  try {
+    sessionStorage.setItem("legado_last_purchase", JSON.stringify({
+      lang: currentLang,
+      recurring: P.formatCents(s.recurringCents),
+      period: wizardPaymentType === "annual" ? "annual" : "monthly",
+      fl: !!(res && res.pais === "US" && res.estado === "FL"),
+    }));
+  } catch (_) { /* sin storage: gracias.html muestra el texto genérico */ }
 }
 
 /* ── Código de asesor ──────────────────────────────────────────────────────
@@ -1477,7 +1777,7 @@ async function loadParentescos() {
     console.warn("Parentescos no disponibles:", e.message);
     wizardParentescosError = true;
   }
-  if (wizardOpen && wizardStep === 1) renderWizardStep();
+  if (wizardOpen && wizardStep === S_FAM) renderWizardStep();
 }
 
 function closeWizard() {
@@ -1504,6 +1804,8 @@ function openPlanDetails(planId) {
         .map((line) => `<p>${escapeHTML(line.trim())}</p>`)
         .join("")
     : `<p>${t("plan_details_empty")}</p>`;
+  /* Política de cancelación (brief de Previsión §4.4): solo Florida por ahora. */
+  const bodyWithPolicy = bodyHTML + `<p class="plan-details-policy"><strong>${t("wiz_fl_refund")}</strong></p>`;
   let overlay = document.getElementById("plan-details-overlay");
   if (!overlay) {
     overlay = document.createElement("div");
@@ -1524,7 +1826,7 @@ function openPlanDetails(planId) {
           </svg>
         </button>
       </div>
-      <div class="plan-details-body">${bodyHTML}</div>
+      <div class="plan-details-body">${bodyWithPolicy}</div>
     </div>`;
   overlay.classList.remove("hidden");
   document.body.style.overflow = "hidden";
@@ -1580,6 +1882,7 @@ function renderWizardSteps() {
   const el = $("#wizard-steps");
   if (!el) return;
   const labels = [
+    t("wiz_step_residence"),
     t("wiz_step_data"),
     t("wiz_step_family"),
     t("wiz_step_payment"),
@@ -1612,10 +1915,11 @@ function renderWizardStep() {
   body.innerHTML = "";
   const div = document.createElement("div");
   div.className = "wizard-step active";
-  if (wizardStep === 0) div.innerHTML = renderStep0();
-  else if (wizardStep === 1) div.innerHTML = renderStep1();
-  else if (wizardStep === 2) div.innerHTML = renderStep2();
-  else if (wizardStep === 3) div.innerHTML = renderStep3();
+  if (wizardStep === S_RES) div.innerHTML = renderStepResidence();
+  else if (wizardStep === S_DATA) div.innerHTML = renderStep0();
+  else if (wizardStep === S_FAM) div.innerHTML = renderStep1();
+  else if (wizardStep === S_PAY) div.innerHTML = renderStep2();
+  else if (wizardStep === S_SUM) div.innerHTML = renderStep3();
   body.appendChild(div);
   bindWizardStepEvents();
 }
@@ -1852,11 +2156,49 @@ function renderStep3() {
     ? `
       <div class="summary-row"><span class="label">${isAnnual ? t("wiz_sum_recurring_yr") : t("wiz_sum_recurring_mo")}</span><span class="value">${P.formatCents(s.recurringCents)}${isAnnual ? t("wiz_yr") : t("plan_mo")}</span></div>
       ${s.initialCents ? `<div class="summary-row"><span class="label">${t("wiz_initial_once")}</span><span class="value">${P.formatCents(s.initialCents)}</span></div>` : ""}
-      <div class="summary-row"><span class="label">${t("wiz_sum_first_charge")}</span><span class="value highlight" data-first-charge="${s.firstChargeCents}">${P.formatCents(s.firstChargeCents)}</span></div>
-      <p class="form-hint summary-charge-note">${isAnnual ? t("wiz_sum_note_yr") : t("wiz_sum_note_mo")}</p>`
+      <div class="summary-row"><span class="label">${t("wiz_sum_first_charge")}</span><span class="value highlight" data-first-charge="${s.firstChargeCents}">${P.formatCents(s.firstChargeCents)}</span></div>`
+    : "";
+  const res = wizardResidencia();
+  const resLabel = res
+    ? (res.estado
+        ? escapeHTML((residenceOptions().find(([k]) => k === res.estado) || [res.estado, res.estado])[1])
+        : escapeHTML(countryName(res.pais)))
+    : "";
+
+  /* Términos: los publicados en Previsión para el plan (versión que se
+     acepta); si el plan no tiene, se aceptan los generales del sitio. */
+  const C = wizardCondiciones;
+  let termsBox;
+  if (C.status === "loading") {
+    termsBox = `<div class="contract-box"><p class="form-hint" role="status">${t("wiz_terms_loading")}</p></div>`;
+  } else if (C.vigente) {
+    const v = C.vigente;
+    termsBox = `
+    <div class="contract-box">
+      <h4 id="wf-terms-title">${escapeHTML(v.titulo || t("wiz_terms_title"))}</h4>
+      <div class="contract-text" tabindex="0" role="region" aria-labelledby="wf-terms-title" style="white-space:pre-wrap">${escapeHTML(v.texto)}</div>
+      <p class="form-hint">${t("wiz_terms_version")} ${escapeHTML(String(v.version ?? v.id))}${v.desde ? ` · ${t("wiz_terms_since")} ${escapeHTML(String(v.desde).slice(0, 10))}` : ""}</p>
+      <label class="checkbox-row">
+        <input type="checkbox" id="terms-check" ${wizardAcceptedTerms ? "checked" : ""}>
+        <span class="text">${t("wiz_terms_chk")}</span>
+      </label>
+    </div>`;
+  } else {
+    termsBox = `
+    <div class="contract-box">
+      <h4>${t("wiz_terms_title")}</h4>
+      <label class="checkbox-row">
+        <input type="checkbox" id="terms-check" ${wizardAcceptedTerms ? "checked" : ""}>
+        <span class="text">${t("wiz_terms_chk_site")}</span>
+      </label>
+    </div>`;
+  }
+  const notice = wizardSummaryNotice
+    ? `<div class="wizard-error" role="alert" style="margin-bottom:1rem">${escapeHTML(wizardSummaryNotice)}</div>`
     : "";
 
   return `
+    ${notice}
     <div class="summary-box">
       <h4>${t("wiz_summary_title")}</h4>
       <div class="summary-row"><span class="label">${t("wiz_sum_plan")}</span><span class="value">${planName}</span></div>
@@ -1864,20 +2206,11 @@ function renderStep3() {
       ${amountRows}
       <div class="summary-row"><span class="label">${t("wiz_sum_buyer")}</span><span class="value">${escapeHTML(wizardBuyer.name)} ${escapeHTML(wizardBuyer.lastName)}</span></div>
       <div class="summary-row"><span class="label">${t("wiz_sum_members")}</span><span class="value">${wizardFamily.length}</span></div>
+      ${resLabel ? `<div class="summary-row"><span class="label">${t("wiz_sum_residence")}</span><span class="value">${resLabel}</span></div>` : ""}
     </div>
-    <div class="contract-box">
-      <h4>${t("wiz_contract_title")}</h4>
-      <div class="contract-text">
-        <p><strong>${t("wiz_contract_p0")}</strong></p>
-        <p>${t("wiz_contract_p1")}</p><p>${t("wiz_contract_p2")}</p>
-        <p>${t("wiz_contract_p3")}</p><p>${t("wiz_contract_p4")}</p>
-      </div>
-      <label class="checkbox-row">
-        <input type="checkbox" id="terms-check" ${wizardAcceptedTerms ? "checked" : ""}>
-        <span class="text">${t("wiz_contract_chk")}</span>
-      </label>
-    </div>
-    ${TURNSTILE_SITEKEY ? '<div id="wf-turnstile" class="wizard-turnstile" style="margin-top:1rem;display:flex;justify-content:center"></div><p id="wf-turnstile-msg" class="form-hint" style="text-align:center"></p>' : ""}`;
+    ${termsBox}
+    ${TURNSTILE_SITEKEY ? '<div id="wf-turnstile" class="wizard-turnstile" style="margin-top:1rem;display:flex;justify-content:center"></div><p id="wf-turnstile-msg" class="form-hint" style="text-align:center"></p>' : ""}
+    ${wizardRenewalHTML()}`;
 }
 
 /* =============================================================================
@@ -1894,7 +2227,35 @@ function validateAge(dateStr, maxAge) {
 }
 
 function bindWizardStepEvents() {
-  if (wizardStep === 0) {
+  if (wizardStep === S_RES) {
+    $("#wf-res")?.addEventListener("change", (e) => {
+      wizardResidence.choice = e.target.value;
+      if (wizardResidence.choice !== "__abroad__") wizardResidence.country = "";
+      wizardResidenceNotice = "";
+      renderWizardStep();
+      updateWizardFooter();
+      $("#wf-res")?.focus();
+    });
+    $("#wf-res-country")?.addEventListener("change", (e) => {
+      wizardResidence.country = e.target.value;
+      updateWizardFooter();
+    });
+    ["name", "lastName", "phone", "email"].forEach((field) => {
+      const el = $(`#wl-${field}`);
+      el?.addEventListener("input", () => {
+        wizardLead[field] = el.value;
+        const btn = $("#wl-send");
+        if (btn) btn.disabled = !canSendLead();
+      });
+    });
+    $("#wl-consent")?.addEventListener("change", (e) => {
+      wizardLead.consent = e.target.checked;
+      const btn = $("#wl-send");
+      if (btn) btn.disabled = !canSendLead();
+    });
+    $("#wl-send")?.addEventListener("click", sendResidenceLead);
+  }
+  if (wizardStep === S_DATA) {
     const maxAge = PLANS[wizardSelectedPlan]?.maxAge || 65;
     ["name", "lastName", "cedula", "phone", "email", "birthDate", "zip"].forEach(
       (field) => {
@@ -1929,7 +2290,7 @@ function bindWizardStepEvents() {
       updateWizardFooter();
     });
   }
-  if (wizardStep === 1) {
+  if (wizardStep === S_FAM) {
     $$(".family-remove-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
         wizardFamily.splice(parseInt(btn.dataset.remove), 1);
@@ -1965,7 +2326,7 @@ function bindWizardStepEvents() {
       }
     });
   }
-  if (wizardStep === 2) {
+  if (wizardStep === S_PAY) {
     // Billing mode (monthly/annual) selection
     $$(".payment-option").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -1982,9 +2343,9 @@ function bindWizardStepEvents() {
       });
     });
   }
-  if (wizardStep === 3) {
+  if (wizardStep === S_SUM) {
     $("#wizard-change-billing")?.addEventListener("click", () => {
-      wizardStep = 2;
+      wizardStep = S_PAY;
       renderWizardContent();
     });
     $("#terms-check")?.addEventListener("change", (e) => {
@@ -2039,7 +2400,7 @@ function mountWizardTurnstile() {
   loadTurnstileScript()
     .then((ts) => {
       const box = $("#wf-turnstile");
-      if (!box || !wizardOpen || wizardStep !== 3) return;
+      if (!box || !wizardOpen || wizardStep !== S_SUM) return;
       wizardTurnstile.widgetId = ts.render(box, {
         sitekey: TURNSTILE_SITEKEY,
         action: "checkout",
@@ -2071,11 +2432,12 @@ function mountWizardTurnstile() {
 }
 
 function renderWizardFamilyStep() {
-  if (wizardOpen && wizardStep === 1) renderWizardStep();
+  if (wizardOpen && wizardStep === S_FAM) renderWizardStep();
 }
 
 function canWizardNext() {
-  if (wizardStep === 0) {
+  if (wizardStep === S_RES) return !!wizardResidencias && !wizardResidenceBlocked() && !!wizardResidencia();
+  if (wizardStep === S_DATA) {
     const b = wizardBuyer;
     const maxAge = PLANS[wizardSelectedPlan]?.maxAge || 65;
     return !!(
@@ -2093,7 +2455,7 @@ function canWizardNext() {
       !["short", "checking", "invalido"].includes(wizardAsesor.estado)
     );
   }
-  if (wizardStep === 1) {
+  if (wizardStep === S_FAM) {
     return wizardFamily.every((m) => {
       if (!m.name || !m.lastName || !m.parentescoId || !m.birthDate) return false;
       const parentesco = findParentesco(m.parentescoId);
@@ -2103,8 +2465,8 @@ function canWizardNext() {
       return true;
     });
   }
-  if (wizardStep === 2) return !!wizardPaymentSummary();
-  if (wizardStep === 3) return !!wizardPaymentSummary() && wizardAcceptedTerms && (!TURNSTILE_SITEKEY || !!wizardTurnstile.token);
+  if (wizardStep === S_PAY) return !!wizardPaymentSummary();
+  if (wizardStep === S_SUM) return !!wizardPaymentSummary() && !!wizardResidencia() && wizardCondiciones.status !== "loading" && wizardAcceptedTerms && (!TURNSTILE_SITEKEY || !!wizardTurnstile.token);
   return true;
 }
 
@@ -2117,7 +2479,7 @@ function updateWizardFooter() {
   if (backBtn) backBtn.classList.toggle("hidden", wizardStep === 0);
   if (nextBtn) {
     nextBtn.disabled = !canWizardNext();
-    if (wizardStep === 3) {
+    if (wizardStep === S_SUM) {
       nextBtn.textContent = t("wiz_confirm");
     } else {
       nextBtn.innerHTML =
@@ -2129,8 +2491,8 @@ function updateWizardFooter() {
 
 function wizardNext() {
   if (!canWizardNext()) return;
-  if (wizardStep < 3) {
-    if (wizardStep === 0) applyWizardAsesor();
+  if (wizardStep < S_SUM) {
+    if (wizardStep === S_DATA) applyWizardAsesor();
     wizardStep++;
     renderWizardContent();
   } else {
@@ -2195,7 +2557,11 @@ async function submitWizard() {
     buyer:       wizardBuyer,
     family:      wizardFamily,
     attribution: getAttribution(),
+    residencia:  wizardResidencia(),
+    lang:        currentLang,
   };
+  /* Versión de los términos aceptada (solo si el plan tiene términos). */
+  if (wizardCondiciones.vigente) payload.condicionesVersionId = wizardCondiciones.vigente.id;
   payload.idempotencyKey = wizardIdempotencyKey(payload);
   payload.timestamp = new Date().toISOString();
   /* Fuera de la huella de idempotencia: el token cambia en cada intento. */
@@ -2222,15 +2588,19 @@ async function submitWizard() {
       /* pf_rejected / pf_unavailable traen un mensaje pensado para el usuario
          (worker/src/wizard-compra.js). */
       if (data && data.code && data.message) err.userMessage = data.message;
+      err.code = data && data.code;
+      err.data = data;
       throw err;
     }
 
     setWizardProcessing(false);
+    wizardSummaryNotice = "";
 
     /* La compra se paga con Stripe Checkout (link_de_cobro) — el navegador
        redirige ahí; el contrato solo queda activo tras el webhook firmado de
        Stripe, no por esta respuesta. Ver docs/api-publica-wizard.md. */
     if (data && data.estado === "pendiente_pago" && data.linkDeCobro) {
+      rememberPurchaseForThanks();
       window.location.href = data.linkDeCobro;
       return;
     }
@@ -2240,6 +2610,29 @@ async function submitWizard() {
   } catch (e) {
     console.error("Webhook error:", e);
     setWizardProcessing(false);
+    /* Estado no habilitado (Previsión manda la lista vigente): volver al paso
+       de residencia con el mensaje y el formulario de contacto. */
+    if (e && e.code === "pf_residencia") {
+      const h = e.data && e.data.habilitados;
+      if (h && Array.isArray(h.estados) && h.estados.length) {
+        wizardResidencias = { restringe: true, pais: h.pais || "US", estados: h.estados.filter((x) => x && x.codigo) };
+      }
+      const enabled = wizardResidencias && wizardResidencias.estados.some((x) => x.codigo === wizardResidence.choice);
+      if (!enabled) wizardResidence = { choice: wizardResidencias && wizardResidencias.restringe ? "__other__" : "", country: "" };
+      wizardResidenceNotice = t("wiz_res_rejected") + (enabledStatesText() ? " " + t("wiz_res_only_in") + " " + enabledStatesText() + "." : "");
+      wizardStep = S_RES;
+      renderWizardContent();
+      return;
+    }
+    /* Los términos cambiaron mientras compraba: volver a pedirlos. */
+    if (e && e.code === "pf_condiciones") {
+      wizardAcceptedTerms = false;
+      wizardSummaryNotice = t("wiz_terms_changed");
+      wizardStep = S_SUM;
+      renderWizardContent();
+      loadCondiciones();
+      return;
+    }
     /* Los mensajes del Worker están en español; en inglés se usan textos
        propios según el caso. */
     const timedOut = e && e.name === "AbortError";
