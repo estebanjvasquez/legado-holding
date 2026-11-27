@@ -480,6 +480,8 @@ const LANG = {
     'He leído y acepto los <a href="terminos-condiciones.html" target="_blank" rel="noopener">términos y condiciones</a> y la <a href="politica-privacidad.html" target="_blank" rel="noopener">política de privacidad</a>',
     'I have read and accept the <a href="terminos-condiciones.html" target="_blank" rel="noopener">terms and conditions</a> and the <a href="politica-privacidad.html" target="_blank" rel="noopener">privacy policy</a>',
   ],
+  wiz_terms_open: ["Abrir los términos en una ventana nueva", "Open the terms in a new window"],
+  wiz_privacy_open: ["Política de privacidad", "Privacy policy"],
   wiz_terms_changed: [
     "Los términos del plan se actualizaron. Revísalos y acéptalos de nuevo para continuar.",
     "The plan terms were updated. Please review and accept them again to continue.",
@@ -1429,6 +1431,7 @@ function openWizard(planId) {
   loadParentescos();
   loadResidencias();
   loadCondiciones();
+  if (siteTerms.status === "idle") loadSiteTerms();
 }
 
 /* ── Residencia y términos (brief de Previsión 2026-11-26) ───────────────── */
@@ -1634,6 +1637,21 @@ async function sendResidenceLead() {
   if (wizardOpen && wizardStep === S_RES) renderWizardStep();
   const st = $("#wl-status") || $("#wf-lead-box");
   st?.focus?.();
+}
+
+/* Términos generales del sitio (mismo texto que terminos-condiciones.html). */
+let siteTerms = { status: "idle", text: "" };
+async function loadSiteTerms() {
+  siteTerms.status = "loading";
+  try {
+    const resp = await fetch("terminos-condiciones.txt");
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    siteTerms = { status: "ok", text: (await resp.text()).trim() };
+  } catch (e) {
+    console.warn("Términos del sitio no disponibles:", e.message);
+    siteTerms = { status: "error", text: "" };
+  }
+  if (wizardOpen && wizardStep === S_SUM && !wizardCondiciones.vigente) { renderWizardStep(); updateWizardFooter(); }
 }
 
 /* Texto de renovación automática junto al botón de pagar (brief §4.3). */
@@ -2184,9 +2202,17 @@ function renderStep3() {
       </label>
     </div>`;
   } else {
+    /* Sin términos publicados en Previsión: se muestran completos los del
+       sitio (terminos-condiciones.txt), no solo un enlace. */
+    if (siteTerms.status === "idle") loadSiteTerms();
+    const body = siteTerms.status === "ok"
+      ? `<div class="contract-text" tabindex="0" role="region" aria-labelledby="wf-terms-title" style="white-space:pre-wrap">${escapeHTML(siteTerms.text)}</div>`
+      : `<p class="form-hint" role="status">${siteTerms.status === "error" ? "" : t("wiz_terms_loading")}</p>`;
     termsBox = `
     <div class="contract-box">
-      <h4>${t("wiz_terms_title")}</h4>
+      <h4 id="wf-terms-title">${t("wiz_terms_title")}</h4>
+      ${body}
+      <p style="margin:0.5rem 0 0.75rem"><a href="terminos-condiciones.html" target="_blank" rel="noopener" style="color:var(--legado-navy,#263c5b);font-weight:600;text-decoration:underline">${t("wiz_terms_open")}</a> · <a href="politica-privacidad.html" target="_blank" rel="noopener" style="color:var(--legado-navy,#263c5b);font-weight:600;text-decoration:underline">${t("wiz_privacy_open")}</a></p>
       <label class="checkbox-row">
         <input type="checkbox" id="terms-check" ${wizardAcceptedTerms ? "checked" : ""}>
         <span class="text">${t("wiz_terms_chk_site")}</span>
