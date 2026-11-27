@@ -96,19 +96,24 @@ test("lead: sin consentimiento o sin teléfono se rechaza antes de llamar a Prev
   assert.equal(m.calls.length, 0);
 });
 
-test("consentimiento SMS: no viaja a Previsión hasta activar PF_CONSENTIMIENTO_SMS", async () => {
+test("consentimientos: viajan saneados (otorgados y no otorgados) a POST /compras", async () => {
   m = mockFetch([[isPF, () => jsonResponse(OK)]]);
-  await processWizardCheckout(body({ smsConsent: { aceptado: true, version: "2026-11-27" } }), ENV, META);
+  await processWizardCheckout(body({ consentimientos: [
+    { clave: "comercial_correo", otorgado: true },
+    { clave: "Comercial_WhatsApp", otorgado: "sí" },
+    { clave: "comercial_correo", otorgado: false },
+    { clave: "mal clave!", otorgado: true },
+    null,
+    { clave: "compartir_aliados", otorgado: false },
+  ] }), ENV, META);
+  assert.deepEqual(compras(m.calls)[0].body.consentimientos, [
+    { clave: "comercial_correo", otorgado: true },
+    { clave: "comercial_whatsapp", otorgado: false },
+    { clave: "compartir_aliados", otorgado: false },
+  ]);
   assert.equal(compras(m.calls)[0].body.consentimiento_sms, undefined);
   m.restore();
   m = mockFetch([[isPF, () => jsonResponse(OK)]]);
-  await processWizardCheckout(body({ smsConsent: { aceptado: true, version: "2026-11-27" } }), { ...ENV, PF_CONSENTIMIENTO_SMS: "1" }, META);
-  const c = compras(m.calls)[0].body.consentimiento_sms;
-  assert.equal(c.aceptado, true);
-  assert.equal(c.version, "2026-11-27");
-  assert.equal(c.ip, "203.0.113.7");
-  m.restore();
-  m = mockFetch([[isPF, () => jsonResponse(OK)]]);
-  await processWizardCheckout(body(), { ...ENV, PF_CONSENTIMIENTO_SMS: "1" }, META);
-  assert.deepEqual(compras(m.calls)[0].body.consentimiento_sms, { aceptado: false });
+  await processWizardCheckout(body(), ENV, META);
+  assert.equal(compras(m.calls)[0].body.consentimientos, undefined);
 });

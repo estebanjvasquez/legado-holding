@@ -488,13 +488,10 @@ const LANG = {
   a11y_chat_log: ["Conversación con Alma", "Conversation with Alma"],
   a11y_steps: ["Pasos de la compra", "Purchase steps"],
   a11y_statement: ["Accesibilidad", "Accessibility"],
-  wiz_sms_chk: [
-    "(Opcional) Acepto recibir mensajes de texto (SMS) y llamadas de Legado Holding sobre mi plan, mis pagos y avisos del servicio al teléfono que indiqué.",
-    "(Optional) I agree to receive text messages (SMS) and calls from Legado Holding about my plan, my payments and service notices at the phone number I provided.",
-  ],
-  wiz_sms_help: [
-    "No es condición de compra. La frecuencia varía. Pueden aplicar tarifas de mensajes y datos. Responde STOP para dejar de recibir mensajes o HELP para ayuda.",
-    "Not a condition of purchase. Message frequency varies. Message and data rates may apply. Reply STOP to unsubscribe or HELP for help.",
+  wiz_consents_title: ["Autorizaciones (opcionales)", "Permissions (optional)"],
+  wiz_consents_hint: [
+    "Marca solo lo que aceptes. Ninguna es condición para comprar y puedes cambiarlas cuando quieras.",
+    "Check only what you agree to. None is a condition of purchase and you can change them at any time.",
   ],
   wiz_terms_open: ["Abrir los términos en una ventana nueva", "Open the terms in a new window"],
   wiz_privacy_open: ["Política de privacidad", "Privacy policy"],
@@ -826,10 +823,13 @@ let wizardLead = { name: "", lastName: "", phone: "", email: "", consent: false,
    tiene términos publicados en Previsión y no se manda condicionesVersionId. */
 let wizardCondiciones = { status: "idle", vigente: null };
 let wizardSummaryNotice = "";
-/* Consentimiento OPCIONAL para SMS y llamadas (TCPA): casilla aparte, sin
-   marcar, no es condición de compra. */
-let wizardSmsConsent = false;
-const SMS_CONSENT_VERSION = "2026-11-27";
+/* Consentimientos OPCIONALES del titular (GET /consentimientos de Previsión,
+   editables en su panel): una casilla sin marcar por tipo, ninguna es
+   condición de compra. Se mandan todos (marcados o no) y Previsión los
+   registra en la ficha del titular al confirmarse la compra. null = sin
+   catálogo (no se muestra nada ni se manda el campo). */
+let wizardConsentTypes = null;
+let wizardConsents = {};
 let revealObserver = null;
 
 /* =============================================================================
@@ -1448,7 +1448,7 @@ function openWizard(planId) {
   wizardResidence = { choice: "", country: "" };
   wizardResidenceNotice = "";
   wizardSummaryNotice = "";
-  wizardSmsConsent = false;
+  wizardConsents = {};
   wizardLead = { name: "", lastName: "", phone: "", email: "", consent: false, status: "" };
   initWizardAsesor();
   if (!lastFocusBeforeDialog) lastFocusBeforeDialog = document.activeElement;
@@ -1458,6 +1458,61 @@ function openWizard(planId) {
   loadParentescos();
   loadResidencias();
   loadCondiciones();
+  loadConsentimientos();
+}
+
+async function loadConsentimientos() {
+  if (wizardConsentTypes) return;
+  try {
+    const resp = await fetch(PF_PUBLIC_BASE + "/consentimientos");
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const d = await resp.json();
+    wizardConsentTypes = (Array.isArray(d && d.items) ? d.items : [])
+      .filter((c) => c && typeof c.clave === "string" && c.nombre)
+      .slice(0, 20);
+  } catch (e) {
+    console.warn("Consentimientos no disponibles:", e.message);
+    wizardConsentTypes = null;
+  }
+  if (wizardOpen && wizardStep === S_DATA) { renderWizardStep(); updateWizardFooter(); }
+}
+
+/* Texto de cada consentimiento: el de Previsión (español). En inglés se usa
+   una traducción local de las claves conocidas; si no hay, el de Previsión. */
+const CONSENT_EN = {
+  comercial_correo: ["Marketing communications by email", "Offers, news and promotions by email."],
+  comercial_whatsapp: [
+    "Marketing communications by WhatsApp, SMS and calls",
+    "Offers, news and promotions by WhatsApp, SMS and calls, including automated ones. Not a condition of purchase. Message and data rates may apply. Reply STOP to stop receiving them.",
+  ],
+  compartir_aliados: [
+    "Share my data with partners",
+    "Allow the company to share my contact details with its partners (service providers) to offer me benefits.",
+  ],
+};
+function consentText(c) {
+  const en = currentLang === "en" && CONSENT_EN[c.clave];
+  return en ? { nombre: en[0], descripcion: en[1] } : { nombre: c.nombre, descripcion: c.descripcion || "" };
+}
+
+function wizardConsentsHTML() {
+  if (!wizardConsentTypes || !wizardConsentTypes.length) return "";
+  const rows = wizardConsentTypes.map((c, i) => {
+    const tx = consentText(c);
+    const id = `wf-consent-${i}`;
+    return `
+      <label class="checkbox-row" for="${id}">
+        <input type="checkbox" id="${id}" data-consent="${escapeHTML(c.clave)}" ${wizardConsents[c.clave] ? "checked" : ""}${tx.descripcion ? ` aria-describedby="${id}-help"` : ""}>
+        <span class="text">${escapeHTML(tx.nombre)}</span>
+      </label>
+      ${tx.descripcion ? `<p id="${id}-help" class="form-hint" style="margin:0.1rem 0 0.6rem">${escapeHTML(tx.descripcion)}</p>` : ""}`;
+  }).join("");
+  return `
+    <fieldset class="form-row" style="border:0;padding:0;margin:0">
+      <legend class="form-label">${t("wiz_consents_title")}</legend>
+      <p class="form-hint" style="margin-top:0">${t("wiz_consents_hint")}</p>
+      ${rows}
+    </fieldset>`;
 }
 
 /* ── Residencia y términos (brief de Previsión 2026-11-26) ───────────────── */
@@ -2058,13 +2113,7 @@ function renderStep0() {
         <div id="asesor-status" style="font-size:0.8125rem;margin-top:0.35rem;color:var(--muted-foreground)">${wizardAsesorStatusHTML()}</div>
       </div>
     </div>
-    <div class="form-row">
-      <label class="checkbox-row" for="wf-sms">
-        <input type="checkbox" id="wf-sms" ${wizardSmsConsent ? "checked" : ""} aria-describedby="wf-sms-help">
-        <span class="text">${t("wiz_sms_chk")}</span>
-      </label>
-      <p id="wf-sms-help" class="form-hint" style="margin-top:0.25rem">${t("wiz_sms_help")}</p>
-    </div>`;
+    ${wizardConsentsHTML()}`;
 }
 
 /* Encuentra el parentesco elegido para un familiar por id (número, viene del
@@ -2368,9 +2417,11 @@ function bindWizardStepEvents() {
         });
       },
     );
-    $("#wf-sms")?.addEventListener("change", (e) => {
-      wizardSmsConsent = e.target.checked;
-    });
+    document.querySelectorAll("[data-consent]").forEach((el) =>
+      el.addEventListener("change", (e) => {
+        wizardConsents[e.target.dataset.consent] = e.target.checked;
+      }),
+    );
     const asesorEl = $("#wf-asesor");
     asesorEl?.addEventListener("input", () => {
       const code = asesorEl.value.replace(/[^A-Za-z0-9]/g, "").slice(0, 20);
@@ -2660,10 +2711,12 @@ async function submitWizard() {
     attribution: getAttribution(),
     residencia:  wizardResidencia(),
     lang:        currentLang,
-    smsConsent:  wizardSmsConsent
-      ? { aceptado: true, version: SMS_CONSENT_VERSION, idioma: currentLang }
-      : { aceptado: false },
   };
+  /* Todos los consentimientos mostrados, marcados o no (un "no" queda como
+     Rechazado en la ficha del titular). */
+  if (wizardConsentTypes && wizardConsentTypes.length) {
+    payload.consentimientos = wizardConsentTypes.map((c) => ({ clave: c.clave, otorgado: wizardConsents[c.clave] === true }));
+  }
   /* Versión de los términos aceptada (solo si el plan tiene términos). */
   if (wizardCondiciones.vigente) payload.condicionesVersionId = wizardCondiciones.vigente.id;
   payload.idempotencyKey = wizardIdempotencyKey(payload);

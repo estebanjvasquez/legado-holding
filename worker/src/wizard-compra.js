@@ -48,6 +48,21 @@ const VALID_PLAN_SLUGS = [
    letras en mayúscula (ISO de país, USPS de estado). Previsión decide qué
    estados están habilitados (GET /residencias) y rechaza la compra si no lo
    está; acá solo se valida el formato. Fuera de EE. UU. va el país sin estado. */
+/* [{clave, otorgado}] saneado: clave en minúsculas [a-z0-9_], sin repetidos, máx. 20. */
+export function normalizeConsentimientos(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  const vistos = new Set();
+  for (const c of raw) {
+    const clave = c && typeof c.clave === "string" ? c.clave.trim().toLowerCase() : "";
+    if (!/^[a-z0-9_]{1,40}$/.test(clave) || vistos.has(clave)) continue;
+    vistos.add(clave);
+    out.push({ clave, otorgado: c.otorgado === true });
+    if (out.length >= 20) break;
+  }
+  return out;
+}
+
 export function normalizeResidencia(raw) {
   if (raw === undefined || raw === null || raw === "") return null;
   if (typeof raw !== "object") throw new ValidationError("residencia inválida");
@@ -139,10 +154,9 @@ function normalize(body) {
         ? Number(body.condicionesVersionId)
         : null,
     idioma: body.lang === "en" ? "en" : "es",
-    /* Consentimiento OPCIONAL de SMS/llamadas (casilla aparte del wizard). */
-    smsConsent: body.smsConsent && body.smsConsent.aceptado === true
-      ? { aceptado: true, version: sanitizeText(body.smsConsent.version, 20) || null }
-      : { aceptado: false },
+    /* Consentimientos OPCIONALES del titular (catálogo GET /consentimientos de
+       Previsión): una casilla por tipo, marcada o no. */
+    consentimientos: normalizeConsentimientos(body.consentimientos),
   };
 }
 
@@ -172,17 +186,12 @@ function buildCompraBody(ctx, env, meta = {}) {
   if (ctx.residencia) body.residencia = ctx.residencia;
   /* Idioma de la página de pago de Stripe (brief §3.4). */
   body.idioma = ctx.idioma;
+  /* Consentimientos: Previsión los registra en la ficha del titular al
+     confirmarse la compra (canal web, IP de la compra), también los no
+     otorgados (PF-12). */
+  if (ctx.consentimientos.length) body.consentimientos = ctx.consentimientos;
   /* Aceptación de términos (brief §3.3): versión + IP real + navegador. Solo
      si el plan tiene términos vigentes (si no, no se manda el campo). */
-  /* La API pública de Previsión todavía no documenta un campo para el
-     consentimiento de SMS/llamadas (pedido LH-6). Mandar un campo
-     desconocido podría hacer fallar la compra, así que solo viaja cuando
-     Previsión confirme el contrato y se active PF_CONSENTIMIENTO_SMS="1". */
-  if (env.PF_CONSENTIMIENTO_SMS === "1") {
-    body.consentimiento_sms = ctx.smsConsent.aceptado
-      ? { aceptado: true, aceptado_en: new Date().toISOString(), version: ctx.smsConsent.version, canal: "wizard_sitio", ip: meta.ip || null }
-      : { aceptado: false };
-  }
   if (ctx.condicionesVersionId) {
     body.condiciones_version_id = ctx.condicionesVersionId;
     if (meta.ip) body.ip = String(meta.ip).slice(0, 64);
@@ -342,7 +351,7 @@ export async function processWizardCheckout(body, env, meta = {}) {
   const compraBody = buildCompraBody(ctx, env, meta);
   const key = validIdempotencyKey(body.idempotencyKey);
   console.log(
-    `Wizard checkout start: plan=${ctx.planSlug} paymentType=${ctx.paymentType} frecuencia_pago=${ctx.frecuenciaPago} email=${maskEmail(ctx.buyer.email)} atribucion=${attributionTag(ctx.atribucion)} idem=${key ? "sí" : "no"} residencia=${ctx.residencia ? [ctx.residencia.pais, ctx.residencia.estado].filter(Boolean).join("-") : "-"} condiciones=${ctx.condicionesVersionId || "-"} idioma=${ctx.idioma} sms=${ctx.smsConsent.aceptado ? "sí" : "no"}`,
+    `Wizard checkout start: plan=${ctx.planSlug} paymentType=${ctx.paymentType} frecuencia_pago=${ctx.frecuenciaPago} email=${maskEmail(ctx.buyer.email)} atribucion=${attributionTag(ctx.atribucion)} idem=${key ? "sí" : "no"} residencia=${ctx.residencia ? [ctx.residencia.pais, ctx.residencia.estado].filter(Boolean).join("-") : "-"} condiciones=${ctx.condicionesVersionId || "-"} idioma=${ctx.idioma} consentimientos=${ctx.consentimientos.map((c) => c.clave + ":" + (c.otorgado ? "sí" : "no")).join(",") || "-"}`,
   );
 
   let result;

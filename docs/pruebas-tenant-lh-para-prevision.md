@@ -227,6 +227,26 @@ tampoco existe en el catálogo.
 casilla opcional y sin marcar por cada tipo, y el Worker manda el arreglo. Esto reemplaza
 el campo provisional `consentimiento_sms` y la variable `PF_CONSENTIMIENTO_SMS`.
 
+**Respuesta de Previsión (2026-11-27, PF `82b30a4`, migración 0023, Worker `977a07de`):**
+- [x] 1. SMS en el catálogo: se amplió `comercial_whatsapp` (misma clave) en `lh` a
+  **"Comunicaciones comerciales por WhatsApp, SMS y llamadas"**, con descripción que nombra
+  llamadas automatizadas, tarifas y **STOP**. Pendiente: que lo apruebe el abogado (editable
+  en el panel; el sitio lo toma solo).
+- [x] 2. `GET /api/public/t/lh/consentimientos` en prod, mismo CORS que `/residencias`:
+  `{ "items": [{ "clave", "nombre", "descripcion" }] }` (solo activos). Verificado en vivo.
+- [x] 3. `POST /compras` acepta `"consentimientos": [{ "clave", "otorgado" }]` (máx. 20).
+  Se guarda con la compra y se registra en el titular **al confirmarse** (canal `web`, IP
+  de la compra), también `otorgado:false`. Claves desconocidas o inactivas se ignoran.
+  Cubierto por test; **sin probar todavía con una compra real del wizard**.
+- [ ] 4. Uso: la mensajería ya excluye a quien retiró el consentimiento configurado en cada
+  canal. **Falta**: procesar STOP/HELP entrantes (Previsión no recibe SMS entrantes; depende
+  del proveedor que se elija) y revisar el enlace de baja en correos de marketing.
+
+**Para cerrar (LH):** wizard + Worker mandando el arreglo, una compra de prueba confirmada, y
+verificar en la ficha del titular que salen "Otorgado"/"Rechazado" con canal web.
+
+**LH (2026-11-27):** hecho el lado del sitio — el wizard lee `/consentimientos` (paso Datos, una casilla sin marcar por tipo; en inglés usa traducción local de las 3 claves) y el Worker manda `consentimientos:[{clave,otorgado}]` con todos los mostrados. Se retiró `consentimiento_sms`/`PF_CONSENTIMIENTO_SMS`. Falta la compra de prueba y ver la ficha.
+
 ### PF-8 · `whatsapp_emergencia` del tenant `lh` desactualizado — **P1**
 
 **Qué:** `GET /api/public/t/lh/servicios` devuelve `whatsapp_emergencia: "+584246950136"`.

@@ -64,7 +64,7 @@ Navegador ──GET catálogo (CORS, sin token)──▶ app.previsionfuneraria.
 ### Frontend (raíz)
 | Archivo | Rol |
 |---|---|
-| `index.html` | Página única. `LEGADO_CONFIG` (switch dev/prod), `PLANS_API_URL` directo a Previsión, `PARENTESCOS_API_URL`/chat vía Worker. **Cache-bust `?v=N`**: `css/main.css?v=6`, `js/attribution.js?v=3`, `js/wizard-pricing.js?v=1`, `js/main.js?v=23` (independientes; líneas ~110 y ~1358). |
+| `index.html` | Página única. `LEGADO_CONFIG` (switch dev/prod), `PLANS_API_URL` directo a Previsión, `PARENTESCOS_API_URL`/chat vía Worker. **Cache-bust `?v=N`**: `css/main.css?v=6`, `js/attribution.js?v=3`, `js/wizard-pricing.js?v=1`, `js/main.js?v=24` (independientes; líneas ~110 y ~1358). |
 | `js/attribution.js` | Atribución de vendedor (`?ref=`): valida el código contra `/wizard/vendedor`, first-touch entre códigos válidos (TTL 90d), guarda los últimos 10 toques. Si Previsión devuelve otro `codigo` (el vendedor cambió de código) guarda el **vigente**. Manda `fuente_codigo` (`enlace`/`manual`). Se carga antes de `main.js`; tests en `worker/test/attribution-frontend.test.mjs`. |
 | `js/wizard-pricing.js` | Montos que **muestra** el wizard según la frecuencia (mensual = `precio_mensual_centavos`, anual = `precio_anual_centavos`, + `cuota_inicial_centavos` en Selecto). Solo presentación: el sitio nunca envía montos. Tests en `worker/test/wizard-pricing.test.mjs`. |
 | `js/main.js` | i18n, wizard de 4 pasos, UI del chat de Alma, y **§"ATRIBUCIÓN DE VENDEDOR / CANAL"** (`initAttribution`/`getAttribution`, `localStorage["legado_attribution"]`, first-touch TTL 90d). `SELECTO_CHECKOUT_ENABLED = true`, `WIZARD_ENABLED_SLUGS`. |
