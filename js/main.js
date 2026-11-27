@@ -195,7 +195,7 @@ const LANG = {
   ],
   plans_sub: [
     "Total, confiable y al alcance de todos. Titular y hasta 6 familiares, edad máxima 65 años.",
-    "Total, reliable, and within everyone's reach. Policyholder and up to 6 family members, max age 65.",
+    "Total, reliable, and within everyone's reach. Account holder and up to 6 family members, max age 65.",
   ],
   region_zulia:   ["Región Zulia", "Zulia Region"],
   region_ven:     ["Toda Venezuela", "All Venezuela"],
@@ -247,8 +247,8 @@ const LANG = {
   ],
   step3_title: ["Acepta y paga", "Accept & pay"],
   step3_desc: [
-    "Revisa el contrato, acepta términos y realiza tu pago seguro.",
-    "Review the contract, accept terms, and make a secure payment.",
+    "Revisa el contrato, acepta términos y realiza tu pago con tarjeta.",
+    "Review the contract, accept terms, and pay by card.",
   ],
   step4_title: ["Tu familia protegida", "Your family protected"],
   step4_desc: [
@@ -309,8 +309,8 @@ const LANG = {
     "This innovation is simple: you decide how to say goodbye",
   ],
   cta_sub: [
-    "Sin cambios en tu cuota mensual. Solo haz click en el plan que más te convenga, realiza el pago de la inicial anual, y amplía tus servicios siendo tú quien decide. Titular + 6 familiares hasta 65 años.",
-    "No changes to your monthly fee. Just click on the plan that suits you best, make the annual initial payment, and expand your services — you decide. Policyholder + 6 family members up to age 65.",
+    "Sin cambios en tu cuota mensual. Solo haz click en el plan que más te convenga, paga la cuota inicial única, y amplía tus servicios siendo tú quien decide. Titular + 6 familiares hasta 65 años.",
+    "No changes to your monthly fee. Just click on the plan that suits you best, pay the one-time initial fee, and expand your services — you decide. Account holder + 6 family members up to age 65.",
   ],
   cta_call: ["Llámanos", "Call us"],
 
@@ -480,6 +480,22 @@ const LANG = {
     'He leído y acepto los <a href="terminos-condiciones.html" target="_blank" rel="noopener">términos y condiciones</a> y la <a href="politica-privacidad.html" target="_blank" rel="noopener">política de privacidad</a>',
     'I have read and accept the <a href="terminos-condiciones.html" target="_blank" rel="noopener">terms and conditions</a> and the <a href="politica-privacidad.html" target="_blank" rel="noopener">privacy policy</a>',
   ],
+  a11y_skip: ["Saltar al contenido", "Skip to content"],
+  a11y_close: ["Cerrar", "Close"],
+  a11y_close_chat: ["Cerrar chat", "Close chat"],
+  a11y_send: ["Enviar mensaje", "Send message"],
+  a11y_chat_input: ["Escribe tu mensaje para Alma", "Type your message to Alma"],
+  a11y_chat_log: ["Conversación con Alma", "Conversation with Alma"],
+  a11y_steps: ["Pasos de la compra", "Purchase steps"],
+  a11y_statement: ["Accesibilidad", "Accessibility"],
+  wiz_sms_chk: [
+    "(Opcional) Acepto recibir mensajes de texto (SMS) y llamadas de Legado Holding sobre mi plan, mis pagos y avisos del servicio al teléfono que indiqué.",
+    "(Optional) I agree to receive text messages (SMS) and calls from Legado Holding about my plan, my payments and service notices at the phone number I provided.",
+  ],
+  wiz_sms_help: [
+    "No es condición de compra. La frecuencia varía. Pueden aplicar tarifas de mensajes y datos. Responde STOP para dejar de recibir mensajes o HELP para ayuda.",
+    "Not a condition of purchase. Message frequency varies. Message and data rates may apply. Reply STOP to unsubscribe or HELP for help.",
+  ],
   wiz_terms_open: ["Abrir los términos en una ventana nueva", "Open the terms in a new window"],
   wiz_privacy_open: ["Política de privacidad", "Privacy policy"],
   wiz_terms_changed: [
@@ -582,7 +598,6 @@ const PLAN_FEATURES = {
   },
   "esencial-selecto": {
     es: [
-      "Cuota inicial de $35 + $9,47/mes (misma mensualidad)",
       "Cobertura extendida a TODA VENEZUELA",
       "Traslado entre estados incluido",
       "Tú eliges todos los componentes del servicio en la funeraria aliada",
@@ -593,7 +608,6 @@ const PLAN_FEATURES = {
       "Titular + 6 familiares hasta 65 años en toda Venezuela",
     ],
     en: [
-      "Initial fee $35 + $9.47/month (same monthly rate)",
       "Coverage extended to ALL VENEZUELA",
       "Inter-state transfer included",
       "You choose all service components at the allied funeral home",
@@ -601,12 +615,11 @@ const PLAN_FEATURES = {
       "Casket without restrictions per your choice",
       "No extra charges for overweight or pacemaker removal",
       "Cremation included",
-      "Policyholder + 6 family members up to age 65, all Venezuela",
+      "Account holder + 6 family members up to age 65, all Venezuela",
     ],
   },
   "vanguardia-selecto": {
     es: [
-      "Cuota inicial de $55 + $14,7/mes (misma mensualidad)",
       "El plan más amplio — EXCLUSIVO EN TODA VENEZUELA",
       "Cobertura extendida a TODA VENEZUELA + traslado entre estados",
       "Tú eliges: cremación O bóveda en cementerio privado",
@@ -617,14 +630,13 @@ const PLAN_FEATURES = {
       "Innovación exclusiva: bóveda en parcelas cementerio privado",
     ],
     en: [
-      "Initial fee $55 + $14.70/month (same monthly rate)",
       "Most comprehensive plan — EXCLUSIVE IN ALL VENEZUELA",
       "Coverage across ALL VENEZUELA + inter-state transfer",
       "You choose: cremation OR vault in private cemetery",
       "All funeral components of your choice",
       "No extra charges for overweight — Crematorio del Zulia",
       "No extra charges for pacemaker removal",
-      "Policyholder + 6 family members up to age 65",
+      "Account holder + 6 family members up to age 65",
       "Exclusive innovation: vault in private cemetery parcels",
     ],
   },
@@ -814,6 +826,10 @@ let wizardLead = { name: "", lastName: "", phone: "", email: "", consent: false,
    tiene términos publicados en Previsión y no se manda condicionesVersionId. */
 let wizardCondiciones = { status: "idle", vigente: null };
 let wizardSummaryNotice = "";
+/* Consentimiento OPCIONAL para SMS y llamadas (TCPA): casilla aparte, sin
+   marcar, no es condición de compra. */
+let wizardSmsConsent = false;
+const SMS_CONSENT_VERSION = "2026-11-27";
 let revealObserver = null;
 
 /* =============================================================================
@@ -872,6 +888,12 @@ function applyLanguage() {
       el.textContent = txt;
     }
   });
+
+  /* aria-label traducibles (botones de solo ícono, regiones). */
+  $$("[data-i18n-aria]").forEach((el) => {
+    el.setAttribute("aria-label", t(el.getAttribute("data-i18n-aria")));
+  });
+  document.documentElement.lang = currentLang;
 
   /* Actualiza el botón de idioma */
   $$("[data-i18n-lang]").forEach((el) => {
@@ -1149,6 +1171,7 @@ function openChat(mode) {
   chatSessionId = generateSessionId();
 
   const overlay = $("#chatbot-overlay");
+  if (overlay.classList.contains("hidden")) lastFocusBeforeDialog = document.activeElement;
   overlay.classList.remove("hidden");
   $("#chat-header").className =
     `chat-header ${mode === "emergency" ? "emergency" : "normal"}`;
@@ -1180,6 +1203,7 @@ function openChat(mode) {
 
 function closeChat() {
   $("#chatbot-overlay").classList.add("hidden");
+  restoreFocus();
 }
 
 /* Alma 2 (modo emergencia) emite HTML con cards. Para los mensajes normales
@@ -1276,7 +1300,7 @@ function showTypingIndicator() {
   const wrap = document.createElement("div");
   wrap.className = "chat-bubble-wrap bot";
   wrap.id = "typing-indicator";
-  wrap.innerHTML = `<div class="chat-bubble bot"><div class="chat-typing"><span></span><span></span><span></span></div></div>`;
+  wrap.innerHTML = `<div class="chat-bubble bot"><span class="sr-only">${currentLang === "es" ? "Alma está escribiendo…" : "Alma is typing…"}</span><div class="chat-typing" aria-hidden="true"><span></span><span></span><span></span></div></div>`;
   msgs.appendChild(wrap);
   msgs.scrollTop = msgs.scrollHeight;
 }
@@ -1424,10 +1448,13 @@ function openWizard(planId) {
   wizardResidence = { choice: "", country: "" };
   wizardResidenceNotice = "";
   wizardSummaryNotice = "";
+  wizardSmsConsent = false;
   wizardLead = { name: "", lastName: "", phone: "", email: "", consent: false, status: "" };
   initWizardAsesor();
+  if (!lastFocusBeforeDialog) lastFocusBeforeDialog = document.activeElement;
   $("#wizard-overlay").classList.remove("hidden");
   renderWizardContent();
+  announceWizardStep();
   loadParentescos();
   loadResidencias();
   loadCondiciones();
@@ -1790,6 +1817,7 @@ function closeWizard() {
   wizardOpen = false;
   unmountWizardTurnstile();
   $("#wizard-overlay").classList.add("hidden");
+  restoreFocus();
 }
 
 /* =============================================================================
@@ -1865,6 +1893,58 @@ function showWizardSuccessScreen(email) {
   if (steps) steps.style.display = "none";
 }
 
+/* ── Accesibilidad: foco en diálogos ──────────────────────────────────────
+   Al abrir un diálogo se guarda el elemento que tenía el foco para
+   devolverlo al cerrar; dentro del wizard, Tab no se escapa del modal. */
+let lastFocusBeforeDialog = null;
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function trapFocus(e, container) {
+  if (!container) return;
+  const items = $$(FOCUSABLE, container).filter((el) => el.offsetParent !== null);
+  if (!items.length) return;
+  const first = items[0];
+  const last = items[items.length - 1];
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  } else if (!container.contains(document.activeElement)) {
+    e.preventDefault();
+    first.focus();
+  }
+}
+
+function restoreFocus() {
+  const el = lastFocusBeforeDialog;
+  lastFocusBeforeDialog = null;
+  if (el && document.body.contains(el)) {
+    try { el.focus(); } catch (_) { /* nada */ }
+  }
+}
+
+/* Anuncia el paso actual a lectores de pantalla y lleva el foco al
+   contenido del paso (si no, el foco queda en un botón que ya no existe). */
+function announceWizardStep() {
+  const live = $("#wizard-live");
+  const labels = wizardStepLabels();
+  if (live) live.textContent = `${t("step_word")} ${wizardStep + 1} / ${labels.length}: ${labels[wizardStep]}`;
+  const first = $(FOCUSABLE, $("#wizard-body"));
+  (first || $("#wizard-body"))?.focus();
+}
+
+function wizardStepLabels() {
+  return [
+    t("wiz_step_residence"),
+    t("wiz_step_data"),
+    t("wiz_step_family"),
+    t("wiz_step_payment"),
+    t("wiz_step_summary"),
+  ];
+}
+
 function renderWizardContent() {
   renderWizardSteps();
   renderWizardStep();
@@ -1883,28 +1963,22 @@ function renderWizardContent() {
 function renderWizardSteps() {
   const el = $("#wizard-steps");
   if (!el) return;
-  const labels = [
-    t("wiz_step_residence"),
-    t("wiz_step_data"),
-    t("wiz_step_family"),
-    t("wiz_step_payment"),
-    t("wiz_step_summary"),
-  ];
+  const labels = wizardStepLabels();
   el.innerHTML = labels
     .map((label, i) => {
       const dotClass =
         i < wizardStep ? "done" : i === wizardStep ? "active" : "inactive";
       const labelClass = i <= wizardStep ? "active" : "inactive";
       return `
-      <div class="step-dot-wrap">
-        <div class="step-dot ${dotClass}">
+      <div class="step-dot-wrap" role="listitem"${i === wizardStep ? ' aria-current="step"' : ""}>
+        <div class="step-dot ${dotClass}" aria-hidden="true">
           ${
             i < wizardStep
               ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`
               : i + 1
           }
         </div>
-        <span class="step-label ${labelClass}">${label}</span>
+        <span class="step-label ${labelClass}"><span class="sr-only">${t("step_word")} ${i + 1}${i < wizardStep ? " ✓" : ""}: </span>${label}</span>
         ${i < labels.length - 1 ? `<div class="step-line ${i < wizardStep ? "done" : ""}"></div>` : ""}
       </div>`;
     })
@@ -1914,6 +1988,13 @@ function renderWizardSteps() {
 function renderWizardStep() {
   const body = $("#wizard-body");
   if (!body) return;
+  /* Re-render sin perder el foco del campo que el usuario estaba usando
+     (teclado y lectores de pantalla). */
+  const a = document.activeElement;
+  const focusKey = a && body.contains(a)
+    ? (a.id ? "#" + a.id
+      : a.dataset && a.dataset.idx != null ? `[data-idx="${a.dataset.idx}"][data-field="${a.dataset.field}"]` : null)
+    : null;
   body.innerHTML = "";
   const div = document.createElement("div");
   div.className = "wizard-step active";
@@ -1924,6 +2005,7 @@ function renderWizardStep() {
   else if (wizardStep === S_SUM) div.innerHTML = renderStep3();
   body.appendChild(div);
   bindWizardStepEvents();
+  if (focusKey) $(focusKey, body)?.focus();
 }
 
 function renderStep0() {
@@ -1959,7 +2041,7 @@ function renderStep0() {
     <div class="form-row cols-2">
       <div class="form-group"><label class="form-label">${t("wiz_birth")}</label>
         <input class="form-input" id="wf-birthDate" type="date" value="${b.birthDate}" min="${minDate}" max="${maxDate}">
-        <div id="age-error" class="form-error" style="display:none">
+        <div id="age-error" class="form-error" role="alert" style="display:none">
           ${currentLang === "es" ? "Edad máxima permitida: " + maxAge + " años" : "Maximum allowed age: " + maxAge + " years"}
         </div>
       </div>
@@ -1975,6 +2057,13 @@ function renderStep0() {
         }
         <div id="asesor-status" style="font-size:0.8125rem;margin-top:0.35rem;color:var(--muted-foreground)">${wizardAsesorStatusHTML()}</div>
       </div>
+    </div>
+    <div class="form-row">
+      <label class="checkbox-row" for="wf-sms">
+        <input type="checkbox" id="wf-sms" ${wizardSmsConsent ? "checked" : ""} aria-describedby="wf-sms-help">
+        <span class="text">${t("wiz_sms_chk")}</span>
+      </label>
+      <p id="wf-sms-help" class="form-hint" style="margin-top:0.25rem">${t("wiz_sms_help")}</p>
     </div>`;
 }
 
@@ -2279,6 +2368,9 @@ function bindWizardStepEvents() {
         });
       },
     );
+    $("#wf-sms")?.addEventListener("change", (e) => {
+      wizardSmsConsent = e.target.checked;
+    });
     const asesorEl = $("#wf-asesor");
     asesorEl?.addEventListener("input", () => {
       const code = asesorEl.value.replace(/[^A-Za-z0-9]/g, "").slice(0, 20);
@@ -2502,6 +2594,7 @@ function wizardNext() {
     if (wizardStep === S_DATA) applyWizardAsesor();
     wizardStep++;
     renderWizardContent();
+    announceWizardStep();
   } else {
     submitWizard();
   }
@@ -2511,6 +2604,7 @@ function wizardBack() {
   if (wizardStep > 0) {
     wizardStep--;
     renderWizardContent();
+    announceWizardStep();
   }
 }
 
@@ -2566,6 +2660,9 @@ async function submitWizard() {
     attribution: getAttribution(),
     residencia:  wizardResidencia(),
     lang:        currentLang,
+    smsConsent:  wizardSmsConsent
+      ? { aceptado: true, version: SMS_CONSENT_VERSION, idioma: currentLang }
+      : { aceptado: false },
   };
   /* Versión de los términos aceptada (solo si el plan tiene términos). */
   if (wizardCondiciones.vigente) payload.condicionesVersionId = wizardCondiciones.vigente.id;
@@ -2735,6 +2832,12 @@ function initWizard() {
   $("#wizard-next-btn")?.addEventListener("click", wizardNext);
   $("#wizard-back-btn")?.addEventListener("click", wizardBack);
   document.addEventListener("keydown", (e) => {
+    /* El foco no sale del wizard con Tab (diálogo modal). */
+    if (e.key === "Tab" && wizardOpen) trapFocus(e, $(".wizard-modal"));
+    if (e.key === "Escape" && !$("#chatbot-overlay").classList.contains("hidden")) {
+      closeChat();
+      return;
+    }
     if (e.key === "Escape" && wizardOpen) closeWizard();
     if (e.key === "Escape") {
       const overlay = document.getElementById("plan-details-overlay");

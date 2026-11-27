@@ -32,7 +32,7 @@
         />
         <meta
             name="keywords"
-            content="previsión funeraria Venezuela, seguro funeral Venezuela, venezolanos USA, legado holding, funeraria del Zulia"
+            content="previsión funeraria Venezuela, servicios funerarios prepagados Venezuela, venezolanos USA, legado holding, funeraria del Zulia"
         />
 
         <!-- Open Graph (redes sociales) -->
@@ -107,7 +107,7 @@
              en el edge, independiente de si cPanel ya desplegó el archivo nuevo en
              origin. Sube este número cada vez que cambies css/main.css o js/main.js
              para forzar que el navegador y el edge pidan la versión nueva. -->
-        <link rel="stylesheet" href="css/main.css?v=5" />
+        <link rel="stylesheet" href="css/main.css?v=6" />
 
         <!-- ═══ CONFIGURACIÓN GLOBAL — Webhooks y API Keys ═══ -->
         <script>
@@ -138,6 +138,7 @@
         </script>
     </head>
     <body>
+        <a class="skip-link" href="#main-content" data-i18n="a11y_skip">Saltar al contenido</a>
         <!-- ════════════════════════════════════════════════════════════
      NAVEGACIÓN FIJA
      ────────────────────────────────────────────────────────────
@@ -303,6 +304,7 @@
 
      Para cambiar textos: js/main.js → sección i18n, claves hero_*
      ════════════════════════════════════════════════════════════ -->
+        <main id="main-content" tabindex="-1">
         <section id="inicio">
             <!-- Foto de los abuelos (semitransparente sobre el fondo navy) -->
             <img
@@ -928,6 +930,8 @@
      Para cambiar links legales:  edita los <a> en "Legal"
      Para cambiar textos: js/main.js → claves footer_*
      ════════════════════════════════════════════════════════════ -->
+        </main>
+
         <footer>
             <div class="container">
                 <div class="footer-grid">
@@ -1113,6 +1117,7 @@
                                 data-i18n="footer_privacy"
                                 >Política de privacidad</a
                             >
+                            <a href="accesibilidad.html" target="_blank" rel="noopener" data-i18n="a11y_statement">Accesibilidad</a>
                             <a href="#contacto" data-i18n="footer_support"
                                 >Soporte</a
                             >
@@ -1138,7 +1143,7 @@
      BOTÓN EMERGENCIA (flotante, abre chat en modo emergencia)
      Para cambiar color/posición: css/main.css → #emergency-btn
      ════════════════════════════════════════════════════════════ -->
-        <button id="emergency-btn" title="Ayuda inmediata">
+        <button id="emergency-btn" type="button" title="Ayuda inmediata" aria-haspopup="dialog" aria-controls="chatbot-overlay">
             <svg
                 viewBox="0 0 24 24"
                 fill="none"
@@ -1159,7 +1164,7 @@
      Para cambiar URL del webhook: js/main.js → CHAT_WEBHOOK_URL
      Para cambiar textos del chat: js/main.js → claves chat_*
      ════════════════════════════════════════════════════════════ -->
-        <div id="chatbot-overlay" class="hidden">
+        <div id="chatbot-overlay" class="hidden" role="dialog" aria-modal="false" aria-labelledby="chat-title">
             <!-- Header del chat -->
             <div id="chat-header" class="chat-header normal">
                 <div class="chat-header-left">
@@ -1183,7 +1188,7 @@
                         >Alma — Asistente LEGADO</span
                     >
                 </div>
-                <button id="chat-close-btn" class="chat-close-btn">
+                <button id="chat-close-btn" class="chat-close-btn" type="button" aria-label="Cerrar chat" data-i18n-aria="a11y_close_chat">
                     <svg
                         viewBox="0 0 24 24"
                         fill="none"
@@ -1200,17 +1205,22 @@
                 </button>
             </div>
             <!-- Mensajes -->
-            <div id="chat-messages" class="chat-messages"></div>
+            <div id="chat-messages" class="chat-messages" role="log" aria-live="polite" aria-relevant="additions" tabindex="0" aria-label="Conversación con Alma" data-i18n-aria="a11y_chat_log"></div>
             <!-- Input -->
             <div class="chat-input-area">
                 <input
                     id="chat-input"
+                    aria-label="Escribe tu mensaje para Alma"
+                    data-i18n-aria="a11y_chat_input"
                     class="chat-input"
                     type="text"
                     placeholder="Escribe tu pregunta..."
                 />
                 <button
                     id="chat-send-btn"
+                    type="button"
+                    aria-label="Enviar mensaje"
+                    data-i18n-aria="a11y_send"
                     class="chat-send-btn normal"
                     disabled
                 >
@@ -1236,11 +1246,12 @@
      Para cambiar textos: js/main.js → claves wiz_*
      ════════════════════════════════════════════════════════════ -->
         <div id="wizard-overlay" class="hidden">
-            <div class="wizard-modal">
+            <!-- role/aria del diálogo en .wizard-modal (accesibilidad) -->
+            <div class="wizard-modal" role="dialog" aria-modal="true" aria-labelledby="wizard-title">
                 <!-- Header -->
                 <div class="wizard-header">
                     <div>
-                        <h3 class="wizard-header-title" data-i18n="wiz_title">
+                        <h3 id="wizard-title" class="wizard-header-title" data-i18n="wiz_title">
                             Compra tu plan
                         </h3>
                         <p
@@ -1249,7 +1260,7 @@
                             style="display: none"
                         ></p>
                     </div>
-                    <button id="wizard-close-btn" class="wizard-close-btn">
+                    <button id="wizard-close-btn" class="wizard-close-btn" type="button" aria-label="Cerrar" data-i18n-aria="a11y_close">
                         <svg
                             viewBox="0 0 24 24"
                             fill="none"
@@ -1266,9 +1277,10 @@
                     </button>
                 </div>
                 <!-- Indicador de pasos (JS lo llena) -->
-                <div id="wizard-steps" class="wizard-steps"></div>
+                <div id="wizard-steps" class="wizard-steps" role="list" aria-label="Pasos" data-i18n-aria="a11y_steps"></div>
                 <!-- Contenido del paso actual (JS lo renderiza) -->
-                <div id="wizard-body" class="wizard-body"></div>
+                <div id="wizard-body" class="wizard-body" tabindex="-1"></div>
+                <p id="wizard-live" class="sr-only" aria-live="polite"></p>
                 <!-- Navegación atrás / siguiente -->
                 <div class="wizard-footer">
                     <button id="wizard-back-btn" class="btn-back hidden">
@@ -1357,7 +1369,7 @@
         <!-- ?v= cache-busting, ver comentario junto a css/main.css arriba -->
         <script src="js/attribution.js?v=3"></script>
         <script src="js/wizard-pricing.js?v=1"></script>
-        <script src="js/main.js?v=22"></script>
+        <script src="js/main.js?v=23"></script>
         <script src="js/wizard-generic.js?v=1"></script>
     </body>
 </html>

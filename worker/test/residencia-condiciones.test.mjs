@@ -95,3 +95,20 @@ test("lead: sin consentimiento o sin teléfono se rechaza antes de llamar a Prev
   await assert.rejects(() => processWizardLead(lead({ buyer: { name: "A", lastName: "B" } }), ENV), /teléfono/);
   assert.equal(m.calls.length, 0);
 });
+
+test("consentimiento SMS: no viaja a Previsión hasta activar PF_CONSENTIMIENTO_SMS", async () => {
+  m = mockFetch([[isPF, () => jsonResponse(OK)]]);
+  await processWizardCheckout(body({ smsConsent: { aceptado: true, version: "2026-11-27" } }), ENV, META);
+  assert.equal(compras(m.calls)[0].body.consentimiento_sms, undefined);
+  m.restore();
+  m = mockFetch([[isPF, () => jsonResponse(OK)]]);
+  await processWizardCheckout(body({ smsConsent: { aceptado: true, version: "2026-11-27" } }), { ...ENV, PF_CONSENTIMIENTO_SMS: "1" }, META);
+  const c = compras(m.calls)[0].body.consentimiento_sms;
+  assert.equal(c.aceptado, true);
+  assert.equal(c.version, "2026-11-27");
+  assert.equal(c.ip, "203.0.113.7");
+  m.restore();
+  m = mockFetch([[isPF, () => jsonResponse(OK)]]);
+  await processWizardCheckout(body(), { ...ENV, PF_CONSENTIMIENTO_SMS: "1" }, META);
+  assert.deepEqual(compras(m.calls)[0].body.consentimiento_sms, { aceptado: false });
+});

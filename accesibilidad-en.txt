@@ -1,0 +1,27 @@
+ACCESSIBILITY STATEMENT
+Legado Holding Group LLC — Last updated: November 2026
+
+1. OUR COMMITMENT
+Legado Holding Group LLC wants everyone, including people with disabilities, to be able to learn about our plans, buy them and ask for help at www.legadoholding.com. We work to make the site conform to the W3C Web Content Accessibility Guidelines (WCAG) 2.1, level AA.
+
+2. WHAT WE HAVE DONE
+- The site can be used with a keyboard only, with a link to skip to the main content and a visible indicator of the selected element.
+- The purchase process (wizard) works as a dialog: focus stays inside it, it closes with the Escape key and it tells screen readers which step you are on.
+- Form fields have labels, and errors are announced to screen readers.
+- The "Alma" virtual assistant has labels for its text field and buttons, and announces its replies to screen readers.
+- Text has a color contrast of at least 4.5:1 against its background.
+- The site respects the system setting to reduce motion and animations.
+- Content is available in Spanish and English, and the page language is declared for screen readers.
+
+3. KNOWN LIMITATIONS
+Some parts may not be fully accessible yet:
+- The payment page is shown by Stripe, a third-party provider. Stripe states its own accessibility commitment, but we do not control its content.
+- The security check (Cloudflare Turnstile) in the last step of the purchase is provided by a third party.
+- Some older documents or images may not have a complete description.
+We keep reviewing the site and fixing what we find.
+
+4. HOW TO ASK FOR HELP OR REPORT A PROBLEM
+If you have trouble using any part of the site, or need the information in another format, write to soporte@legadoholding.com. Tell us the page and the problem you found. We will reply within 2 business days and, if you prefer, we can help you complete your purchase by phone or email.
+
+5. ASSESSMENT
+This statement was prepared from an internal review of the site in November 2026. We will review it at least once a year and whenever we make major changes to the site.

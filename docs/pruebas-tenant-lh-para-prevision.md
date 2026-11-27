@@ -189,6 +189,26 @@ Stub de atribución del handoff a WhatsApp (mismo endpoint):
 
 ## Abierto
 
+### PF-12 · Consentimiento de SMS y llamadas en `POST /compras` — **P1** (2026-11-27)
+
+El wizard tiene ahora una casilla **aparte, opcional y sin marcar** (TCPA) para recibir
+SMS y llamadas sobre el plan, con el texto de STOP/HELP. La API pública no documenta un
+campo para guardarlo, así que hoy el Worker **no lo manda** (mandar un campo desconocido
+podría hacer fallar la compra). Está listo para viajar así, detrás de la variable
+`PF_CONSENTIMIENTO_SMS="1"` del Worker:
+
+```json
+"consentimiento_sms": { "aceptado": true, "aceptado_en": "2026-11-27T15:00:00Z",
+  "version": "2026-11-27", "canal": "wizard_sitio", "ip": "203.0.113.7" }
+```
+o `{ "aceptado": false }` si no marcó la casilla.
+
+Pedido: (1) aceptar y guardar ese campo en la compra/contrato (con fecha, versión del
+texto e IP como constancia); (2) no enviar SMS de promoción a quien no consintió;
+(3) procesar las respuestas STOP/HELP del proveedor de SMS (baja inmediata); (4) los
+correos de marketing que envíe Previsión llevan enlace para darse de baja. Avisar acá
+el nombre final del campo para activar la variable.
+
 ### PF-8 · `whatsapp_emergencia` del tenant `lh` desactualizado — **P1**
 
 **Qué:** `GET /api/public/t/lh/servicios` devuelve `whatsapp_emergencia: "+584246950136"`.

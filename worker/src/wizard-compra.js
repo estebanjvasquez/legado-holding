@@ -139,6 +139,10 @@ function normalize(body) {
         ? Number(body.condicionesVersionId)
         : null,
     idioma: body.lang === "en" ? "en" : "es",
+    /* Consentimiento OPCIONAL de SMS/llamadas (casilla aparte del wizard). */
+    smsConsent: body.smsConsent && body.smsConsent.aceptado === true
+      ? { aceptado: true, version: sanitizeText(body.smsConsent.version, 20) || null }
+      : { aceptado: false },
   };
 }
 
@@ -170,6 +174,15 @@ function buildCompraBody(ctx, env, meta = {}) {
   body.idioma = ctx.idioma;
   /* Aceptación de términos (brief §3.3): versión + IP real + navegador. Solo
      si el plan tiene términos vigentes (si no, no se manda el campo). */
+  /* La API pública de Previsión todavía no documenta un campo para el
+     consentimiento de SMS/llamadas (pedido LH-6). Mandar un campo
+     desconocido podría hacer fallar la compra, así que solo viaja cuando
+     Previsión confirme el contrato y se active PF_CONSENTIMIENTO_SMS="1". */
+  if (env.PF_CONSENTIMIENTO_SMS === "1") {
+    body.consentimiento_sms = ctx.smsConsent.aceptado
+      ? { aceptado: true, aceptado_en: new Date().toISOString(), version: ctx.smsConsent.version, canal: "wizard_sitio", ip: meta.ip || null }
+      : { aceptado: false };
+  }
   if (ctx.condicionesVersionId) {
     body.condiciones_version_id = ctx.condicionesVersionId;
     if (meta.ip) body.ip = String(meta.ip).slice(0, 64);
@@ -329,7 +342,7 @@ export async function processWizardCheckout(body, env, meta = {}) {
   const compraBody = buildCompraBody(ctx, env, meta);
   const key = validIdempotencyKey(body.idempotencyKey);
   console.log(
-    `Wizard checkout start: plan=${ctx.planSlug} paymentType=${ctx.paymentType} frecuencia_pago=${ctx.frecuenciaPago} email=${maskEmail(ctx.buyer.email)} atribucion=${attributionTag(ctx.atribucion)} idem=${key ? "sí" : "no"} residencia=${ctx.residencia ? [ctx.residencia.pais, ctx.residencia.estado].filter(Boolean).join("-") : "-"} condiciones=${ctx.condicionesVersionId || "-"} idioma=${ctx.idioma}`,
+    `Wizard checkout start: plan=${ctx.planSlug} paymentType=${ctx.paymentType} frecuencia_pago=${ctx.frecuenciaPago} email=${maskEmail(ctx.buyer.email)} atribucion=${attributionTag(ctx.atribucion)} idem=${key ? "sí" : "no"} residencia=${ctx.residencia ? [ctx.residencia.pais, ctx.residencia.estado].filter(Boolean).join("-") : "-"} condiciones=${ctx.condicionesVersionId || "-"} idioma=${ctx.idioma} sms=${ctx.smsConsent.aceptado ? "sí" : "no"}`,
   );
 
   let result;

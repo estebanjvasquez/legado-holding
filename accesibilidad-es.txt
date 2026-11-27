@@ -1,0 +1,27 @@
+DECLARACIÓN DE ACCESIBILIDAD
+Legado Holding Group LLC — Última actualización: noviembre de 2026
+
+1. NUESTRO COMPROMISO
+Legado Holding Group LLC quiere que todas las personas, incluidas las personas con discapacidad, puedan informarse sobre nuestros planes, comprarlos y pedir ayuda en www.legadoholding.com. Trabajamos para que el sitio cumpla las Pautas de Accesibilidad para el Contenido Web (WCAG) 2.1, nivel AA, del W3C.
+
+2. QUÉ HEMOS HECHO
+- El sitio se puede usar solo con el teclado, con un enlace para saltar al contenido principal y un indicador visible del elemento seleccionado.
+- El proceso de compra (wizard) funciona como una ventana de diálogo: el foco queda dentro de ella, se cierra con la tecla Escape y anuncia a los lectores de pantalla en qué paso estás.
+- Los campos de los formularios tienen etiquetas, y los errores se anuncian a los lectores de pantalla.
+- El asistente virtual "Alma" tiene etiquetas para el campo de texto y los botones, y anuncia sus respuestas a los lectores de pantalla.
+- Los textos tienen un contraste de color de al menos 4,5:1 sobre su fondo.
+- El sitio respeta la preferencia del sistema de reducir el movimiento y las animaciones.
+- El contenido está disponible en español y en inglés, y el idioma de la página se indica para los lectores de pantalla.
+
+3. LIMITACIONES CONOCIDAS
+Algunas partes pueden no ser totalmente accesibles todavía:
+- La página de pago la muestra Stripe, un proveedor externo. Stripe declara su propio compromiso de accesibilidad, pero no controlamos su contenido.
+- La verificación de seguridad (Cloudflare Turnstile) del último paso de la compra la presta un proveedor externo.
+- Algunos documentos o imágenes antiguos pueden no tener una descripción completa.
+Seguimos revisando el sitio y corrigiendo lo que encontramos.
+
+4. CÓMO PEDIR AYUDA O REPORTAR UN PROBLEMA
+Si tienes dificultad para usar alguna parte del sitio, o necesitas la información en otro formato, escríbenos a soporte@legadoholding.com. Indica la página y el problema que encontraste. Te responderemos dentro de 2 días hábiles y, si lo prefieres, te ayudamos a completar la compra por teléfono o por correo.
+
+5. EVALUACIÓN
+Esta declaración se preparó a partir de una revisión interna del sitio en noviembre de 2026. La revisaremos al menos una vez al año y cada vez que hagamos cambios importantes en el sitio.

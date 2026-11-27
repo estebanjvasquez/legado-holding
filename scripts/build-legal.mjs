@@ -64,3 +64,4 @@ ${toHTML(en)}
 const updated = { es: "noviembre de 2026 (versión 2.0)", en: "November 2026 (version 2.0)" };
 build("terminos-condiciones.html", "terminos-condiciones", updated);
 build("politica-privacidad.html", "politica-privacidad", updated);
+build("accesibilidad.html", "accesibilidad", { es: "noviembre de 2026", en: "November 2026" });

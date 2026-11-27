@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="es">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title data-i18n-title>Declaración de accesibilidad — LEGADO</title>
+        <meta name="robots" content="noindex" />
+        <link rel="icon" type="image/png" href="images/LogoLegado.png" />
+        <link
+            rel="stylesheet"
+            href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;1,14..32,400&display=swap"
+        />
+        <style>
+            :root {
+                --navy: #263c5b;
+                --navy-light: #3a5581;
+                --gold: #c9a84c;
+                --ink: #17243a;
+                --muted: #6b7280;
+                --border: #e5e7eb;
+                --warm-white: #f3f2ee;
+                --radius: 0.75rem;
+            }
+            * {
+                box-sizing: border-box;
+            }
+            body {
+                margin: 0;
+                font-family: "Inter", Arial, sans-serif;
+                color: var(--ink);
+                background: #ffffff;
+                line-height: 1.65;
+                -webkit-font-smoothing: antialiased;
+            }
+            a {
+                color: var(--navy);
+            }
+            .container {
+                max-width: 860px;
+                margin: 0 auto;
+                padding: 0 1.25rem;
+            }
+
+            /* ── Header ── */
+            header {
+                border-bottom: 1px solid var(--border);
+                background: #ffffff;
+                position: sticky;
+                top: 0;
+                z-index: 10;
+            }
+            .header-inner {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 1.1rem 0;
+            }
+            .logo {
+                font-family: "Inter", Arial, sans-serif;
+                font-weight: 700;
+                font-size: 1.4rem;
+                letter-spacing: 0.02em;
+                color: var(--navy);
+                text-decoration: none;
+            }
+            .header-actions {
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+            }
+            .back-link {
+                font-size: 0.9rem;
+                font-weight: 600;
+                color: var(--navy);
+                text-decoration: none;
+                display: inline-flex;
+                align-items: center;
+                gap: 0.35rem;
+            }
+            .back-link:hover {
+                text-decoration: underline;
+            }
+            .lang-btn {
+                border: 1.5px solid var(--navy);
+                color: var(--navy);
+                background: none;
+                font-family: inherit;
+                font-weight: 700;
+                font-size: 0.8rem;
+                letter-spacing: 0.03em;
+                border-radius: 999px;
+                padding: 0.4rem 0.9rem;
+                cursor: pointer;
+            }
+            .lang-btn:hover {
+                background: var(--navy);
+                color: #fff;
+            }
+
+            /* ── Hero ── */
+            .doc-hero {
+                background: linear-gradient(180deg, #faf8f5 0%, #f0ede6 100%);
+                padding: 3rem 0 2.25rem;
+                border-bottom: 1px solid var(--border);
+            }
+            .doc-hero h1 {
+                font-size: clamp(1.7rem, 3vw, 2.3rem);
+                color: var(--navy);
+                margin: 0 0 0.5rem;
+            }
+            .doc-hero .updated {
+                color: var(--muted);
+                font-size: 0.9rem;
+            }
+
+            /* ── Content ── */
+            main {
+                padding: 2.5rem 0 4rem;
+            }
+            section.clause {
+                margin-bottom: 2.25rem;
+            }
+            section.clause h2 {
+                font-size: 1.15rem;
+                color: var(--navy);
+                margin: 0 0 0.75rem;
+                padding-bottom: 0.5rem;
+                border-bottom: 2px solid var(--gold);
+                display: inline-block;
+            }
+            section.clause p {
+                margin: 0 0 0.85rem;
+            }
+            section.clause ul {
+                margin: 0 0 0.85rem;
+                padding-left: 1.25rem;
+            }
+            section.clause li {
+                margin-bottom: 0.4rem;
+            }
+            .note {
+                background: var(--warm-white);
+                border-left: 3px solid var(--gold);
+                border-radius: 0.4rem;
+                padding: 0.9rem 1.1rem;
+                font-size: 0.92rem;
+                color: var(--ink);
+            }
+            [lang-block] {
+                display: none;
+            }
+            [lang-block].active {
+                display: block;
+            }
+
+            /* ── Footer ── */
+            footer {
+                border-top: 1px solid var(--border);
+                background: var(--warm-white);
+                padding: 2rem 0;
+            }
+            .footer-inner {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.5rem 1.5rem;
+                align-items: center;
+                justify-content: space-between;
+                font-size: 0.85rem;
+                color: var(--muted);
+            }
+            .footer-links {
+                display: flex;
+                gap: 1.25rem;
+                flex-wrap: wrap;
+            }
+            .footer-links a {
+                color: var(--muted);
+                text-decoration: none;
+                font-weight: 600;
+            }
+            .footer-links a:hover {
+                color: var(--navy);
+            }
+
+            @media (max-width: 600px) {
+                .header-inner {
+                    flex-wrap: wrap;
+                    gap: 0.75rem;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <div class="container header-inner">
+                <a href="index.html" class="logo">LEGADO</a>
+                <div class="header-actions">
+                    <a href="index.html" class="back-link" id="back-link">
+                        <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <line x1="19" y1="12" x2="5" y2="12" />
+                            <polyline points="12 19 5 12 12 5" />
+                        </svg>
+                        <span id="back-link-text">Volver al inicio</span>
+                    </a>
+                    <button class="lang-btn" id="lang-toggle" type="button">EN</button>
+                </div>
+            </div>
+        </header>
+
+        <div class="doc-hero">
+            <div class="container">
+                <h1 id="doc-title">Declaración de accesibilidad</h1>
+                <p class="updated" id="doc-updated">
+                    Última actualización: noviembre de 2026
+                </p>
+            </div>
+        </div>
+
+        <main class="container">
+            <!-- Generado por scripts/build-legal.mjs desde accesibilidad-es.txt / accesibilidad-en.txt. No editar a mano. -->
+            <div lang-block="es" class="active">
+                <p class="updated-inline"><strong>Legado Holding Group LLC — Última actualización: noviembre de 2026</strong></p>
+                <section class="clause">
+                <h2>1. NUESTRO COMPROMISO</h2>
+                <p>Legado Holding Group LLC quiere que todas las personas, incluidas las personas con discapacidad, puedan informarse sobre nuestros planes, comprarlos y pedir ayuda en <a href="https://www.legadoholding.com.">www.legadoholding.com.</a> Trabajamos para que el sitio cumpla las Pautas de Accesibilidad para el Contenido Web (WCAG) 2.1, nivel AA, del W3C.</p>
+                </section>
+                <section class="clause">
+                <h2>2. QUÉ HEMOS HECHO</h2>
+                <ul>
+                <li>El sitio se puede usar solo con el teclado, con un enlace para saltar al contenido principal y un indicador visible del elemento seleccionado.</li>
+                <li>El proceso de compra (wizard) funciona como una ventana de diálogo: el foco queda dentro de ella, se cierra con la tecla Escape y anuncia a los lectores de pantalla en qué paso estás.</li>
+                <li>Los campos de los formularios tienen etiquetas, y los errores se anuncian a los lectores de pantalla.</li>
+                <li>El asistente virtual &quot;Alma&quot; tiene etiquetas para el campo de texto y los botones, y anuncia sus respuestas a los lectores de pantalla.</li>
+                <li>Los textos tienen un contraste de color de al menos 4,5:1 sobre su fondo.</li>
+                <li>El sitio respeta la preferencia del sistema de reducir el movimiento y las animaciones.</li>
+                <li>El contenido está disponible en español y en inglés, y el idioma de la página se indica para los lectores de pantalla.</li>
+                </ul>
+                </section>
+                <section class="clause">
+                <h2>3. LIMITACIONES CONOCIDAS</h2>
+                <p>Algunas partes pueden no ser totalmente accesibles todavía:</p>
+                <ul>
+                <li>La página de pago la muestra Stripe, un proveedor externo. Stripe declara su propio compromiso de accesibilidad, pero no controlamos su contenido.</li>
+                <li>La verificación de seguridad (Cloudflare Turnstile) del último paso de la compra la presta un proveedor externo.</li>
+                <li>Algunos documentos o imágenes antiguos pueden no tener una descripción completa.</li>
+                </ul>
+                <p>Seguimos revisando el sitio y corrigiendo lo que encontramos.</p>
+                </section>
+                <section class="clause">
+                <h2>4. CÓMO PEDIR AYUDA O REPORTAR UN PROBLEMA</h2>
+                <p>Si tienes dificultad para usar alguna parte del sitio, o necesitas la información en otro formato, escríbenos a <a href="mailto:soporte@legadoholding.com">soporte@legadoholding.com</a>. Indica la página y el problema que encontraste. Te responderemos dentro de 2 días hábiles y, si lo prefieres, te ayudamos a completar la compra por teléfono o por correo.</p>
+                </section>
+                <section class="clause">
+                <h2>5. EVALUACIÓN</h2>
+                <p>Esta declaración se preparó a partir de una revisión interna del sitio en noviembre de 2026. La revisaremos al menos una vez al año y cada vez que hagamos cambios importantes en el sitio.</p>
+                </section>
+            </div>
+
+            <div lang-block="en">
+                <p class="updated-inline"><strong>Legado Holding Group LLC — Last updated: November 2026</strong></p>
+                <section class="clause">
+                <h2>1. OUR COMMITMENT</h2>
+                <p>Legado Holding Group LLC wants everyone, including people with disabilities, to be able to learn about our plans, buy them and ask for help at <a href="https://www.legadoholding.com.">www.legadoholding.com.</a> We work to make the site conform to the W3C Web Content Accessibility Guidelines (WCAG) 2.1, level AA.</p>
+                </section>
+                <section class="clause">
+                <h2>2. WHAT WE HAVE DONE</h2>
+                <ul>
+                <li>The site can be used with a keyboard only, with a link to skip to the main content and a visible indicator of the selected element.</li>
+                <li>The purchase process (wizard) works as a dialog: focus stays inside it, it closes with the Escape key and it tells screen readers which step you are on.</li>
+                <li>Form fields have labels, and errors are announced to screen readers.</li>
+                <li>The &quot;Alma&quot; virtual assistant has labels for its text field and buttons, and announces its replies to screen readers.</li>
+                <li>Text has a color contrast of at least 4.5:1 against its background.</li>
+                <li>The site respects the system setting to reduce motion and animations.</li>
+                <li>Content is available in Spanish and English, and the page language is declared for screen readers.</li>
+                </ul>
+                </section>
+                <section class="clause">
+                <h2>3. KNOWN LIMITATIONS</h2>
+                <p>Some parts may not be fully accessible yet:</p>
+                <ul>
+                <li>The payment page is shown by Stripe, a third-party provider. Stripe states its own accessibility commitment, but we do not control its content.</li>
+                <li>The security check (Cloudflare Turnstile) in the last step of the purchase is provided by a third party.</li>
+                <li>Some older documents or images may not have a complete description.</li>
+                </ul>
+                <p>We keep reviewing the site and fixing what we find.</p>
+                </section>
+                <section class="clause">
+                <h2>4. HOW TO ASK FOR HELP OR REPORT A PROBLEM</h2>
+                <p>If you have trouble using any part of the site, or need the information in another format, write to <a href="mailto:soporte@legadoholding.com">soporte@legadoholding.com</a>. Tell us the page and the problem you found. We will reply within 2 business days and, if you prefer, we can help you complete your purchase by phone or email.</p>
+                </section>
+                <section class="clause">
+                <h2>5. ASSESSMENT</h2>
+                <p>This statement was prepared from an internal review of the site in November 2026. We will review it at least once a year and whenever we make major changes to the site.</p>
+                </section>
+            </div>
+        </main>
+
+        <footer>
+            <div class="container footer-inner">
+                <span id="footer-copy">© 2026 Legado. Todos los derechos reservados.</span>
+                <div class="footer-links">
+                    <a href="index.html" id="footer-home">Inicio</a>
+                    <a href="politica-privacidad.html" id="footer-privacy">Política de privacidad</a>
+                    <a href="accesibilidad.html">Accesibilidad / Accessibility</a>
+                    <a href="mailto:soporte@legadoholding.com">soporte@legadoholding.com</a>
+                </div>
+            </div>
+        </footer>
+
+        <script>
+            (function () {
+                var LANG_KEY = "legado_lang";
+                var TEXT = {
+                    es: {
+                        title: "Declaración de accesibilidad — LEGADO",
+                        heading: "Declaración de accesibilidad",
+                        updated: "Última actualización: noviembre de 2026",
+                        back: "Volver al inicio",
+                        toggle: "EN",
+                        footerCopy: "© 2026 Legado. Todos los derechos reservados.",
+                        footerHome: "Inicio",
+                        footerPrivacy: "Política de privacidad",
+                        htmlLang: "es",
+                    },
+                    en: {
+                        title: "Accessibility statement — LEGADO",
+                        heading: "Accessibility statement",
+                        updated: "Last updated: November 2026",
+                        back: "Back to home",
+                        toggle: "ES",
+                        footerCopy: "© 2026 Legado. All rights reserved.",
+                        footerHome: "Home",
+                        footerPrivacy: "Privacy policy",
+                        htmlLang: "en",
+                    },
+                };
+
+                function getInitialLang() {
+                    try {
+                        var saved = localStorage.getItem(LANG_KEY);
+                        if (saved === "es" || saved === "en") return saved;
+                    } catch (e) {}
+                    return (navigator.language || "").toLowerCase().indexOf("en") === 0
+                        ? "en"
+                        : "es";
+                }
+
+                function applyLang(lang) {
+                    var t = TEXT[lang];
+                    document.documentElement.lang = t.htmlLang;
+                    document.title = t.title;
+                    document.getElementById("doc-title").textContent = t.heading;
+                    document.getElementById("doc-updated").textContent = t.updated;
+                    document.getElementById("back-link-text").textContent = t.back;
+                    document.getElementById("lang-toggle").textContent = t.toggle;
+                    document.getElementById("footer-copy").textContent = t.footerCopy;
+                    document.getElementById("footer-home").textContent = t.footerHome;
+                    document.getElementById("footer-privacy").textContent = t.footerPrivacy;
+
+                    document.querySelectorAll("[lang-block]").forEach(function (el) {
+                        el.classList.toggle("active", el.getAttribute("lang-block") === lang);
+                    });
+                }
+
+                var currentLang = getInitialLang();
+                applyLang(currentLang);
+
+                document.getElementById("lang-toggle").addEventListener("click", function () {
+                    currentLang = currentLang === "es" ? "en" : "es";
+                    try {
+                        localStorage.setItem(LANG_KEY, currentLang);
+                    } catch (e) {}
+                    applyLang(currentLang);
+                });
+            })();
+        </script>
+    </body>
+</html>

@@ -2798,3 +2798,58 @@ footer {
 .plan-details-body p:last-child {
     margin-bottom: 0;
 }
+
+/* ── Accesibilidad (WCAG 2.1 AA) ─────────────────────────────────────────── */
+.sr-only {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0);
+  white-space: nowrap; border: 0;
+}
+.skip-link {
+  position: absolute;
+  left: 1rem; top: -100px;
+  z-index: 10000;
+  background: #263c5b; color: #fff;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  text-decoration: underline;
+}
+.skip-link:focus { top: 1rem; }
+/* Foco visible en todo elemento interactivo al navegar con teclado. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid #1d4ed8;
+  outline-offset: 2px;
+}
+#main-content:focus { outline: none; }
+.contract-box a,
+.renewal-notice a,
+.checkbox-row a { color: #263c5b; text-decoration: underline; font-weight: 600; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+/* Contraste AA (4.5:1) para TEXTO dorado sobre fondos claros: el dorado de
+   marca (#c9a84c, 2.3:1 sobre blanco) queda para íconos y bordes
+   decorativos; el texto usa un tono más oscuro de la misma familia. */
+:root { --gold-text: #7d6420; --muted-foreground: #5b6472; }
+.wizard-info-link a,
+.protege-link,
+.plan-price-annual,
+.plan-price-initial strong,
+.step-number,
+.storytelling-eyebrow,
+.chat-bubble .service-card .service-price,
+.btn-add-family { color: var(--gold-text); }
+.toast.error { background: #b91c1c; }
